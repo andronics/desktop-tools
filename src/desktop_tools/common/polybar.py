@@ -2,9 +2,10 @@
 
 polybar 3.7 listens on one Unix stream socket per bar, `$XDG_RUNTIME_DIR/polybar/ipc.<pid>.sock`.
 A message is a 13-byte header then the payload: the magic `polyipc`, a version byte (0), the
-payload's length (uint32, little-endian) and a type byte (0 a command such as `restart`, 1 an
+payload's length (uint32, little-endian) and a type byte (1 a command such as `restart`, 2 an
 action such as `#audio-level.hook.0`). The bar answers with the same header, type 0 for OK or
-255 for an error with its message as the payload.
+255 for an error with its message as the payload; it refuses any other type it is sent,
+0 included.
 
 barctl speaks this itself instead of starting a `polybar-msg` per message. When a bar answers
 in a format it doesn't recognise (another magic or version), it falls back to `polybar-msg`,
@@ -32,10 +33,12 @@ from desktop_tools.common import paths
 MAGIC = b"polyipc"
 VERSION = 0
 HEADER = struct.Struct("<7sBIB")
-TYPE_CMD = 0
-TYPE_ACTION = 1
-TYPE_OK = 0
-TYPE_ERR = 255
+# The type byte, as polybar 3.7's include/ipc/msg.hpp defines it: TYPE_OK and TYPE_ERR, then
+# v0::ipc_type (the protocol's type_t values). tests/fixtures holds a copy the tests pin these to.
+TYPE_CMD = 1  # msg.hpp v0::ipc_type::CMD
+TYPE_ACTION = 2  # msg.hpp v0::ipc_type::ACTION
+TYPE_OK = 0  # msg.hpp TYPE_OK
+TYPE_ERR = 255  # msg.hpp TYPE_ERR
 PING = "#barctl-ping.ping"  # an action no module has: every bar answers it, nothing happens
 TIMEOUT = 2.0
 

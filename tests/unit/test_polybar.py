@@ -4,24 +4,44 @@ fake /proc. Nothing here reaches a real bar."""
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from desktop_tools.common import polybar
+from tests import fakes
 from tests.fakes import FakeBar, calls
+
+MSG_HPP = Path(__file__).resolve().parents[1] / "fixtures" / "polybar-3.7.2-ipc-msg.hpp"
+
+
+def test_type_numbers_match_polybars_own_definition() -> None:
+    """barctl's numbers against polybar 3.7.2's include/ipc/msg.hpp (a copy in tests/fixtures)."""
+    text = MSG_HPP.read_text(encoding="utf-8")
+    found = {k: int(v) for k, v in re.findall(r"\b(TYPE_OK|TYPE_ERR|CMD|ACTION) = (\d+)", text)}
+    assert found == {"TYPE_OK": 0, "TYPE_ERR": 255, "CMD": 1, "ACTION": 2}
+    ours = (polybar.TYPE_OK, polybar.TYPE_ERR, polybar.TYPE_CMD, polybar.TYPE_ACTION)
+    assert ours == (found["TYPE_OK"], found["TYPE_ERR"], found["CMD"], found["ACTION"])
+    assert f"VERSION = {polybar.VERSION};" in text
+    assert (fakes.OK, fakes.CMD, fakes.ACTION, fakes.ERR) == (0, 1, 2, 255)
+
+
+def test_an_unknown_type_is_refused(bar: FakeBar) -> None:
+    reply = polybar.send(bar.path, 0, "show")
+    assert (reply.ok, reply.message) == (False, "Unrecognized IPC message type 0")
 
 
 def test_poke_sends_the_hook_action(bar: FakeBar) -> None:
     assert polybar.sockets() == {4242: bar.path}
     assert polybar.poke("audio-level") == {4242: True}
-    assert bar.messages == [(polybar.TYPE_ACTION, "#audio-level.hook.0")]
+    assert bar.messages == [(fakes.ACTION, "#audio-level.hook.0")]
 
 
 def test_command_and_ping(bar: FakeBar) -> None:
     assert polybar.command("hide") == {4242: True}
-    assert bar.messages[-1] == (polybar.TYPE_CMD, "hide")
+    assert bar.messages[-1] == (fakes.CMD, "hide")
     reply = polybar.ping(4242)
     assert reply is not None and reply.ok and reply.known and reply.version == 0
     assert "ok=True" in repr(reply)
@@ -103,7 +123,7 @@ def test_restart_in_place(bar: FakeBar, isolate: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(polybar, "alive", lambda pid: True)
     result = polybar.restart(wait=1, sleep=lambda s: None)
     assert result.ok and result.restarted == [4242]
-    assert (polybar.TYPE_CMD, "restart") in bar.messages
+    assert (fakes.CMD, "restart") in bar.messages
 
 
 def test_restart_relaunches_a_frozen_bar(
