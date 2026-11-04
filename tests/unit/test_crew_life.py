@@ -244,7 +244,7 @@ def test_stop_all_asks_once_and_yes_forces_the_unclean(desk: Desk) -> None:
     assert life.stop_all(reg) == 0
     rofi = desk.calls("rofi")
     assert len(rofi) == 1
-    assert rofi[0][-2:] == ["-p", "notes not clean for homelab, media: stop all anyway?"]
+    assert rofi[0][-4:] == ["-p", "crew", "-mesg", "notes not clean for homelab, media: stop all anyway?"]
     assert rofi[0][rofi[0].index("-selected-row") + 1] == "1"  # No is selected
     assert desk.lifecycle()[3:] == [
         ["homelab", "stop", "--force", "--reason", life.ALL_YES],

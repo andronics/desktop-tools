@@ -23,13 +23,17 @@ from __future__ import annotations
 import shutil
 import subprocess
 import time
+from pathlib import Path
 
 from desktop_tools.common import paths
 from desktop_tools.crew import log, metacall, switch, tmux, wm
 from desktop_tools.crew.registry import Coordinator, Registry, valid_name
 
 OK, FAILED, USAGE = 0, 1, 2
-CONFIRM_THEME = "prompt"  # coord's confirm theme, ~/.config/rofi/themes/prompt.rasi
+# The Yes/No's rofi theme, the first found in ~/.config/rofi/themes: dotfiles' confirm.rasi (the
+# question in full over two rows, nothing to type), else the one-line prompt.rasi it replaced.
+CONFIRM_THEMES = ("confirm", "prompt")
+CONFIRM_PROMPT = "crew"  # rofi's -p; the question is the -mesg, where a long one wraps
 FORCED = "Stephen: crew stop --force"
 ALL_YES = "Stephen: Yes to stop all anyway"
 ALL_FLAG = "Stephen: crew stop --all --yes"
@@ -65,6 +69,11 @@ class Unasked(Exception):
     caller fails instead of going back a level."""
 
 
+def _confirm_theme() -> Path | None:
+    themes = paths.config_home() / "rofi" / "themes"
+    return next((t for n in CONFIRM_THEMES if (t := themes / f"{n}.rasi").is_file()), None)
+
+
 def _ask(question: str) -> bool | str:
     """One Yes/No: True on Yes, False on No (Escape, Return on the selected No), else why it
     couldn't be shown. It opens only once the click that picked it has landed (`SETTLE`): a rofi
@@ -75,14 +84,14 @@ def _ask(question: str) -> bool | str:
     from desktop_tools.barmenu import menus as bm
 
     bm.settle(SETTLE)
-    theme = paths.config_home() / "rofi" / "themes" / f"{CONFIRM_THEME}.rasi"
     argv = ["rofi", "-dmenu", "-i", "-no-custom", "-format", "s", "-selected-row", "1"]
-    argv += ["-theme", str(theme)] if theme.is_file() else []
+    argv += ["-theme", str(theme)] if (theme := _confirm_theme()) else []
+    mesg = question.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     started = time.monotonic()
     try:
         # S603/S607: rofi with crew's fixed options; it blocks until answered.
         done = subprocess.run(  # noqa: S603
-            [*argv, "-p", question],
+            [*argv, "-p", CONFIRM_PROMPT, "-mesg", mesg],
             input="Yes\nNo\n",
             capture_output=True,
             text=True,

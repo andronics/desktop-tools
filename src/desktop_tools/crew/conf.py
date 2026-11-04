@@ -17,7 +17,7 @@
     CREW_MENU_THEME        unset     the full menu's rofi theme (a name in rofi/themes, or a path);
                                      unset, `crew`, else coord's `coord` until it is renamed
     CREW_CONFIRM_THEME     prompt    the rofi theme of the full menu's second level (the Yes/No
-                                     questions are `life.confirm`'s, in `prompt`)
+                                     questions are `life.confirm`'s, in `confirm`)
 
 Folders: `$XDG_RUNTIME_DIR/crew/` (each coordinator's activity, the locks) and
 `$XDG_STATE_HOME/crew/` (width, side, last shown, the registry's last good copy).
