@@ -16,6 +16,7 @@ dependencies = [
 desktop-tools = "desktop_tools.cli:main"
 barctl = "desktop_tools.barctl.cli:main"
 barmenu = "desktop_tools.barmenu.cli:main"
+crew = "desktop_tools.crew.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/andronics/desktop-tools"

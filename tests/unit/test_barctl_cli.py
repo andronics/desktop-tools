@@ -335,7 +335,7 @@ def test_desktop_tools_mounts_the_tools(isolate: Path, monkeypatch: pytest.Monke
     out = isolate / "completions"
     r = runner.invoke(top, ["completions", "zsh", "--out", str(out)])
     assert r.exit_code == 0
-    assert sorted(p.name for p in out.iterdir()) == ["_barctl_cmd", "_barmenu_cmd"]
+    assert sorted(p.name for p in out.iterdir()) == ["_barctl_cmd", "_barmenu_cmd", "_crew_cmd"]
     assert runner.invoke(top, ["completions", "bash", "--out", str(out)]).exit_code == 2
 
 

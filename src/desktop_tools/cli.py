@@ -47,9 +47,11 @@ def _mount() -> None:
     `barctl status` are the same command."""
     from desktop_tools.barctl.app import app as barctl
     from desktop_tools.barmenu.cli import app as barmenu
+    from desktop_tools.crew.app import app as crew
 
     app.add_typer(barctl, name="barctl")
     app.add_typer(barmenu, name="barmenu")
+    app.add_typer(crew, name="crew")
 
 
 _mount()
@@ -60,7 +62,8 @@ def completions(
     shell: Annotated[str, typer.Argument(help="The shell: zsh.")],
     out: Annotated[Path, typer.Option("--out", help="The folder to write them into.")],
 ) -> None:
-    """Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`) for this version."""
+    """Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`, `_crew_cmd`) for this
+    version."""
     from desktop_tools import completions as comp
 
     if shell != "zsh":
