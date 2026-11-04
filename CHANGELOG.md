@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/andronics/desktop-tools/compare/v0.1.6...v0.1.7) (2026-11-04)
+
+
+### 🐛 Bug Fixes
+
+* **crew:** the quick menu's Stop and Restart always ask, then act ([#23](https://github.com/andronics/desktop-tools/issues/23)) ([2fe474a](https://github.com/andronics/desktop-tools/commit/2fe474a5c2356781223293dca15bb8260a95da93))
+
 ## [0.1.6](https://github.com/andronics/desktop-tools/compare/v0.1.5...v0.1.6) (2026-11-04)
 
 
