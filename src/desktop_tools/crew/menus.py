@@ -123,7 +123,12 @@ def act(reg: Registry, c: Coordinator, row: Row) -> int:
         return stopping.end(target, life[1], ask_first=item.confirm)
     if item.confirm and not stopping.confirm(f"{c.name}: {item.label}?"):
         return stopping.DECLINED
-    return items.run(c, item)
+    code = items.run(c, item)
+    if item.kind == "meta" and item.args[1:2] == ["launch"]:
+        # Launch starts the session hidden, as record 0019 §7a's item 2 says (no window); the
+        # strip shows it running at once rather than at the next hook.
+        switch.refresh(reg)
+    return code
 
 
 def quick(reg: Registry, name: str) -> int:

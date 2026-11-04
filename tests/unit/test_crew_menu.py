@@ -172,6 +172,10 @@ def test_quick_menu_for_a_stopped_one_offers_launch(menu_desk: Desk) -> None:
     assert quick_pick(menu_desk, reg, "ventures", "Launch") == 0
     assert rofi_rows(menu_desk, 0)[:2] == ["Show", "Launch"]
     assert menu_desk.launched() == ["ventures"]
+    from desktop_tools.barctl import state as bst
+
+    strip = (bst.read("crew") or {}).get("segments", [])
+    assert [(s["id"], s["tier"]) for s in strip] == [("ventures", "idle")]  # refreshed: running
     assert [n[-2:] for n in menu_desk.notified()][-1] == [
         "ventures: Launch",
         "ventures: launched in tmux session ventures-coordinator",
