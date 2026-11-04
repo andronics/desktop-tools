@@ -322,10 +322,17 @@ def open_menu(menu: Menu, extra: list[str] | None = None) -> Row | None:
     if picked is None:
         return None
     row = menu.rows[picked]
-    if menu.settle:
-        time.sleep(menu.settle)
+    settle(menu.settle)
     procs.detach(row.argv())
     return row
+
+
+def settle(seconds: float) -> None:
+    """Let a rofi that has just closed finish closing (its fade, the click that closed it)
+    before what follows starts: a screenshot never catches it, a second rofi never gets its
+    click. barmenu's picks and crew's Yes/No both wait here."""
+    if seconds > 0:
+        time.sleep(seconds)
 
 
 def run(argv: list[str]) -> int:

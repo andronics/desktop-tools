@@ -21,6 +21,7 @@ from __future__ import annotations
 from desktop_tools.crew import items, life, metacall, switch
 from desktop_tools.crew.registry import Coordinator, Registry
 
+Unasked = life.Unasked  # a Yes/No that couldn't be shown (Stephen told): no No, a failure
 DECLINED = -1  # Stephen said No: a menu goes back a level instead of closing
 NOT_CLEAN = 1
 DONE = {"launch": "launched", "stop": "stopped", "restart": "restarted"}
@@ -65,7 +66,15 @@ def _forced(reg: Registry, c: Coordinator, verb: str, reason: str) -> int:
 
 def end(reg: Registry, c: Coordinator, verb: str, *, ask_first: bool) -> int:
     """Launch, stop or restart one coordinator for a menu: 0 done, else meta's code (notified),
-    or DECLINED. `ask_first` is the item's own Yes/No."""
+    DECLINED, or 1 when a Yes/No couldn't be shown (notified, nothing ended). `ask_first` is the
+    item's own Yes/No."""
+    try:
+        return _end(reg, c, verb, ask_first=ask_first)
+    except Unasked:
+        return switch.FAILED
+
+
+def _end(reg: Registry, c: Coordinator, verb: str, *, ask_first: bool) -> int:
     if verb == "launch":
         return _plain(reg, c, verb)
     only = c.stephen_only

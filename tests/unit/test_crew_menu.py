@@ -8,13 +8,14 @@ own server. Detached children are recorded, not run (alacritty runs, to add its 
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from desktop_tools.crew import items, menus, registry, stopping
+from desktop_tools.crew import items, life, menus, registry, stopping
 from desktop_tools.crew.registry import Registry
 from tests.crew_fakes import ROFI_SEQ, XCLIP, Desk
 
@@ -749,6 +750,156 @@ def test_every_one_only_stephen_ends_is_asked_and_confirmed(menu_desk: Desk, ver
     assert meta_calls(menu_desk)[-1] == ["desktop", verb]
 
 
+# ------------------------------------------- Stop and Restart from a click (the click-test)
+
+# crew's real waits, kept before make_desk zeroes them for speed (absent before the fix).
+REAL_WAITS = {k: getattr(life, k) for k in ("SETTLE", "UNSHOWN") if hasattr(life, k)}
+
+
+def platform_running(desk: Desk) -> Registry:
+    reg = reg_of(desk, "platform")
+    desk.session("platform-coordinator")
+    serve(desk, "platform", PLATFORM_MENU)
+    return reg
+
+
+def unshown(desk: Desk) -> list[str]:
+    path = desk.base / "rofi-unshown"
+    return path.read_text().split() if path.exists() else []
+
+
+def drawn(row: str) -> str:
+    return row.rsplit("</span> ", 1)[-1]  # the label, without its glyph
+
+
+@pytest.mark.parametrize("verb", ["Stop", "Restart"])
+def test_a_question_opened_on_the_menus_click_is_still_asked(
+    menu_desk: Desk, monkeypatch: pytest.MonkeyPatch, verb: str
+) -> None:
+    """The click-test: Stop from platform's quick menu did nothing. A rofi started the instant
+    the menu's rofi closed closes at once (the menu's own click lands on it), which read as No:
+    exit 0, meta never called. crew now waits for the click to land, so it is asked."""
+    for name, value in REAL_WAITS.items():
+        monkeypatch.setattr(life, name, value)
+    reg = platform_running(menu_desk)
+    menu_desk.put("rofi-race", "0.15")
+    answers(menu_desk, "")
+    assert menus.quick(reg, "platform") == 0
+    pick = index_of(menu_desk, verb)
+    clear_rofi(menu_desk)
+    (menu_desk.base / "rofi-closed").unlink()  # the menu itself opens long after the last
+    answers(menu_desk, pick, "Yes")
+    assert menus.quick(reg, "platform") == 0
+    assert unshown(menu_desk) == []
+    v = verb.lower()
+    assert meta_calls(menu_desk)[-2:] == [["platform", "stop", "--check"], ["platform", v]]
+
+
+def platform_paths() -> list[tuple[str, ...]]:
+    """Every row of platform's quick menu while it runs, as the labels picked to reach it."""
+    found = items.parse(PLATFORM_MENU)
+    assert found is not None
+    paths: list[tuple[str, ...]] = [("Show",)]
+    for i in found:
+        if not items.applies(i, True):
+            continue
+        if i.kind == items.LIST:
+            paths += [(i.label, s.label) for s in i.items if items.applies(s, True)]
+        else:
+            paths.append((i.label,))
+    return paths
+
+
+def test_the_paths_cover_every_drawn_row(menu_desk: Desk) -> None:
+    reg = platform_running(menu_desk)
+    answers(menu_desk, "")
+    menus.quick(reg, "platform")
+    tops = [drawn(r) for r in rofi_rows(menu_desk, 0)]
+    paths = platform_paths()
+    assert tops == list(dict.fromkeys(p[0] for p in paths))
+    assert len(paths) > len(tops)  # Repos on GitHub holds rows of its own
+
+
+@pytest.mark.parametrize("path", platform_paths(), ids=lambda p: "/".join(p))
+def test_each_label_runs_its_own_item(
+    menu_desk: Desk, monkeypatch: pytest.MonkeyPatch, path: tuple[str, ...]
+) -> None:
+    """The row picked by its label runs that row's item, never a neighbour's: rofi's index is
+    read back against the very rows drawn."""
+    from desktop_tools.crew import switch
+
+    reg = platform_running(menu_desk)
+    ran: list[tuple[str, ...]] = []
+
+    def record(*what: str) -> int:
+        ran.append(what)
+        return 0
+
+    monkeypatch.setattr(switch, "toggle", lambda reg, name, **kw: record("toggle"))
+    monkeypatch.setattr(items, "run", lambda c, item: record("run", item.label))
+    monkeypatch.setattr(
+        stopping, "end", lambda reg, c, verb, *, ask_first: record(verb, str(ask_first))
+    )
+    picks: list[str] = []
+    for depth, label in enumerate(path):
+        clear_rofi(menu_desk)
+        answers(menu_desk, *picks, "", "")  # learn this level's rows, then Escape out
+        menus.quick(reg, "platform")
+        rows = [drawn(r) for r in rofi_rows(menu_desk, depth)]
+        assert rows.count(label) == 1, rows
+        picks.append(str(rows.index(label)))
+    ran.clear()
+    clear_rofi(menu_desk)
+    answers(menu_desk, *picks)
+    assert menus.quick(reg, "platform") == 0
+    found = items.parse(PLATFORM_MENU)
+    assert found is not None
+    flat = {i.label: i for i in found} | {s.label: s for i in found for s in i.items}
+    if path == ("Show",):
+        assert ran == [("toggle",)]
+    elif (life_of := flat[path[-1]].lifecycle()) is not None:
+        assert ran == [(life_of[1], str(flat[path[-1]].confirm))]
+    else:
+        assert ran == [("run", path[-1])]
+
+
+@pytest.mark.parametrize("verb", ["Stop", "Restart"])
+def test_a_question_that_fails_once_is_asked_again(
+    menu_desk: Desk, capsys: pytest.CaptureFixture[str], verb: str
+) -> None:
+    reg = platform_running(menu_desk)
+    menu_desk.put("rofi-fails", "1")
+    assert quick_pick(menu_desk, reg, "platform", verb, "Yes") == 0
+    assert unshown(menu_desk) == ["grab"]
+    v = verb.lower()
+    assert meta_calls(menu_desk)[-2:] == [["platform", "stop", "--check"], ["platform", v]]
+    assert f"cannot ask (platform: {v} it?)" in capsys.readouterr().err  # the journal's warning
+
+
+@pytest.mark.parametrize("verb", ["Stop", "Restart"])
+def test_a_question_that_cannot_be_shown_is_no_no(
+    menu_desk: Desk, capsys: pytest.CaptureFixture[str], verb: str
+) -> None:
+    """Twice unshown: Stephen is told it couldn't ask, nothing runs and crew exits 1."""
+    reg = platform_running(menu_desk)
+    menu_desk.put("rofi-fails", "2")
+    assert quick_pick(menu_desk, reg, "platform", verb, "Yes") == 1
+    assert unshown(menu_desk) == ["grab", "grab"]
+    assert meta_calls(menu_desk)[-1] == ["platform", "menu", "--json"]  # nothing ended
+    title, body = menu_desk.notified()[-1][-2:]
+    assert title == "couldn't ask: Failed to grab keyboard after 500 times. Giving up."
+    assert body == f"platform: {verb.lower()} it? Nothing was done."
+    assert "cannot ask" in capsys.readouterr().err
+
+
+def test_no_from_platforms_quick_menu_runs_nothing(menu_desk: Desk) -> None:
+    reg = platform_running(menu_desk)
+    for verb in ("Stop", "Restart"):
+        assert quick_pick(menu_desk, reg, "platform", verb, "No") == 0
+    assert meta_calls(menu_desk) == [["platform", "menu", "--json"]] * 4
+    assert unshown(menu_desk) == []
+
+
 # ---------------------------------------------------------------- the full menu
 
 
@@ -940,3 +1091,21 @@ def test_view_needs_its_pager_and_names_files_safely(menu_desk: Desk) -> None:
     (menu_desk.base / "bin" / "less").unlink()
     assert items.view(c, item, "text") == 1
     assert menu_desk.notified()[-1][-1] == "exit 127: less is not on PATH"
+
+
+def test_a_question_closed_at_once_is_unshown_and_says_why(
+    menu_desk: Desk, monkeypatch: pytest.MonkeyPatch, commands: Callable[..., Path]
+) -> None:
+    """No settle: each try opens on the last rofi's heels and closes unseen, twice."""
+    monkeypatch.setattr(life, "UNSHOWN", REAL_WAITS["UNSHOWN"])
+    menu_desk.put("rofi-race", "60")
+    menu_desk.put("rofi-closed", repr(time.monotonic()))
+    with pytest.raises(stopping.Unasked, match=r"^rofi closed after \d+ ms"):
+        stopping.confirm("go?")
+    assert unshown(menu_desk) == ["race", "race"]
+    commands(rofi="sys.stderr.write('rofi: boom\\n'); sys.exit(2)")
+    with pytest.raises(stopping.Unasked, match=r"^rofi exited 2: rofi: boom$"):
+        stopping.confirm("go?")
+    commands(rofi="sys.exit(1)")  # Escape after the question was seen: No
+    monkeypatch.setattr(life, "UNSHOWN", 0.0)
+    assert stopping.confirm("go?") is False

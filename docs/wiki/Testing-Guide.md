@@ -55,4 +55,7 @@ the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_
   `time.sleep`: subprocess's wait loop sleeps too.
 - **crew's menus** (`tests/unit/test_crew_menu.py`): the quick menu runs on meta's real JSON
   (`tests/fixtures/meta-menu-*.json`, from the live `meta <name> menu --json` with its paths made generic). The fake
-  rofi answers from `rofi-answers`, one line per call ("" is Escape), and keeps each call's rows.
+  rofi answers from `rofi-answers`, one line per call ("" is Escape), and keeps each call's rows. `rofi-race`
+  (seconds) makes a rofi started that soon after the last one closed close at once, as the menu's own click makes the
+  real one do; `rofi-fails` (a count) fails that many Yes/No questions as a grab failure does. `make_desk` turns
+  crew's Yes/No waits off (`life.SETTLE`, `life.UNSHOWN`); the tests of them set them back.

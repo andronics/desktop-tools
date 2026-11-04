@@ -64,6 +64,14 @@ After Yes, crew runs `meta brain stop --confirmed` (or `restart`), and meta take
 sxhkd was started from a coordinator's or agent's environment: restart it from a clean session. A terminal works
 too: `meta brain stop`. The same goes for the arbiter, and any coordinator the registry marks `ended_by: "stephen"`.
 
+### A menu says "couldn't ask: …"
+
+crew's Yes/No (rofi's `prompt` theme) closed before it could be answered, twice, so nothing was done and crew
+exited 1. The reason is rofi's own line (another rofi running, a keyboard it couldn't grab, no display) or "closed after
+… ms": a rofi that opens while the menu's click is still landing takes that click as one outside it. crew waits
+0.3 s for it first; each try is a warning in `journalctl --user -t crew`. Try the item again; if it keeps happening,
+close any other rofi.
+
 ### A quick-menu item says "there is a problem" or "not found"
 
 Neither is a failure. meta's exit 1 is a result whose answer is "there is a problem" (a `status` with a warning):
