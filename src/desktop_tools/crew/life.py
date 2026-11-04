@@ -33,7 +33,9 @@ OK, FAILED, USAGE = 0, 1, 2
 # The Yes/No's rofi theme, the first found in ~/.config/rofi/themes: dotfiles' confirm.rasi (the
 # question in full over two rows, nothing to type), else the one-line prompt.rasi it replaced.
 CONFIRM_THEMES = ("confirm", "prompt")
-CONFIRM_PROMPT = "crew"  # rofi's -p; the question is the -mesg, where a long one wraps
+# rofi's -p in confirm, where the question is the -mesg and a long one wraps. prompt.rasi has no
+# message, so there (and with neither theme) the question stays the -p as well.
+CONFIRM_PROMPT = "crew"
 FORCED = "Stephen: crew stop --force"
 ALL_YES = "Stephen: Yes to stop all anyway"
 ALL_FLAG = "Stephen: crew stop --all --yes"
@@ -85,13 +87,15 @@ def _ask(question: str) -> bool | str:
 
     bm.settle(SETTLE)
     argv = ["rofi", "-dmenu", "-i", "-no-custom", "-format", "s", "-selected-row", "1"]
-    argv += ["-theme", str(theme)] if (theme := _confirm_theme()) else []
+    theme = _confirm_theme()
+    argv += ["-theme", str(theme)] if theme else []
+    shown = theme is not None and theme.stem == CONFIRM_THEMES[0]
     mesg = question.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     started = time.monotonic()
     try:
         # S603/S607: rofi with crew's fixed options; it blocks until answered.
         done = subprocess.run(  # noqa: S603
-            [*argv, "-p", CONFIRM_PROMPT, "-mesg", mesg],
+            [*argv, "-p", CONFIRM_PROMPT if shown else question, "-mesg", mesg],
             input="Yes\nNo\n",
             capture_output=True,
             text=True,

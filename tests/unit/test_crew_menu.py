@@ -608,9 +608,12 @@ def test_without_confirm_the_question_falls_back_to_prompt(menu_desk: Desk, isol
     argv = rofi_calls(menu_desk)[-1]
     assert argv[argv.index("-theme") + 1] == str(themes / "prompt.rasi")
     assert argv[argv.index("-mesg") + 1] == "go?"
+    assert argv[argv.index("-p") + 1] == "go?"  # prompt.rasi shows no message: the -p as before
     (themes / "prompt.rasi").unlink()
     assert not stopping.confirm("go?")
-    assert "-theme" not in rofi_calls(menu_desk)[-1]  # neither: rofi's own
+    argv = rofi_calls(menu_desk)[-1]
+    assert "-theme" not in argv  # neither: rofi's own
+    assert argv[argv.index("-p") + 1] == "go?"
 
 
 def test_the_question_is_pango_escaped(menu_desk: Desk) -> None:
