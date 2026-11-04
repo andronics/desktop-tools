@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from desktop_tools.barctl import state as bst
-from desktop_tools.crew import hook, registry, store, strip, switch
+from desktop_tools.crew import hook, registry, store, strip, switch, wm
 from tests.crew_fakes import Desk
 from tests.fakes import FakeBar, run
 
@@ -271,3 +271,31 @@ def test_no_notify_send_no_notification(desk: Desk) -> None:
     (desk.base / "bin" / "notify-send").unlink()
     desk.coordinators("desktop")
     assert switch.notify_waiting(registry.load(), "desktop", "x") == 0
+
+
+def test_scan_against_a_real_tmux_on_its_own_socket(
+    isolate: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fake tmux's answers, checked once against a real tmux: its own server on a socket in
+    tmp_path (-S), the cleanup naming it too, never the default server or TMUX_TMPDIR."""
+    import shutil
+    import subprocess
+
+    # The binary itself: a wrapper earlier on the developer's PATH (a tmux guard) is not run.
+    real = shutil.which("tmux", path="/usr/bin:/bin")
+    if real is None:
+        pytest.skip("no tmux installed")
+    (isolate / "real" / "tmux").symlink_to(real)
+    (isolate / "bin" / "tmux").unlink()  # the tripwire
+    sock = isolate / "tmux.sock"
+    monkeypatch.setenv("CREW_TMUX_SOCKET", str(sock))
+    monkeypatch.delenv("TMUX", raising=False)
+    base = [real, "-S", str(sock), "-f", "/dev/null"]
+    try:
+        subprocess.run(  # noqa: S603 - the test's own server
+            [*base, "new-session", "-d", "-s", "crewtest-coordinator", "sleep 600"], check=True
+        )
+        reg = registry.Registry([registry.Coordinator("crewtest", isolate, "crewtest-coordinator")])
+        assert strip.scan(reg, tree=wm.Tree()).running == {"crewtest"}
+    finally:
+        subprocess.run([*base, "kill-server"], check=False, capture_output=True)  # noqa: S603

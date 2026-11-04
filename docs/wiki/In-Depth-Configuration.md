@@ -64,6 +64,14 @@ list of arguments) and `dynamic` (a barctl module whose source's rows are append
 | `BARCTL_POLYBAR_WAIT` | Seconds a restarted bar has to answer before it counts as frozen (6) |
 | `BARCTL_POLYBAR_CONFIG` | The polybar config `doctor` reads (default `$XDG_CONFIG_HOME/polybar`) |
 | `THEME_STATE_DIR` | Where the current theme is (default `$XDG_STATE_HOME/theme`) |
+| `CREW_CLASS`, `CREW_OLD_CLASS` | crew's window class (`crew`) and the second one it matches until coord's windows close (`coord`; empty for none) |
+| `CREW_ACTORS_DIR` | Where the coordinators' homes are (`/pool/local/actors`) |
+| `CREW_TMUX_SOCKET` | Another tmux server for crew: a path is `-S`, a name `-L` (tests); unset, the default server |
+| `CREW_LAUNCH_TIMEOUT` | Seconds crew waits for a window or a lock (10) |
+| `CREW_GUARD_SETTLE` | Seconds of quiet after a crew window's last event before the guard re-docks (0.2) |
+| `CREW_REGISTRY_MAX_AGE` | Seconds the registry's kept copy is used before `meta` is asked again (300; 0 asks every time) |
+| `CREW_BAR_TTL` | Seconds a pushed strip holds before barctl shows it stale (3600) |
+| `CREW_DEBUG` | `1`: crew's debug lines on stderr |
 | `TOOL_STATS=skip`, `TOOL_JOURNAL=off` | No run record; nothing to the journal (brain record 0017) |
 
 ## Secrets
@@ -88,10 +96,13 @@ pusher = "crew"
 display = "icon"
 
 [modules.crew.segment_clicks]
-left = ["crew", "toggle", "{segment}"]
-right = ["crew", "quick", "{segment}"]
-middle = ["crew", "menu"]
+left = ["crew", "toggle", "--launch", "{segment}"]
+scroll-up = ["crew", "cycle", "prev"]
+scroll-down = ["crew", "cycle", "next"]
 ```
+
+A segment may carry `"underline": true` (crew marks the shown coordinator with it), drawn in the theme's `accent`.
+The menus (`right = ["crew", "quick", "{segment}"]`, `middle = ["crew", "menu"]`) come with crew's menu.
 
 ```sh
 barctl push crew --json - --ttl 10m <<<'{"source": "crew", "segments": [{"id": "brain", "tier": "alert", "glyph": "…"}]}'

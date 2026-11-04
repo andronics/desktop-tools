@@ -250,7 +250,8 @@ VPN menu: CONNECT, Disconnect, Information
 
 ### `desktop-tools completions`
 
-Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`) for this version.
+Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`, `_crew_cmd`) for this
+version.
 
 | Argument | Description |
 |---|---|
@@ -267,6 +268,130 @@ Print the effective configuration and where each value came from. Secrets: set o
 | Option | Environment variable | Description |
 |---|---|---|
 | `--config`, `-c` | `DESKTOP_TOOLS_CONFIG` | Config file (default /etc/desktop-tools/config.yaml; missing is fine). |
+
+### `desktop-tools crew bar`
+
+Push the strip (a cell per coordinator) to barctl's `crew` module and print its line.
+
+Tiers: dim not running, fg_dim idle, accent busy, urgent waiting; the shown one underlined.
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--quiet` |  | Push only; print nothing. |
+
+### `desktop-tools crew cycle`
+
+Show the next or previous running coordinator in menu order, wrapping.
+
+Stopped ones are skipped. With none shown, the last one shown comes back (or the first).
+With none running, crew says so and exits 1.
+
+| Argument | Description |
+|---|---|
+| `DIRECTION` | next or prev. |
+
+### `desktop-tools crew guard`
+
+Keep the shown coordinator docked (started detached by every show; exits when none is).
+
+After a drag, a resize or a tiling, the panel goes back to floating at the stored side and
+width once bspwm's events settle. A singleton: a second one exits at once.
+
+### `desktop-tools crew hide`
+
+Hide the shown coordinator, focused or not, and give its strip back.
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--toggle` |  | With none shown, show the last one shown (or the first), if running. |
+
+### `desktop-tools crew list`
+
+List crew's windows and whether each is hidden or visible.
+
+### `desktop-tools crew names`
+
+List the coordinators crew knows, in menu order, from the registry.
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--keys` |  | Each with its menu key first. |
+
+### `desktop-tools crew notify`
+
+The waiting notification, run detached by `status`; its click shows the coordinator.
+
+| Argument | Description |
+|---|---|
+| `NAME` | A coordinator, as `crew names` lists them. |
+| `BODY` |  |
+
+### `desktop-tools crew show`
+
+Show a coordinator docked, never hiding it and never starting it (exit 1 if stopped).
+
+| Argument | Description |
+|---|---|
+| `NAME` | A coordinator, as `crew names` lists them. |
+
+### `desktop-tools crew side`
+
+Print the dock side, or set it, re-docking a shown coordinator.
+
+| Argument | Description |
+|---|---|
+| `VALUE` | left or right. |
+
+### `desktop-tools crew status`
+
+Claude Code hook: read the hook's JSON on stdin and record the coordinator busy, idle or
+waiting. Always exits 0 and prints nothing.
+
+Only sessions under the actors folder count. Entering waiting raises a notification whose
+click shows the coordinator; every change refreshes the strip.
+
+| Argument | Description |
+|---|---|
+| `EVENT` | Overrides the hook's event name. |
+
+### `desktop-tools crew stopped`
+
+The desktop half of a stop, run by the brain's stop script after it ends a session.
+
+Drops the coordinator's state, waits for its window to close, gives the dock strip back and
+refreshes the strip. Works without DISPLAY. Exit 1 if a window is still open.
+
+| Argument | Description |
+|---|---|
+| `NAMES...` |  |
+
+### `desktop-tools crew toggle`
+
+Hide a coordinator if it is shown and focused, else show it docked.
+
+A stopped coordinator is not started: crew says it is stopped and exits 1, unless --launch
+is given, which starts it through `meta <name> launch` and shows its window.
+
+| Argument | Description |
+|---|---|
+| `NAME` | A coordinator, as `crew names` lists them. |
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--launch` |  | Start it if it is stopped (the bar glyph's left click). |
+
+### `desktop-tools crew width`
+
+Print the dock panel's visible width, or set it (640 to 2560), resizing a shown panel.
+
+`left` and `right` move the panel's inner edge (by 128, or N): docked right, left widens it;
+docked left, left narrows it. A width set but not printed (sxhkd's stdout gone) is not a
+failure.
+
+| Argument | Description |
+|---|---|
+| `VALUE` | N, +N, -N, or left or right to move the inner edge. |
+| `STEP` | How far left or right moves it. |
 
 ### `desktop-tools version`
 
@@ -288,7 +413,13 @@ barctl uses the `meta` codes (brain record 0019): 1 is an answer ("a problem fou
 (`push` to a module the caller may not write), 4 a failure (`modules.toml` broken, a command that can't start), 5 not
 found (an unknown module).
 
+crew keeps coord's codes: 0 done, 1 failed or refused (a stopped coordinator shown without `--launch`, a lock busy, a
+width that couldn't be written: each says why on stderr), 2 bad usage. `crew status` always exits 0.
+
 ```sh
+crew toggle --launch desktop            # the glyph's left click: starts it if stopped
+crew cycle next                         # the next running coordinator
+crew width left                         # move the panel's inner edge left
 barctl push crew --source crew --tier alert --label waiting --ttl 10m
 barctl alert crew --for 1m
 barctl click player-play-pause left     # what the module's action tag runs

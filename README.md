@@ -16,6 +16,12 @@ the name and flags it had before. The design is the dotfiles' [record 0003](http
   `show`, `push`, `alert`, `menu`, `click`, `reload`, `restart`, `theme`, `enable`, `disable`, `watch`, `doctor`,
   `run`, `render`, `hide`, `unhide`.
 - **`barmenu`**, the bar's rofi menus, opened just above the clicked button: `barmenu <menu>`, `barmenu run <command>`.
+- **`crew`**, the coordinator switchboard (brain record 0019 §7, replacing the dotfiles' `coord`): one hidden
+  terminal per Claude Code coordinator, docked left or right when shown, with its strip in the bar (pushed to barctl)
+  and the Claude hooks' `crew status`. Showing never starts a stopped coordinator; only `crew toggle --launch` (the
+  glyph's left click) does, through `meta <name> launch`. Verbs: `toggle`, `show`, `hide`, `cycle`, `width`, `side`,
+  `guard`, `status`, `bar`, `list`, `names`, `stopped`. The wiki's
+  [Crew](https://github.com/andronics/desktop-tools/wiki/Crew) page has the rest.
 
 ## Quick Start
 
