@@ -1,0 +1,154 @@
+{
+ "meta": 1,
+ "centre": "desktop",
+ "verb": "menu",
+ "generated": "2026-11-04T05:44:20+00:00",
+ "cached": false,
+ "age_s": 0,
+ "stale": false,
+ "data": {
+  "running": true,
+  "items": [
+   {
+    "when": "running",
+    "output": "notify",
+    "confirm": true,
+    "id": "stop",
+    "label": "Stop",
+    "run": {
+     "meta": [
+      "desktop",
+      "stop"
+     ]
+    }
+   },
+   {
+    "when": "running",
+    "output": "notify",
+    "confirm": true,
+    "id": "restart",
+    "label": "Restart",
+    "run": {
+     "meta": [
+      "desktop",
+      "restart"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "none",
+    "confirm": false,
+    "id": "home",
+    "label": "Open home in VS Code",
+    "run": {
+     "edit": "/actors/desktop"
+    }
+   },
+   {
+    "when": "always",
+    "output": "view",
+    "confirm": false,
+    "id": "status",
+    "label": "Status",
+    "run": {
+     "meta": [
+      "desktop",
+      "status"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "view",
+    "confirm": false,
+    "id": "inbox",
+    "label": "Inbox",
+    "glyph": "U+F02FA",
+    "run": {
+     "meta": [
+      "brain",
+      "inbox",
+      "desktop"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "none",
+    "confirm": false,
+    "id": "note",
+    "label": "Actor note in Obsidian",
+    "run": {
+     "open": "obsidian://open?path=%2Fvault%2FCoordinator.md"
+    }
+   },
+   {
+    "when": "always",
+    "output": "view",
+    "confirm": false,
+    "id": "notes",
+    "label": "Resume notes",
+    "run": {
+     "meta": [
+      "desktop",
+      "notes"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "notify",
+    "confirm": false,
+    "id": "attach",
+    "label": "Copy attach command",
+    "run": {
+     "copy": "tmux attach -t desktop-coordinator"
+    }
+   },
+   {
+    "when": "always",
+    "output": "view",
+    "confirm": false,
+    "id": "agents",
+    "label": "Agents and work",
+    "run": {
+     "meta": [
+      "desktop",
+      "agents"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "none",
+    "confirm": false,
+    "id": "repo-andronics-dotfiles",
+    "label": "andronics/dotfiles",
+    "run": {
+     "open": "https://github.com/andronics/dotfiles"
+    }
+   },
+   {
+    "when": "always",
+    "output": "none",
+    "confirm": false,
+    "id": "repo-andronics-example",
+    "label": "andronics/example",
+    "run": {
+     "open": "https://github.com/andronics/example"
+    }
+   },
+   {
+    "when": "always",
+    "output": "none",
+    "confirm": false,
+    "id": "repo-andronics-desktop-tools",
+    "label": "andronics/desktop-tools",
+    "run": {
+     "open": "https://github.com/andronics/desktop-tools"
+    }
+   }
+  ]
+ }
+}

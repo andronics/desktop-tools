@@ -30,6 +30,8 @@ VERBS = [
     "names",
     "stopped",
     "notify",
+    "quick",
+    "menu",
 ]
 QUIET = frozenset({"guard", "notify"})  # started by crew itself: no run record of their own
 OWNER = "desktop-coordinator"

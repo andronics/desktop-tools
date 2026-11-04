@@ -1,0 +1,111 @@
+{
+ "meta": 1,
+ "centre": "ventures",
+ "verb": "menu",
+ "generated": "2026-11-04T05:45:08+00:00",
+ "cached": false,
+ "age_s": 0,
+ "stale": false,
+ "data": {
+  "running": false,
+  "items": [
+   {
+    "when": "stopped",
+    "output": "notify",
+    "confirm": false,
+    "id": "launch",
+    "label": "Launch",
+    "run": {
+     "meta": [
+      "ventures",
+      "launch"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "none",
+    "confirm": false,
+    "id": "home",
+    "label": "Open home in VS Code",
+    "run": {
+     "edit": "/actors/ventures"
+    }
+   },
+   {
+    "when": "always",
+    "output": "view",
+    "confirm": false,
+    "id": "status",
+    "label": "Status",
+    "run": {
+     "meta": [
+      "ventures",
+      "status"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "view",
+    "confirm": false,
+    "id": "inbox",
+    "label": "Inbox",
+    "glyph": "U+F02FA",
+    "run": {
+     "meta": [
+      "brain",
+      "inbox",
+      "ventures"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "none",
+    "confirm": false,
+    "id": "note",
+    "label": "Actor note in Obsidian",
+    "run": {
+     "open": "obsidian://open?path=%2Fvault%2FCoordinator.md"
+    }
+   },
+   {
+    "when": "always",
+    "output": "view",
+    "confirm": false,
+    "id": "notes",
+    "label": "Resume notes",
+    "run": {
+     "meta": [
+      "ventures",
+      "notes"
+     ]
+    }
+   },
+   {
+    "when": "always",
+    "output": "notify",
+    "confirm": false,
+    "id": "attach",
+    "label": "Copy attach command",
+    "run": {
+     "copy": "tmux attach -t ventures-coordinator"
+    }
+   },
+   {
+    "when": "always",
+    "output": "view",
+    "confirm": false,
+    "id": "agents",
+    "label": "Agents and work",
+    "run": {
+     "meta": [
+      "ventures",
+      "agents"
+     ]
+    }
+   }
+  ]
+ }
+}

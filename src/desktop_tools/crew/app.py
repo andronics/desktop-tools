@@ -242,3 +242,31 @@ def stopped(names_: Annotated[list[str], typer.Argument(metavar="NAMES...")]) ->
 def notify(name: Name, body: Annotated[str, typer.Argument()] = "") -> None:
     """The waiting notification, run detached by `status`; its click shows the coordinator."""
     _done(switch.notify_waiting(registry.load(refresh=False), name, body))
+
+
+@app.command()
+def quick(name: Name) -> None:
+    """Open one coordinator's quick menu above the pointer (its glyph's right click).
+
+    Show or Hide first, then what `meta <name> menu --json` offers for it, in meta's order:
+    Launch or Stop and Restart, its home in VS Code, status, inbox, resume notes and more. With
+    meta failing, Show, Launch, Stop and Restart from crew's own state. Stop and Restart ask
+    first; the brain coordinator is always asked about.
+    """
+    from desktop_tools.crew import menus
+
+    _done(menus.quick(registry.load(), name))
+
+
+@app.command()
+def menu() -> None:
+    """Open the full menu, each coordinator then its actions (middle click, super + c).
+
+    Level one lists every coordinator with its state (type its key to filter, as `crew names
+    --keys` lists them) and Stop all; level two offers Show or Hide, Start, Stop and Restart.
+    Escape on level two, or No to a question, goes back to level one. Starting and stopping go
+    through `meta`.
+    """
+    from desktop_tools.crew import menus
+
+    _done(menus.full(registry.load()))

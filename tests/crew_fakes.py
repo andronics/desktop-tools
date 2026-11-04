@@ -15,7 +15,10 @@ tmp_path. Nothing reaches a real window, session or coordinator.
   verb exits as `<verb>-rc-<name>` or `<verb>-rc` say (`check` for `--check`), giving the reason in
   `<verb>-why[-<name>]`: on stdout as the stop script's log line for 1, else on stderr; a 1 for
   `stop` or `restart` with `--force` ends it anyway.
-- **rofi** prints `rofi-answer` if it exists (the row picked), else exits 1 (Escape).
+- **rofi** prints `rofi-answer` if it exists (the row picked), else exits 1 (Escape). The menus'
+  tests use `ROFI_SEQ` instead: one answer per call from `rofi-answers`, each call's rows kept.
+- **meta** also answers `<name> menu --json` from `menu-<name>.json` (exit `menu-rc[-<name>]`) and
+  any other verb with six lines echoing it (exit `<verb>-rc[-<name>]`, two lines on stderr).
 - **alacritty** adds a hidden floating window of its `--class` to `wm.json`, as bspwmrc's rule
   makes it (none when `no-window` exists).
 - **notify-send** prints `notify-answer` if it exists (what a click on the action returns).
@@ -211,6 +214,7 @@ if verb == "launch":
         sys.stderr.write(f"meta {name}: {why('launch', name)}\n")
         sys.exit(code)
     start(name)
+    print(f"{name}: launched in tmux session {name}-coordinator")
     sys.exit(0)
 if verb == "stop" and "--check" in args:
     code = rc("check", name)
@@ -233,6 +237,21 @@ if verb in ("stop", "restart"):
     end(name)
     if verb == "restart":
         start(name)
+    print(f"{name}: stopped")
+    sys.exit(0)
+if verb == "menu":
+    code = rc("menu", name)
+    if code:
+        sys.stderr.write(f"meta {name}: menu failed\n")
+        sys.exit(code)
+    print(open(os.path.join(here, f"menu-{name}.json")).read())
+    sys.exit(0)
+if verb:  # a read-only verb: six lines echoing it, or `<verb>-rc` and two lines on stderr
+    code = rc(verb, name)
+    if code:
+        sys.stderr.write(f"meta {name}: {verb} broke\nmore\n")
+        sys.exit(code)
+    print(f"{' '.join(args)}\nline 2\nline 3\nline 4\nline 5\nline 6")
     sys.exit(0)
 sys.exit(2)
 """
@@ -245,6 +264,27 @@ if os.path.exists(p):
     print(open(p).read().strip())
     sys.exit(0)
 sys.exit(1)
+"""
+
+# rofi answers from `rofi-answers`, one line per call in order (an empty line, or none left, is
+# Escape), and keeps each call's rows in rofi-in.<n>.
+ROFI_SEQ = r"""
+path = os.path.join(here, "rofi-answers")
+answers = open(path).read().split("\n") if os.path.exists(path) else []
+n = len([f for f in os.listdir(here) if f.startswith("rofi-in.")])
+open(os.path.join(here, f"rofi-in.{n}"), "w").write(sys.stdin.read())
+answer = answers[n] if n < len(answers) else ""
+if not answer:
+    sys.exit(1)
+print(answer)
+"""
+
+# xclip keeps what it was given on stdin in `clipboard`.
+XCLIP = r"""
+if os.path.exists(os.path.join(here, "xclip-fail")):
+    sys.stderr.write("Error: Can't open display\n")
+    sys.exit(1)
+open(os.path.join(here, "clipboard"), "w").write(sys.stdin.read())
 """
 
 ALACRITTY = (
