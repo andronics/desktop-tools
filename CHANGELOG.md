@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/andronics/desktop-tools/compare/v0.1.3...v0.1.4) (2026-11-04)
+
+
+### 🐛 Bug Fixes
+
+* **journal:** keep tool arguments out of journald's _CMDLINE (brain PR 170) ([#14](https://github.com/andronics/desktop-tools/issues/14)) ([9edcfc4](https://github.com/andronics/desktop-tools/commit/9edcfc40839405ed14995d001d9546c46c154665))
+
 ## [0.1.3](https://github.com/andronics/desktop-tools/compare/v0.1.2...v0.1.3) (2026-11-04)
 
 
