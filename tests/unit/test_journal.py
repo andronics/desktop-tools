@@ -359,8 +359,40 @@ def test_pass_paths_with_their_ages_untouched() -> None:
         "accounts/nordvpn.com/cli-password  27",
         "services/github/token 12",
         "actors/tagwarden/api_key  9",
+        "services/github/github-token  12",
+        "accounts/example.com/X-Api-Key  5",
+        "gh-cli-token 312",
+        "--token-file /run/x",
     ):
         assert journal.redact(s) == s
+
+
+HYPHENATED = {
+    "gh api --github-token abc123": "gh api --github-token [redacted]",
+    "--api-key=x": "--api-key=[redacted]",
+    "--api-key x9": "--api-key [redacted]",
+    "mysql --db-password hunter2": "mysql --db-password [redacted]",
+    "--client-secret s3cr3t": "--client-secret [redacted]",
+    "X-Auth-Token deadbeef": "X-Auth-Token [redacted]",
+    "curl -H 'X-API-Key k9zz'": "curl -H 'X-API-Key [redacted]'",
+    "X-Gitlab-Token: deadbeef": "X-Gitlab-Token: [redacted]",
+    "Authorization: Bearer x": "Authorization: [redacted]",
+    # Over-masks, the safe direction: a negated option looks like a secret option.
+    "--no-password foo": "--no-password [redacted]",
+}
+
+
+@pytest.mark.parametrize(("raw", "want"), HYPHENATED.items())
+def test_hyphenated_options_and_headers_masked(raw: str, want: str) -> None:
+    """With only a space after it, a keyword ending a hyphenated name was left alone, so an
+    option or a header name kept its value (found by this port, fixed in brain PR 193)."""
+    assert journal.redact(raw) == want
+
+
+def test_lowercase_header_without_colon_passes() -> None:
+    """As the brain documents: a header name is masked only in Capitalised-Words (or with a
+    colon), so a lowercase one with only a space keeps the word after it."""
+    assert journal.redact("x-auth-token value") == "x-auth-token value"
 
 
 def test_real_help_text_passes_unchanged() -> None:
@@ -619,9 +651,11 @@ def test_no_entry_when_the_command_line_cant_be_rewritten(
 ) -> None:
     journal.setup("demo", "desktop-coordinator", argv=[f"--token={CMDLINE_SECRET}"])
     real_open = builtins.open
+    tried: list[object] = []
 
     def refuse(path: object, *a: Any, **k: Any) -> Any:
         if str(path) == "/proc/self/mem":
+            tried.append(path)
             raise PermissionError(path)
         return real_open(path, *a, **k)  # type: ignore[call-overload]  # open's own arguments
 
@@ -633,5 +667,6 @@ def test_no_entry_when_the_command_line_cant_be_rewritten(
         m.setattr(builtins, "open", refuse)
         journal.error("boom")
         journal.record(1, 5)
+    assert tried == ["/proc/self/mem"]  # the write was tried, once, and refused
     assert journald.received() == []
     assert len(runs(isolate)) == 1  # the run store still has its line
