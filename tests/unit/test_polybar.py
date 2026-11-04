@@ -62,6 +62,8 @@ def test_no_bar_and_a_stale_socket(isolate: Path) -> None:
     folder.mkdir()
     (folder / "ipc.77.sock").touch()  # a socket file nobody listens on
     (folder / "other.txt").touch()
+    assert polybar.sockets() == {}  # no bar 77 runs: a killed bar's socket, skipped
+    (isolate / "proc" / "77").mkdir()  # bar 77 runs but doesn't answer
     assert polybar.poke("x") == {77: False}
     assert polybar.ping(77) is None
 
@@ -95,7 +97,7 @@ def fake_proc(
     root: Path, pid: int, comm: str, ppid: int = 1, argv: list[str] | None = None
 ) -> None:
     d = root / str(pid)
-    d.mkdir()
+    d.mkdir(exist_ok=True)  # a fake bar's pid is there already
     (d / "comm").write_text(comm + "\n")
     (d / "stat").write_text(f"{pid} ({comm}) S {ppid} {pid} {pid} 0\n")
     (d / "cmdline").write_bytes(b"\0".join(a.encode() for a in (argv or [comm])) + b"\0")
@@ -193,6 +195,10 @@ def test_kill_bar_and_alive(isolate: Path, commands: Callable[..., Path]) -> Non
     commands(sleeper="time.sleep(30)")
     pid = polybar.start(polybar.Launch(["sleeper"], dict(os.environ)))
     assert polybar.alive(pid)
+    sock = polybar.socket_dir() / f"ipc.{pid}.sock"
+    sock.parent.mkdir()
+    sock.touch()
     polybar.kill_bar(pid, isolate / "proc")
     os.waitpid(pid, 0)
     assert not polybar.alive(pid)
+    assert not sock.exists()  # the dead bar's socket is gone

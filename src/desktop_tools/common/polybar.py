@@ -62,7 +62,8 @@ def socket_dir() -> Path:
 
 
 def sockets() -> dict[int, Path]:
-    """pid -> socket of every bar that has one. A stale socket is left for polybar to clear."""
+    """pid -> socket of every running bar that has one. A socket whose bar is gone (killed, so
+    it couldn't remove it) is skipped: kill_bar removes it."""
     out: dict[int, Path] = {}
     try:
         entries = list(socket_dir().iterdir())
@@ -71,7 +72,9 @@ def sockets() -> dict[int, Path]:
     for entry in entries:
         name = entry.name
         if name.startswith("ipc.") and name.endswith(".sock") and name[4:-5].isdigit():
-            out[int(name[4:-5])] = entry
+            pid = int(name[4:-5])
+            if (proc_root() / str(pid)).is_dir():
+                out[pid] = entry
     return dict(sorted(out.items()))
 
 
@@ -245,7 +248,7 @@ def start(launch: Launch) -> int:
 
 
 def kill_bar(pid: int, root: Path | None = None) -> None:
-    """Kill a bar and its scripts (each script is its own process group)."""
+    """Kill a bar and its scripts (each script is its own process group), and remove its socket."""
     kids = children(pid, root)
     with contextlib.suppress(OSError):
         os.kill(pid, signal.SIGKILL)
@@ -260,6 +263,9 @@ def kill_bar(pid: int, root: Path | None = None) -> None:
         if not alive(pid):
             break
         time.sleep(0.05)
+    # A SIGKILLed bar can't remove its socket: barctl does, so nothing finds a dead bar there.
+    with contextlib.suppress(OSError):
+        (socket_dir() / f"ipc.{pid}.sock").unlink()
 
 
 class RestartResult:

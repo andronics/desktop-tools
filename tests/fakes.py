@@ -46,6 +46,8 @@ class FakeBar:
     def __init__(self, folder: Path, pid: int = 4242, version: int = 0, ok: bool = True) -> None:
         folder.mkdir(parents=True, exist_ok=True)
         self.path = folder / f"ipc.{pid}.sock"
+        # The bar's process, as barctl sees it in the fake /proc (BARCTL_PROC).
+        Path(os.environ["BARCTL_PROC"], str(pid)).mkdir(parents=True, exist_ok=True)
         self.pid, self.version, self.ok = pid, version, ok
         self.messages: list[tuple[int, str]] = []
         self.silent = False
