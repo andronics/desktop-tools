@@ -83,7 +83,7 @@ def clamp(width: int) -> int:
 
 def width() -> int:
     text = _read("width")
-    return clamp(int(text)) if text.isdigit() else conf.WIDTH_DEFAULT
+    return clamp(int(text)) if text.isascii() and text.isdecimal() else conf.WIDTH_DEFAULT
 
 
 def set_width(value: int) -> None:

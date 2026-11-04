@@ -88,6 +88,8 @@ def test_width_get_logs(desk: Desk) -> None:
         (["+-3"], "got '+-3'"),
         (["100", "5"], "got '100'"),
         (["left", "x"], "width: expected a step N after 'left', got 'x'"),
+        (["\u00b2"], "got '\u00b2'"),
+        (["left", "\u00b3"], "expected a step N after 'left'"),
     ],
 )
 def test_width_usage_logs(desk: Desk, args: list[str], why: str) -> None:
@@ -240,6 +242,8 @@ def test_bad_stored_values_fall_back(isolate: Path) -> None:
     (conf.state_dir() / "width").write_text("wide")
     (conf.state_dir() / "side").write_text("up")
     assert (store.width(), store.side()) == (1280, "right")
+    (conf.state_dir() / "width").write_text("\u00b2")
+    assert store.width() == 1280
     (conf.state_dir() / "width").write_text("99999")
     assert store.width() == 2560
 

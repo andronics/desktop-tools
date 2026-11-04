@@ -129,7 +129,7 @@ def launch(reg: Registry, c: Coordinator) -> wm.Window | None:
     """The one way crew starts a coordinator (brain record 0019 §3a): `meta <name> launch`
     starts its tmux session, then crew opens its window and waits for it. A coordinator that is
     already running (exit 3) gets its window. Every failure is logged and notified."""
-    argv = ["meta", c.name, "launch"]
+    argv = [conf.meta(), c.name, "launch"]
     try:
         # S603/S607: a fixed argument list; `meta` is found on PATH, as the brain installs it.
         done = subprocess.run(  # noqa: S603
@@ -249,9 +249,18 @@ def hide(reg: Registry, *, toggling: bool = False) -> int:
     none shown, show the last one shown (or the first), if it is running."""
     try:
         with store.lock("switch"):
-            hidden = False
+            hidden = failed = False
             for win in wm.look().crew(shown_only=True):
-                hidden = wm.hide(win) or hidden
+                if wm.hide(win):
+                    hidden = True
+                else:
+                    log.error(f"hide: cannot hide {win.instance} ({win.node})")
+                    failed = True
+            if failed:
+                if hidden:
+                    wm.unpad()
+                    refresh(reg)
+                return FAILED
             if hidden:
                 wm.unpad()
                 refresh(reg)
@@ -319,10 +328,10 @@ def width(arg: str | None = None, step: str | None = None) -> int:
         return OK
     if arg in conf.SIDES:
         step = str(conf.WIDTH_STEP) if step is None else step
-        if not step.isdigit():
+        if not step.isdecimal():
             log.error(f"width: expected a step N after {arg!r}, got {step!r}")
             return FAILED
-    elif not (arg.lstrip("+-").isdigit() and arg.count("+") + arg.count("-") <= 1) or step:
+    elif not (arg.lstrip("+-").isdecimal() and arg.count("+") + arg.count("-") <= 1) or step:
         log.error(f"width: expected +N, -N, N, left [N] or right [N], got {arg!r}")
         return FAILED
     try:

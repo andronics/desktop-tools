@@ -244,3 +244,14 @@ def test_the_live_registrys_answer_parses() -> None:
     assert found is not None
     assert [c.name for c in found] == NEW
     assert found[6].icon == "\U000f0493" and found[0].session == "brain-coordinator"
+
+
+def test_meta_is_found_in_the_brains_bin_first(
+    desk: Desk, isolate: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """systemd units, polybar and sxhkd may not have /mnt/brain/bin on PATH."""
+    from desktop_tools.crew import conf
+
+    assert conf.meta() == str(isolate / "bin" / "meta")
+    monkeypatch.setenv("BRAIN_BIN", str(isolate / "nowhere"))
+    assert conf.meta() == "meta"

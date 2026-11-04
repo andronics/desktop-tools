@@ -116,8 +116,8 @@ def follow(
     settle: float | None = None,
     look: Callable[[set[int]], bool] = tick,
     clock: Callable[[], float] = time.monotonic,
-) -> None:
-    """The guard's loop, until nothing is shown or bspwm is gone."""
+) -> bool:
+    """The guard's loop, until nothing is shown (True) or bspwm is gone (False)."""
     settle = conf.guard_settle() if settle is None else settle
     known: set[int] = set()
     dragging = False
@@ -128,16 +128,16 @@ def follow(
             line = None if wait <= 0 else events.read(wait)
             if line is None:
                 if not look(known):
-                    return
+                    return True
                 due = None
                 # A read that ended before the deadline is the end of the stream: bspwm is gone.
                 if not alive():
-                    return
+                    return False
                 continue
         else:
             line = events.read(None)
         if line is EOF or not isinstance(line, str):
-            return
+            return False
         fields = line.split()
         if not fields:
             continue
@@ -148,6 +148,9 @@ def follow(
                 continue
             if event == "pointer_action":
                 dragging = len(fields) > 5 and fields[5] == "begin"
+        elif event == "node_remove":
+            # A window closed mid-drag sends no end: never wait on one for ever.
+            dragging = False
         due = clock() + settle
 
 
@@ -156,20 +159,27 @@ def _stop(signum: int, frame: FrameType | None) -> None:
 
 
 def main() -> int:
-    """Run the guard; 0 at once when another holds the guard lock."""
-    try:
-        with store.lock("guard", wait=False):
-            sub = Subscription()
-            previous = {s: signal.signal(s, _stop) for s in (signal.SIGTERM, signal.SIGHUP)}
-            try:
-                follow(sub, sub.alive)
-            finally:
-                sub.close()
-                for s, handler in previous.items():
-                    signal.signal(s, handler)
-    except store.LockError:
-        return 0
-    except OSError as e:
-        log.error(f"guard: cannot follow bspwm: {e.strerror}")
-        return 1
-    return 0
+    """Run the guard; 0 at once when another holds the guard lock.
+
+    A show that lands while this guard is on its way out (its last tick saw nothing shown, so
+    it is releasing the guard lock) starts a guard that finds the lock still held and exits.
+    So once the lock is released, this one looks again, and follows on if anything is shown."""
+    while True:
+        idle = False
+        try:
+            with store.lock("guard", wait=False):
+                sub = Subscription()
+                previous = {s: signal.signal(s, _stop) for s in (signal.SIGTERM, signal.SIGHUP)}
+                try:
+                    idle = follow(sub, sub.alive)
+                finally:
+                    sub.close()
+                    for s, handler in previous.items():
+                        signal.signal(s, handler)
+        except store.LockError:
+            return 0
+        except OSError as e:
+            log.error(f"guard: cannot follow bspwm: {e.strerror}")
+            return 1
+        if not idle or not wm.look().crew(shown_only=True):
+            return 0

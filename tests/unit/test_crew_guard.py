@@ -199,3 +199,43 @@ def test_guard_stops_on_term(desk: Desk) -> None:
     time.sleep(0.2)
     os.kill(proc.pid, signal.SIGTERM)
     assert proc.wait(10) == 143
+
+
+def test_a_window_closed_mid_drag_ends_the_hold_off() -> None:
+    begin = f"pointer_action 0x1 0x2 {NODE} move begin"
+    events = Script(begin, f"node_remove 0x1 0x2 {NODE}", QUIET)
+    look = Looks(True, False)
+    guard.follow(events, lambda: True, settle=0.01, look=look)
+    assert look.calls == 2  # the remove's tick ran: no wait for an end that never comes
+
+
+def test_a_show_during_the_guards_exit_is_still_guarded(
+    desk: Desk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The last tick saw nothing shown; a show lands before the guard lock is released."""
+    rounds: list[int] = []
+
+    def follow(events: object, alive: object) -> bool:
+        rounds.append(1)
+        return True  # the round ended because nothing was shown
+
+    monkeypatch.setattr(guard, "follow", follow)
+    monkeypatch.setattr(guard.Subscription, "__init__", lambda self: None)
+    monkeypatch.setattr(guard.Subscription, "close", lambda self: None)
+    d = desk.load()
+    calls = iter([True, False])
+    from desktop_tools.crew import wm
+
+    monkeypatch.setattr(wm, "look", lambda: _tree(desk, next(calls)))
+    assert guard.main() == 0
+    assert len(rounds) == 2
+    del d
+
+
+def _tree(desk: Desk, shown: bool) -> object:
+    from desktop_tools.crew import wm
+
+    tree = wm.Tree()
+    if shown:
+        tree.windows.append(wm.Window(1, "crew", "desktop", False, True, 1, 1, (0, 0, 1, 1)))
+    return tree

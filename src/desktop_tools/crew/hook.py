@@ -116,6 +116,8 @@ def run(args: list[str], stdin: IO[str] | None = None) -> int:
     from desktop_tools.crew import switch
 
     if state == "waiting":
-        switch.detach(switch.crew_argv("notify", name, message_of(data) or "Waiting for input"))
+        switch.detach(
+            switch.crew_argv("notify", name, "--", message_of(data) or "Waiting for input")
+        )
     switch.detach(switch.crew_argv("bar", "--quiet"))
     return 0

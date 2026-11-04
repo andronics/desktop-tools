@@ -278,7 +278,7 @@ def ask_meta() -> Any | None:
     """`meta brain coordinators --json`, parsed; None (with a warning) when it fails."""
     import subprocess
 
-    argv = ["meta", "brain", "coordinators", "--json"]
+    argv = [conf.meta(), "brain", "coordinators", "--json"]
     try:
         # S603/S607: a fixed argument list; `meta` is found on PATH, as the brain installs it.
         done = subprocess.run(  # noqa: S603

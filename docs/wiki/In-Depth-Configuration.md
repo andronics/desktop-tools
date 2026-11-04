@@ -66,6 +66,7 @@ list of arguments) and `dynamic` (a barctl module whose source's rows are append
 | `THEME_STATE_DIR` | Where the current theme is (default `$XDG_STATE_HOME/theme`) |
 | `CREW_CLASS`, `CREW_OLD_CLASS` | crew's window class (`crew`) and the second one it matches until coord's windows close (`coord`; empty for none) |
 | `CREW_ACTORS_DIR` | Where the coordinators' homes are (`/pool/local/actors`) |
+| `BRAIN_BIN` | Where crew finds `meta` (`/mnt/brain/bin`; PATH when it isn't there): systemd units, polybar and sxhkd may not have the brain's folder on PATH |
 | `CREW_TMUX_SOCKET` | Another tmux server for crew: a path is `-S`, a name `-L` (tests); unset, the default server |
 | `CREW_LAUNCH_TIMEOUT` | Seconds crew waits for a window or a lock (10) |
 | `CREW_GUARD_SETTLE` | Seconds of quiet after a crew window's last event before the guard re-docks (0.2) |

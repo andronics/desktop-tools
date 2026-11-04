@@ -95,13 +95,13 @@ def test_only_a_change_refreshes(coords: Desk) -> None:
 def test_waiting_notifies_with_the_question(coords: Desk) -> None:
     question = {"questions": [{"question": "Merge   the\nPR?"}]}
     fire(coords, "PreToolUse", tool_name="AskUserQuestion", tool_input=question)
-    assert detached_verbs(coords)[0] == ["notify", "desktop", "Merge the PR?"]
+    assert detached_verbs(coords)[0] == ["notify", "desktop", "--", "Merge the PR?"]
     fire(coords, "Stop")
     fire(coords, "Notification", notification_type="permission_prompt", message="Allow rm?")
-    assert ["notify", "desktop", "Allow rm?"] in detached_verbs(coords)
+    assert ["notify", "desktop", "--", "Allow rm?"] in detached_verbs(coords)
     fire(coords, "Stop")
     fire(coords, "Notification", notification_type="permission_prompt")
-    assert detached_verbs(coords)[-2] == ["notify", "desktop", "Waiting for input"]
+    assert detached_verbs(coords)[-2] == ["notify", "desktop", "--", "Waiting for input"]
 
 
 def test_the_event_argument_overrides(coords: Desk) -> None:
@@ -300,3 +300,17 @@ def test_scan_against_a_real_tmux_on_its_own_socket(
         assert strip.scan(reg, tree=wm.Tree()).running == {"crewtest"}
     finally:
         subprocess.run([*base, "kill-server"], check=False, capture_output=True)  # noqa: S603
+
+
+def test_a_body_that_looks_like_an_option_still_notifies(desk: Desk) -> None:
+    """The hook passes the text after `--`, so `crew notify` never reads it as an option."""
+    desk.coordinators("desktop")
+    done = run([*CREW, "notify", "desktop", "--", "--help"])
+    assert done.returncode == 0 and "Usage" not in done.stdout
+    assert desk.calls("notify-send")[0][-1] == "--help"
+
+
+def test_scan_uses_the_registrys_session_name(desk: Desk) -> None:
+    desk.coordinators("desktop", desktop={"tmux_session": "desk-main"})
+    desk.session("desk-main")
+    assert strip.scan(registry.load()).running == {"desktop"}

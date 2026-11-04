@@ -85,6 +85,8 @@ def isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     # crew never reads the real actors folder or tmux server in a test.
     monkeypatch.setenv("CREW_ACTORS_DIR", str(tmp_path / "no-actors"))
     monkeypatch.setenv("CREW_TMUX_SOCKET", "crew-test-unused")
+    # Never the brain's real meta: unless a test fakes it, PATH's tripwire answers.
+    monkeypatch.setenv("BRAIN_BIN", str(tmp_path / "no-brain-bin"))
     yield tmp_path
     tripped = tripwires(tmp_path)
     assert tripped == [], f"a test reached a desktop command it didn't fake: {tripped}"

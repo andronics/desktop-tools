@@ -4,6 +4,8 @@
     CREW_OLD_CLASS         coord     a second class matched until coord's windows have closed
                                      (record 0019 §7); empty matches none
     CREW_ACTORS_DIR        /pool/local/actors   where the coordinators' homes are
+    BRAIN_BIN              /mnt/brain/bin       where `meta` is; PATH when it isn't there (systemd
+                                     units, polybar and sxhkd may not have the brain's bin)
     CREW_TMUX_SOCKET       unset     another tmux server: a path is -S, a name -L (tests)
     CREW_LAUNCH_TIMEOUT    10        seconds to wait for a window or a lock
     CREW_GUARD_SETTLE      0.2       seconds of quiet after a crew window's last event before
@@ -52,6 +54,12 @@ def classes() -> tuple[str, ...]:
 
 def actors_dir() -> Path:
     return Path(os.environ.get("CREW_ACTORS_DIR") or "/pool/local/actors")
+
+
+def meta() -> str:
+    """The brain's `meta`: `$BRAIN_BIN/meta`, else whatever PATH finds."""
+    found = Path(os.environ.get("BRAIN_BIN") or "/mnt/brain/bin") / "meta"
+    return str(found) if os.access(found, os.X_OK) else "meta"
 
 
 def tmux() -> list[str]:

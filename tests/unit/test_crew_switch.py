@@ -426,3 +426,17 @@ def test_moves_to_the_focused_monitor(desk: Desk) -> None:
     assert switch.summon(reg, "desktop") == 0
     assert desk.windows()["desktop"]["monitor"] == MONITOR
     assert desk.padding(0x00200003)["right"] == 0
+
+
+@pytest.mark.parametrize("toggling", [False, True])
+def test_a_hide_that_fails_says_so_and_shows_nothing(
+    desk: Desk, toggling: bool, capsys: pytest.CaptureFixture[str]
+) -> None:
+    reg = reg_of(desk, "brain", "desktop")
+    desk.window("brain", hidden=False)
+    desk.window("desktop")
+    store.set_last("desktop")
+    desk.fail("flag")
+    assert switch.hide(reg, toggling=toggling) == 1
+    assert "hide: cannot hide brain (0x00C00001)" in capsys.readouterr().err
+    assert desk.shown() == ["brain"]

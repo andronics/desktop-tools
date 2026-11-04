@@ -40,9 +40,12 @@ def scan(reg: Registry, tree: wm.Tree | None = None, sessions: set[str] | None =
     tree = wm.look() if tree is None else tree
     sessions = tmux.sessions() if sessions is None else sessions
     found = Scan()
+    # Each coordinator's session as the registry names it, or a former name's.
+    owner = {s: c.name for c in reg.coordinators for s in c.sessions}
     for s in sessions:
-        if s.endswith("-coordinator"):
-            # A session started under a former name is the same coordinator.
+        if s in owner:
+            found.running.add(owner[s])
+        elif s.endswith("-coordinator"):
             found.running.add(reg.resolve(s.removesuffix("-coordinator")))
     for w in tree.crew():
         name = reg.resolve(w.instance)

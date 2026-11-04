@@ -363,6 +363,8 @@ def make_desk(
     desk = Desk(isolate, log)
     monkeypatch.setenv("CREW_ACTORS_DIR", str(desk.actors))
     monkeypatch.setenv("CREW_TMUX_SOCKET", "crew-test")
+    # meta is found as $BRAIN_BIN/meta first: the fake's folder.
+    monkeypatch.setenv("BRAIN_BIN", str(log.parent / "bin"))
     monkeypatch.setenv("CREW_LAUNCH_TIMEOUT", "1")
     monkeypatch.setenv("CREW_GUARD_SETTLE", "0.05")
     for key in ("CREW_CLASS", "CREW_OLD_CLASS", "CREW_REGISTRY_MAX_AGE", "CREW_BAR_TTL"):
