@@ -145,9 +145,10 @@ def load() -> dict[str, Menu]:
 # ---------------------------------------------------------------- rofi
 
 
-def theme_args() -> list[str]:
-    """-theme <file>, or nothing when it is missing (rofi would refuse to start)."""
-    theme = os.environ.get("BARMENU_THEME") or THEME
+def theme_args(name: str | None = None) -> list[str]:
+    """-theme <file>, or nothing when it is missing (rofi would refuse to start). `name` is
+    another theme (crew's `prompt`); by default the bar menu's, which BARMENU_THEME overrides."""
+    theme = name or os.environ.get("BARMENU_THEME") or THEME
     path = (
         Path(theme) if "/" in theme else paths.config_home() / "rofi" / "themes" / f"{theme}.rasi"
     )
@@ -210,16 +211,32 @@ def lines(rows: list[Row]) -> list[str]:
     return out
 
 
-def choose(menu: Menu, extra: list[str] | None = None) -> int | None:
-    """Show the menu with rofi; the picked row's index, or None on Escape."""
+def pick(rows: list[str], args: list[str]) -> str | None:
+    """rofi -dmenu over these rows with these arguments: what it printed, or None on Escape, a
+    failure or no rofi. The one rofi call barmenu and crew's menus share."""
     import subprocess
 
+    try:
+        # S603/S607: a fixed argument list; rofi is found on PATH like every bar command.
+        result = subprocess.run(  # noqa: S603
+            ["rofi", "-dmenu", *args],  # noqa: S607
+            input="\n".join(rows),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    picked = result.stdout.strip()
+    return picked if result.returncode == 0 and picked else None
+
+
+def choose(menu: Menu, extra: list[str] | None = None) -> int | None:
+    """Show the menu with rofi; the picked row's index, or None on Escape."""
     if not menu.rows:
         return None
     prompt = f"{menu.glyph} {menu.title}" if menu.glyph else menu.title
-    argv = [
-        "rofi",
-        "-dmenu",
+    args = [
         "-i",
         "-no-custom",
         "-markup-rows",
@@ -231,19 +248,8 @@ def choose(menu: Menu, extra: list[str] | None = None) -> int | None:
         prompt,
         *(extra or []),
     ]
-    try:
-        # S603/S607: a fixed argument list; rofi is found on PATH like every bar command.
-        result = subprocess.run(  # noqa: S603
-            argv,
-            input="\n".join(lines(menu.rows)),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError:
-        return None
-    picked = result.stdout.strip()
-    if result.returncode != 0 or not picked.isdigit() or int(picked) >= len(menu.rows):
+    picked = pick(lines(menu.rows), args)
+    if picked is None or not picked.isdigit() or int(picked) >= len(menu.rows):
         return None
     return int(picked)
 
