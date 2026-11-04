@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/andronics/desktop-tools/compare/v0.1.0...v0.1.1) (2026-11-04)
+
+
+### 🐛 Bug Fixes
+
+* **barctl:** use polybar's IPC message type numbers (cmd 1, action 2) ([#3](https://github.com/andronics/desktop-tools/issues/3)) ([2d96ea2](https://github.com/andronics/desktop-tools/commit/2d96ea2ab28304738f96c395187fc2c9ec7880f5))
+
 ## 0.1.0 (2026-11-04)
 
 
