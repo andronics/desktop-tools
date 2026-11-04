@@ -231,7 +231,8 @@ def view(c: Coordinator, item: Item, text: str) -> int:
     try:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
         _prune(folder, now)
-        path = folder / f"{c.name}-{item.id}-{os.getpid()}.txt"
+        safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in item.id)
+        path = folder / f"{c.name}-{safe}-{os.getpid()}.txt"
         path.write_text(text, encoding="utf-8")
     except OSError as e:
         return failed(c, item, 1, f"cannot write the view: {e.strerror}")
@@ -245,8 +246,9 @@ def view(c: Coordinator, item: Item, text: str) -> int:
         *PAGER,
         str(path),
     ]
-    if shutil.which("alacritty") is None:
-        return failed(c, item, 127, "alacritty is not on PATH")
+    for needed in ("alacritty", PAGER[0]):
+        if shutil.which(needed) is None:
+            return failed(c, item, 127, f"{needed} is not on PATH")
     return switch.OK if switch.detach(argv) else failed(c, item, 126, "cannot start alacritty")
 
 
@@ -287,30 +289,37 @@ def start(c: Coordinator, item: Item, argv: list[str], said: str) -> int:
 
 
 def run_copy(c: Coordinator, item: Item) -> int:
-    """The text onto the clipboard. xclip stays behind to serve the selection, holding whatever
-    it was given, so it gets /dev/null for output and its own session; only its stdin is ours."""
+    """The text onto the clipboard. xclip forks a child that stays to serve the selection and
+    keeps whatever it inherited, so it gets no pipe but stdin: a pipe on stdout or stderr would
+    only close when the next copy ends it. Its stderr goes to a file instead."""
+    import tempfile
+
     text = str(item.value)
     argv = ["xclip", "-selection", "clipboard"]
-    try:
-        # S603: xclip with fixed arguments; the text goes on stdin, never in argv.
-        proc = subprocess.Popen(  # noqa: S603
-            argv,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            start_new_session=True,
-            close_fds=True,
-            text=True,
-        )
-        _, err = proc.communicate(text, timeout=5)
-    except OSError as e:
-        return failed(c, item, 127, f"xclip: {e.strerror}")
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.communicate()
-        return failed(c, item, 124, "xclip gave no answer in 5s")
+    with tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace") as err:
+        try:
+            # S603: xclip with fixed arguments; the text goes on stdin, never in argv.
+            proc = subprocess.Popen(  # noqa: S603
+                argv,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=err,
+                start_new_session=True,
+                close_fds=True,
+                text=True,
+            )
+        except OSError as e:
+            return failed(c, item, 127, f"xclip: {e.strerror}")
+        try:
+            proc.communicate(text, timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            return failed(c, item, 124, "xclip gave no answer in 5s")
+        err.seek(0)
+        said = err.read()
     if proc.returncode != 0:
-        return failed(c, item, proc.returncode, err)
+        return failed(c, item, proc.returncode, said)
     # Copying always says what was copied (record 0019 §7a), whatever the output says.
     notify_lines(f"{c.name}: copied", text)
     return switch.OK

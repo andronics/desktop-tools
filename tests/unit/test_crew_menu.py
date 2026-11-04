@@ -705,3 +705,39 @@ def test_every_child_is_an_argument_list(menu_desk: Desk) -> None:
     for argv in menu_desk.detached:
         assert isinstance(argv, list) and all(isinstance(a, str) for a in argv)
         assert argv[0] not in ("sh", "zsh", "bash")
+
+
+def test_copy_does_not_wait_for_xclips_lingering_child(
+    menu_desk: Desk, commands: Callable[..., Path]
+) -> None:
+    """The real xclip forks a child that keeps serving the selection with what it inherited:
+    crew must not wait on it."""
+    import time
+
+    commands(
+        xclip="data = sys.stdin.read()\n"
+        "if os.fork() == 0:\n"
+        "    time.sleep(8)\n"
+        "    os._exit(0)\n"
+        "open(os.path.join(here, 'clipboard'), 'w').write(data)\n"
+    )
+    reg = reg_of(menu_desk, "desktop")
+    c = reg.get("desktop")
+    assert c is not None
+    began = time.monotonic()
+    assert items.run_copy(c, items.Item("a", "A", "copy", "hello")) == 0
+    assert time.monotonic() - began < 4
+    assert (menu_desk.base / "clipboard").read_text() == "hello"
+
+
+def test_view_needs_its_pager_and_names_files_safely(menu_desk: Desk) -> None:
+    reg = reg_of(menu_desk, "desktop")
+    c = reg.get("desktop")
+    assert c is not None
+    item = items.Item("../../x y", "X", "meta", ["desktop", "status"])
+    assert items.view(c, item, "text") == 0
+    shown = Path(next(a for a in menu_desk.detached if a[:1] == ["alacritty"])[-1])
+    assert shown.parent == items.view_dir() and shown.name.startswith("desktop-______x_y-")
+    (menu_desk.base / "bin" / "less").unlink()
+    assert items.view(c, item, "text") == 1
+    assert menu_desk.notified()[-1][-1] == "exit 127: less is not on PATH"
