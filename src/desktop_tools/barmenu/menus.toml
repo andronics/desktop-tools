@@ -5,7 +5,10 @@
 # screen it falls back to when the pointer can't be read, a settle time (seconds to wait after
 # rofi closes before the command runs, so a screenshot never catches rofi fading out), and its
 # rows. A row's command is a shell command (run with `zsh -fc`, as before) or a list of
-# arguments. `dynamic = "<module>"` appends the rows barctl's source for that module gives.
+# arguments; `current = true` marks it (rofi's active rows, in the theme's accent).
+# `dynamic = "<module>"` appends the rows barctl's source for that module gives;
+# `provider = "<name>"` takes the rows a Python function in barmenu/providers/ gives when the
+# menu opens, any static rows following them. A menu has one of the two, never both.
 # Glyphs are current Nerd Font codepoints (the zsh table's legacy U+F900-U+FAFF ones mapped to
 # their nf-md names), written as escapes.
 
@@ -66,3 +69,18 @@ rows = [
     { glyph = "\U000F05FD", label = "QUIT", command = "power logout" }, # md-logout_variant
     { glyph = "\U000F0453", label = "COMPOSITOR", command = "killall -eq picom; sleep 1.5; picom --config ~/.config/picom/picom.conf -b" }, # md-reload
 ]
+
+# Record 0001 §2: rows from barmenu/providers/theme.py (the applied scheme's title, the mode not
+# in use).
+[menus.theme]
+glyph = "\U000F03D8" # md-palette
+title = "Theme"
+side = "left"
+provider = "theme"
+
+# Record 0001 §3: rows from barmenu/providers/lock.py (the idle lock's state marked).
+[menus.lock]
+glyph = "\uF023" # fa-lock
+title = "Lock"
+side = "right"
+provider = "lock"
