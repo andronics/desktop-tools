@@ -74,10 +74,10 @@ rest is unavailable.
 **The full menu** (`crew menu`, a middle click on the strip, `super + c`) is coord's two-level menu, ported. Level
 one lists every coordinator with its state, the shown one marked. Type a coordinator's key to jump to it (`crew names
 --keys`). The last cell is Stop all. Level two offers Start for a stopped coordinator, and Show (or Hide), Stop and
-Restart for a running one. Escape on level two, or No to a question, goes back to level one. Start, Stop and Restart
-go through `meta`. Stop asks only when the notes aren't clean, as coord's did, and always for the brain. Stop all
-checks each running coordinator first, then asks once, naming those whose notes aren't clean (and the brain, if it
-runs). Yes stops them all, the brain last.
+Restart for a running one. Escape on level two, or No to a Stop or Restart question, goes back to level one. Start
+is `crew toggle --launch`, which also shows it. Stop and Restart ask only when the notes aren't clean, as coord's
+did, and always for the brain. Stop all is `crew stop --all`: it leaves the brain coordinator running, asks once if
+any notes aren't clean, and No to it closes the menu.
 
 ## Where it gets the coordinators
 

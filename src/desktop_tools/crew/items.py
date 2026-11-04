@@ -15,7 +15,8 @@ crew knows how to run an item, and nothing about which items exist. Each item is
 - `when`: `always`, `running`, `stopped` or `exists:<path>`. meta judges it when it builds the
   menu; crew judges it again from its own state as the menu opens.
 
-The stop and restart items go through `stopping`, which asks first; this module runs the rest.
+Launch, stop and restart go through `stopping` and crew's lifecycle verbs (`life`); this module
+runs the rest.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from desktop_tools.crew import conf, log, switch
+from desktop_tools.crew import conf, log, metacall, switch
 from desktop_tools.crew.registry import Coordinator, glyph_of
 
 KINDS = ("meta", "open", "edit", "copy")
@@ -72,9 +73,9 @@ class Item:
         return list(self.value) if isinstance(self.value, list) else []
 
     def lifecycle(self) -> tuple[str, str] | None:
-        """(coordinator, verb) when this item stops or restarts a coordinator."""
+        """(coordinator, verb) when this item launches, stops or restarts a coordinator."""
         args = self.args
-        if self.kind == "meta" and len(args) == 2 and args[1] in ("stop", "restart"):
+        if self.kind == "meta" and len(args) == 2 and args[1] in ("launch", "stop", "restart"):
             return args[0], args[1]
         return None
 
@@ -170,26 +171,12 @@ def first_line(text: str) -> str:
 
 
 def meta(args: list[str], timeout: float = RUN_TIMEOUT) -> subprocess.CompletedProcess[str]:
-    """`meta <args...>` with no terminal and nothing to read; a missing or hung meta is an exit
-    code (127, 124) with a reason, like a shell's, so callers have one shape to handle."""
-    argv = [conf.meta(), *args]
-    try:
-        # S603: meta with an argument list from meta's own menu or crew's fixed verbs.
-        return subprocess.run(  # noqa: S603
-            argv,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            errors="replace",
-            timeout=timeout,
-            check=False,
-        )
-    except FileNotFoundError:
-        return subprocess.CompletedProcess(argv, 127, "", "meta is not on PATH")
-    except subprocess.TimeoutExpired:
-        return subprocess.CompletedProcess(argv, 124, "", f"no answer in {timeout:g}s")
-    except OSError as e:
-        return subprocess.CompletedProcess(argv, 126, "", e.strerror or type(e).__name__)
+    """`meta <args...>` through crew's one meta caller (`metacall`), output kept. When meta
+    can't be run, its code (4) and reason come back the same shape, on stderr."""
+    done = metacall.call(args, timeout)
+    if isinstance(done, metacall.Result):
+        return subprocess.CompletedProcess([conf.meta(), *args], done.code, "", done.why)
+    return done
 
 
 def failed(c: Coordinator, item: Item, code: int, stderr: str) -> int:

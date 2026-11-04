@@ -12,8 +12,9 @@
   Escape on the second level, or No to a question, goes back to the first.
 
 Both run from a click: they drop the pipes polybar left them first (procs.close_inherited), as
-barmenu does, and every program they start is detached. Starting goes through `switch.launch`
-and stopping through `stopping`, both `meta`.
+barmenu does, and every program they start is detached. Launch, Stop, Restart and Stop all go
+through `stopping`, on crew's lifecycle verbs (`life`); the full menu's Start is `crew toggle
+--launch`, which shows it too, as coord's Start did.
 """
 
 from __future__ import annotations
@@ -120,15 +121,10 @@ def act(reg: Registry, c: Coordinator, row: Row) -> int:
     life = item.lifecycle()
     target = reg.get(life[0]) if life else None
     if life and target is not None:
-        return stopping.end(target, life[1], ask_first=item.confirm)
+        return stopping.end(reg, target, life[1], ask_first=item.confirm)
     if item.confirm and not stopping.confirm(f"{c.name}: {item.label}?"):
         return stopping.DECLINED
-    code = items.run(c, item)
-    if item.kind == "meta" and item.args[1:2] == ["launch"]:
-        # Launch starts the session hidden, as record 0019 §7a's item 2 says (no window); the
-        # strip shows it running at once rather than at the next hook.
-        switch.refresh(reg)
-    return code
+    return items.run(c, item)
 
 
 def quick(reg: Registry, name: str) -> int:
@@ -152,10 +148,16 @@ def quick(reg: Registry, name: str) -> int:
 # ---------------------------------------------------------------- the full menu
 
 
+def _theme(name: str) -> list[str]:
+    from desktop_tools.barmenu import menus as bm
+
+    return bm.theme_args(name)
+
+
 def menu_theme() -> list[str]:
     """CREW_MENU_THEME, else crew.rasi, else coord's coord.rasi until the dotfiles rename it."""
     for name in conf.menu_themes():
-        found = stopping.theme(name)
+        found = _theme(name)
         if found:
             return found
     return []
@@ -252,7 +254,7 @@ def pick_action(reg: Registry, c: Coordinator) -> str | None:
             ["toggle", "stop", "restart"],
             ["Hide" if shown else "Show", "Stop", "Restart"],
         )
-    args = ["-i", "-no-custom", "-format", "i", *stopping.theme(conf.confirm_theme())]
+    args = ["-i", "-no-custom", "-format", "i", *_theme(conf.confirm_theme())]
     args += ["-p", f"{c.name} ({state})", "-selected-row", "0"]
     picked = bm.pick(labels, args)
     if picked is None or not picked.isdigit() or int(picked) >= len(actions):
@@ -281,6 +283,6 @@ def full(reg: Registry) -> int:
             elif action == "start":
                 code = switch.toggle(reg, c.name, launching=True)
             else:
-                code = stopping.end(c, action, ask_first=False)
+                code = stopping.end(reg, c, action, ask_first=False)
         if code != stopping.DECLINED:
             return code

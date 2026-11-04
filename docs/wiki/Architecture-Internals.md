@@ -55,7 +55,7 @@ flowchart LR
 | `crew/strip.py` | The bar strip: running, shown and activity per coordinator, pushed to barctl's `crew` module |
 | `crew/menus.py` | `crew quick` (one coordinator's menu, from meta's items) and `crew menu` (the two-level menu) |
 | `crew/items.py` | meta's menu items: parsing, `when`, running each kind (`meta`, `open`, `edit`, `copy`) and each output |
-| `crew/stopping.py` | Stop, restart and Stop all through `meta`, with the Yes/No questions; the brain always asked |
+| `crew/stopping.py` | The menus' Launch, Stop and Restart on `life` and `metacall`, with the Yes/No questions (the brain always asked); Stop all is `life.stop_all` |
 | `crew/hook.py` | `crew status`, the Claude hook: event to state, standard library only |
 | `crew/guard.py` | `crew guard`: bspwm's events, the settle deadline, the drag hold-off, the re-dock |
 | `crew/store.py`, `crew/conf.py`, `crew/log.py`, `crew/out.py` | crew's files and locks, settings, messages and stdout |

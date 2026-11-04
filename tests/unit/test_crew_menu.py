@@ -38,7 +38,10 @@ def menu_desk(desk: Desk, commands: Callable[..., Path], monkeypatch: pytest.Mon
     monkeypatch.setattr(procs, "close_inherited", close_inherited)
     desk.closed = closed  # type: ignore[attr-defined]  # a test-only note on the fake
     commands(
-        rofi=ROFI_SEQ, xclip=XCLIP, xdotool="sys.exit(1)", **{"xdg-open": "", "code": "", "less": ""}
+        rofi=ROFI_SEQ,
+        xclip=XCLIP,
+        xdotool="sys.exit(1)",
+        **{"xdg-open": "", "code": "", "less": ""},
     )
     return desk
 
@@ -167,18 +170,29 @@ def test_quick_menu_rows_are_show_then_metas_in_order(menu_desk: Desk) -> None:
 
 
 def test_quick_menu_for_a_stopped_one_offers_launch(menu_desk: Desk) -> None:
+    """Launch is crew's lifecycle verb (`life.launch`): started hidden, the strip refreshed."""
+    from desktop_tools.barctl import state as bst
+
     reg = reg_of(menu_desk, "ventures")
     serve(menu_desk, "ventures", VENTURES_MENU)
     assert quick_pick(menu_desk, reg, "ventures", "Launch") == 0
     assert rofi_rows(menu_desk, 0)[:2] == ["Show", "Launch"]
     assert menu_desk.launched() == ["ventures"]
-    from desktop_tools.barctl import state as bst
-
+    assert menu_desk.shown() == []
     strip = (bst.read("crew") or {}).get("segments", [])
-    assert [(s["id"], s["tier"]) for s in strip] == [("ventures", "idle")]  # refreshed: running
-    assert [n[-2:] for n in menu_desk.notified()][-1] == [
-        "ventures: Launch",
-        "ventures: launched in tmux session ventures-coordinator",
+    assert [(s["id"], s["tier"]) for s in strip] == [("ventures", "idle")]  # running now
+    assert menu_desk.notified()[-1][-2:] == ["ventures: launched", "done"]
+
+
+def test_a_refused_launch_notifies(menu_desk: Desk) -> None:
+    reg = reg_of(menu_desk, "ventures")
+    serve(menu_desk, "ventures", VENTURES_MENU)
+    menu_desk.put("launch-rc-ventures", "3")
+    menu_desk.put("launch-why", "standby: no launch")
+    assert quick_pick(menu_desk, reg, "ventures", "Launch") == 3
+    assert menu_desk.notified()[-1][-2:] == [
+        "ventures: not started",
+        "meta ventures exited 3: meta ventures: standby: no launch",
     ]
 
 
@@ -319,7 +333,7 @@ def test_meta_none_says_nothing(menu_desk: Desk) -> None:
 def test_a_failing_verb_always_notifies(menu_desk: Desk, label: str) -> None:
     reg = reg_of(menu_desk, "desktop")
     serve(menu_desk, "desktop", DESKTOP_MENU)
-    menu_desk.put(f"rc-{label.lower()}", "5")
+    menu_desk.put(f"{label.lower()}-rc", "5")
     assert quick_pick(menu_desk, reg, "desktop", label) == 1
     title, body = menu_desk.notified()[-1][-2:]
     assert title == f"desktop: {label} failed"
@@ -433,7 +447,8 @@ def test_the_question_uses_the_prompt_theme(menu_desk: Desk, isolate: Path) -> N
     assert not stopping.confirm("go?")
     argv = rofi_calls(menu_desk)[-1]
     assert argv[argv.index("-theme") + 1] == str(themes / "prompt.rasi")
-    assert rofi_rows(menu_desk, 0) == ["Yes", "No"]
+    assert argv[argv.index("-selected-row") + 1] == "1"  # No is selected
+    assert rofi_rows(menu_desk, 0)[:2] == ["Yes", "No"]
 
 
 # ---------------------------------------------------------------- stop and restart
@@ -444,13 +459,13 @@ def test_stop_asks_then_stops(menu_desk: Desk, verb: str) -> None:
     reg = reg_of(menu_desk, "desktop")
     menu_desk.session("desktop-coordinator")
     serve(menu_desk, "desktop", DESKTOP_MENU)
+    v = verb.lower()
     assert quick_pick(menu_desk, reg, "desktop", verb, "No") == 0
-    assert [m for m in meta_calls(menu_desk) if m[1] == verb.lower()] == []
-    menu_desk.session("desktop-coordinator")
+    assert [m for m in meta_calls(menu_desk) if m[1] == v] == []
     assert quick_pick(menu_desk, reg, "desktop", verb, "Yes") == 0
-    assert meta_calls(menu_desk)[-1] == ["desktop", verb.lower()]
+    assert meta_calls(menu_desk)[-2:] == [["desktop", "stop", "--check"], ["desktop", v]]
     done = "stopped" if verb == "Stop" else "restarted"
-    assert menu_desk.notified()[-1][-2:] == [f"desktop: {done}", "desktop: stopped"]
+    assert menu_desk.notified()[-1][-2:] == [f"desktop: {done}", "done"]
 
 
 @pytest.mark.parametrize("verb", ["Stop", "Restart"])
@@ -458,36 +473,50 @@ def test_unclean_notes_ask_again_and_yes_forces(menu_desk: Desk, verb: str) -> N
     reg = reg_of(menu_desk, "desktop")
     menu_desk.session("desktop-coordinator")
     serve(menu_desk, "desktop", DESKTOP_MENU)
-    menu_desk.put("stop-rc-desktop", "1")
-    assert quick_pick(menu_desk, reg, "desktop", verb, "Yes", "Yes") == 0
+    menu_desk.put("check-rc-desktop", "1")
+    menu_desk.put("check-why", "no PAUSED notes")
     v = verb.lower()
+    assert quick_pick(menu_desk, reg, "desktop", verb, "Yes", "Yes") == 0
     assert meta_calls(menu_desk)[-2:] == [
-        ["desktop", v],
+        ["desktop", "stop", "--check"],
         ["desktop", v, "--force", "--reason", f"Stephen: Yes to {v} anyway"],
     ]
     again = rofi_calls(menu_desk)[-1]
-    assert again[again.index("-p") + 1] == f'desktop: no "PAUSED" notes: {v} anyway?'
+    assert again[again.index("-p") + 1] == f"desktop: no PAUSED notes: {v} anyway?"
 
 
 def test_unclean_notes_and_no_stops_nothing(menu_desk: Desk) -> None:
     reg = reg_of(menu_desk, "desktop")
     menu_desk.session("desktop-coordinator")
     serve(menu_desk, "desktop", DESKTOP_MENU)
-    menu_desk.put("stop-rc-desktop", "1")
+    menu_desk.put("check-rc-desktop", "1")
     assert quick_pick(menu_desk, reg, "desktop", "Stop", "Yes", "No") == 0
-    assert not any("--force" in m for m in meta_calls(menu_desk))
+    assert meta_calls(menu_desk)[-1] == ["desktop", "stop", "--check"]
 
 
-@pytest.mark.parametrize(("code", "title"), [(3, "desktop: not stopped"), (4, "stop failed")])
-def test_a_refused_or_failed_stop_notifies(menu_desk: Desk, code: int, title: str) -> None:
+@pytest.mark.parametrize("verb", ["stop", "restart"])
+def test_a_refused_forced_stop_notifies(menu_desk: Desk, verb: str) -> None:
+    reg = reg_of(menu_desk, "desktop")
+    menu_desk.session("desktop-coordinator")
+    serve(menu_desk, "desktop", DESKTOP_MENU)
+    menu_desk.put("check-rc-desktop", "1")
+    menu_desk.put(f"{verb}-rc-desktop", "4")
+    assert quick_pick(menu_desk, reg, "desktop", verb.capitalize(), "Yes", "Yes") == 4
+    done = "stopped" if verb == "stop" else "restarted"
+    assert menu_desk.notified()[-1][-2] == f"desktop: not {done}"
+
+
+@pytest.mark.parametrize("code", [3, 4])
+def test_a_refused_or_failed_stop_notifies(menu_desk: Desk, code: int) -> None:
     reg = reg_of(menu_desk, "desktop")
     menu_desk.session("desktop-coordinator")
     serve(menu_desk, "desktop", DESKTOP_MENU)
     menu_desk.put("stop-rc-desktop", str(code))
-    assert quick_pick(menu_desk, reg, "desktop", "Stop", "Yes") == 1
-    got_title, body = menu_desk.notified()[-1][-2:]
-    assert title in got_title
-    assert body == "meta desktop: stop is not for this caller"
+    assert quick_pick(menu_desk, reg, "desktop", "Stop", "Yes") == code
+    assert menu_desk.notified()[-1][-2:] == [
+        "desktop: not stopped",
+        f"meta desktop exited {code}: meta desktop: refused",
+    ]
 
 
 def brain_menu() -> dict[str, Any]:
@@ -515,6 +544,7 @@ def test_the_brain_with_unclean_notes_is_asked_with_why(menu_desk: Desk) -> None
     menu_desk.session("brain-coordinator")
     serve(menu_desk, "brain", brain_menu())
     menu_desk.put("check-rc-brain", "1")
+    menu_desk.put("check-why", "newest heading is RESUMED, not PAUSED")
     assert quick_pick(menu_desk, reg, "brain", "Restart", "No") == 0
     asked = rofi_calls(menu_desk)[-1]
     assert asked[asked.index("-p") + 1] == (
@@ -528,13 +558,6 @@ def test_the_brain_with_unclean_notes_is_asked_with_why(menu_desk: Desk) -> None
         "--reason",
         "Stephen: Yes to restart the brain coordinator anyway",
     ]
-
-
-def test_why_reads_the_stop_scripts_lines() -> None:
-    assert stopping.why("x\nbrain: notes are old\n", "brain") == "notes are old"
-    assert stopping.why("t by=meta why=bare result=x", "brain") == "bare"
-    assert stopping.why('t why="a \\"q\\" \\\\ b"', "d") == 'a "q" \\ b'
-    assert stopping.why("", "d") == ""
 
 
 # ---------------------------------------------------------------- the full menu
@@ -595,9 +618,10 @@ def test_full_menu_stop_asks_only_when_unclean(menu_desk: Desk) -> None:
     menu_desk.session("desktop-coordinator")
     answers(menu_desk, "1", "1")
     assert menus.full(reg) == 0
-    assert meta_calls(menu_desk) == [["desktop", "stop"]]
+    assert meta_calls(menu_desk) == [["desktop", "stop", "--check"], ["desktop", "stop"]]
+    assert len(rofi_calls(menu_desk)) == 2  # no question: the notes were clean
     menu_desk.session("desktop-coordinator")
-    menu_desk.put("stop-rc-desktop", "1")
+    menu_desk.put("check-rc-desktop", "1")
     clear_rofi(menu_desk)
     # Restart, then No to the unclean question: back to level one, then Escape.
     answers(menu_desk, "1", "2", "No", "")
@@ -613,55 +637,37 @@ def test_full_menu_hide_label(menu_desk: Desk) -> None:
     assert rofi_rows(menu_desk, 1)[0] == "Hide"
 
 
-def test_stop_all_asks_once_and_forces_the_unclean(menu_desk: Desk) -> None:
+def test_stop_all_is_crews_stop_all(menu_desk: Desk) -> None:
+    """The full menu's Stop all is `life.stop_all`: asks once, forces the unclean, leaves the
+    brain coordinator (meta never stops it for crew)."""
     reg = reg_of(menu_desk, "brain", "desktop", "homelab", "media")
     menu_desk.session("brain-coordinator", "desktop-coordinator", "homelab-coordinator")
     menu_desk.put("check-rc-desktop", "1")
+    menu_desk.put("check-why", "newest heading is RESUMED, not PAUSED")
     answers(menu_desk, "4", "Yes")
     assert menus.full(reg) == 0
     asked = rofi_calls(menu_desk)[-1]
     assert asked[asked.index("-p") + 1] == (
-        "desktop: newest heading is RESUMED, not PAUSED; the brain coordinator too: "
-        "stop all anyway?"
+        "desktop: newest heading is RESUMED, not PAUSED: stop all anyway?"
     )
     assert meta_calls(menu_desk) == [
         ["desktop", "stop", "--check"],
         ["homelab", "stop", "--check"],
-        ["brain", "stop", "--check"],
         ["desktop", "stop", "--force", "--reason", "Stephen: Yes to stop all anyway"],
         ["homelab", "stop"],
-        ["brain", "stop"],  # the brain last
     ]
 
 
-def test_stop_all_no_stops_nothing_and_goes_back(menu_desk: Desk) -> None:
+def test_stop_all_no_stops_nothing(menu_desk: Desk) -> None:
     reg = reg_of(menu_desk, "desktop", "homelab")
     menu_desk.session("desktop-coordinator", "homelab-coordinator")
     menu_desk.put("check-rc-desktop", "1")
     menu_desk.put("check-rc-homelab", "1")
-    answers(menu_desk, "2", "No", "")
-    assert menus.full(reg) == 0
+    answers(menu_desk, "2", "No")
+    assert menus.full(reg) == 1  # life.stop_all: declined is 1, nothing stopped
     asked = rofi_calls(menu_desk)[1]
     assert asked[asked.index("-p") + 1] == "notes not clean for desktop, homelab: stop all anyway?"
     assert all("--check" in m for m in meta_calls(menu_desk))
-    assert len(rofi_calls(menu_desk)) == 3  # back to level one
-
-
-def test_stop_all_clean_asks_nothing(menu_desk: Desk) -> None:
-    reg = reg_of(menu_desk, "desktop")
-    menu_desk.session("desktop-coordinator")
-    menu_desk.put("stop-rc-desktop", "4")
-    answers(menu_desk, "1")
-    assert menus.full(reg) == 1  # the stop failed, and said so
-    assert meta_calls(menu_desk)[-1] == ["desktop", "stop"]
-    assert "stop failed" in menu_desk.notified()[-1][-2]
-
-
-def test_stop_all_with_none_running(menu_desk: Desk) -> None:
-    reg = reg_of(menu_desk, "desktop")
-    answers(menu_desk, "1")
-    assert menus.full(reg) == 0
-    assert menu_desk.notified()[-1][-2] == "no coordinator is running"
 
 
 def test_full_menu_theme_falls_back_to_coords(
