@@ -117,7 +117,7 @@ def stop(
         bool, typer.Option("--force", help="End it even if its resume notes are not clean.")
     ] = False,
     all_: Annotated[
-        bool, typer.Option("--all", help="Every running coordinator but the brain coordinator.")
+        bool, typer.Option("--all", help="Every running coordinator but those only Stephen ends.")
     ] = False,
     yes: Annotated[
         bool, typer.Option("--yes", "-y", help="With --all: don't ask, stop the unclean ones too.")
@@ -251,7 +251,7 @@ def quick(name: Name) -> None:
     Show or Hide first, then what `meta <name> menu --json` offers for it, in meta's order:
     Launch or Stop and Restart, its home in VS Code, status, inbox, resume notes and more. With
     meta failing, Show, Launch, Stop and Restart from crew's own state. Stop and Restart ask
-    first; the brain coordinator is always asked about.
+    first; one only Stephen ends (the brain coordinator, the arbiter) is always asked about.
     """
     from desktop_tools.crew import menus
 

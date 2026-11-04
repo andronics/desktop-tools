@@ -21,6 +21,8 @@ from tests.crew_fakes import ROFI_SEQ, XCLIP, Desk
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 DESKTOP_MENU = json.loads((FIXTURES / "meta-menu-desktop.json").read_text())
 VENTURES_MENU = json.loads((FIXTURES / "meta-menu-ventures.json").read_text())
+# meta's own folding: more than four repos come as one item holding them (`items`, no `run`).
+PLATFORM_MENU = json.loads((FIXTURES / "meta-menu-platform.json").read_text())
 DESKTOP_IDS = [i["id"] for i in DESKTOP_MENU["data"]["items"]]
 
 
@@ -46,8 +48,8 @@ def menu_desk(desk: Desk, commands: Callable[..., Path], monkeypatch: pytest.Mon
     return desk
 
 
-def reg_of(desk: Desk, *names: str) -> Registry:
-    desk.coordinators(*names)
+def reg_of(desk: Desk, *names: str, **extra: dict[str, Any]) -> Registry:
+    desk.coordinators(*names, **extra)
     return registry.load()
 
 
@@ -192,7 +194,7 @@ def test_a_refused_launch_notifies(menu_desk: Desk) -> None:
     assert quick_pick(menu_desk, reg, "ventures", "Launch") == 3
     assert menu_desk.notified()[-1][-2:] == [
         "ventures: not started",
-        "meta ventures exited 3: meta ventures: standby: no launch",
+        "meta ventures exited 3 (refused): meta ventures: standby: no launch",
     ]
 
 
@@ -333,12 +335,152 @@ def test_meta_none_says_nothing(menu_desk: Desk) -> None:
 def test_a_failing_verb_always_notifies(menu_desk: Desk, label: str) -> None:
     reg = reg_of(menu_desk, "desktop")
     serve(menu_desk, "desktop", DESKTOP_MENU)
-    menu_desk.put(f"{label.lower()}-rc", "5")
+    menu_desk.put(f"{label.lower()}-rc", "6")
     assert quick_pick(menu_desk, reg, "desktop", label) == 1
     title, body = menu_desk.notified()[-1][-2:]
     assert title == f"desktop: {label} failed"
-    assert body.startswith("exit 5: meta ") and body.endswith("broke")
+    assert body.startswith("exit 6 (the module is broken): meta ") and body.endswith("broke")
     assert not any(a[:1] == ["alacritty"] for a in menu_desk.detached)
+
+
+# meta's exit codes (brain record 0019): 0, 1 and 5 are results; 2, 3, 4 and 6 failures.
+
+
+def status_as(desk: Desk, output: str) -> None:
+    envelope = json.loads(json.dumps(DESKTOP_MENU))
+    next(i for i in envelope["data"]["items"] if i["id"] == "status")["output"] = output
+    serve(desk, "desktop", envelope)
+
+
+def failures(desk: Desk) -> list[list[str]]:
+    return [n for n in desk.notified() if n[-2].endswith(" failed")]
+
+
+def test_exit_1_is_a_result_shown_with_a_warning(menu_desk: Desk) -> None:
+    reg = reg_of(menu_desk, "desktop")
+    serve(menu_desk, "desktop", DESKTOP_MENU)
+    menu_desk.put("status-rc", "1")
+    assert quick_pick(menu_desk, reg, "desktop", "Status") == 0
+    view = next(a for a in menu_desk.detached if a[:1] == ["alacritty"])
+    warn = "⚠ desktop: Status: there is a problem"
+    assert view[view.index("--title") + 1] == warn
+    assert Path(view[-1]).read_text().splitlines()[:3] == [warn, "", "desktop status"]
+    assert failures(menu_desk) == []
+
+
+def test_exit_1_notify_is_warned_and_none_says_nothing(menu_desk: Desk) -> None:
+    reg = reg_of(menu_desk, "desktop")
+    menu_desk.put("status-rc", "1")
+    status_as(menu_desk, "notify")
+    assert quick_pick(menu_desk, reg, "desktop", "Status") == 0
+    title, body = menu_desk.notified()[-1][-2:]
+    assert title == "⚠ desktop: Status: there is a problem"
+    assert body.splitlines()[0] == "desktop status"
+    status_as(menu_desk, "none")
+    before = len(menu_desk.notified())
+    assert quick_pick(menu_desk, reg, "desktop", "Status") == 0
+    assert len(menu_desk.notified()) == before
+
+
+def test_exit_4_with_only_stdout_gives_that_reason(menu_desk: Desk) -> None:
+    reg = reg_of(menu_desk, "desktop")
+    serve(menu_desk, "desktop", DESKTOP_MENU)
+    menu_desk.put("status-rc", "4")
+    menu_desk.put("status-stdout", "meta desktop: vault-query unreachable")
+    assert quick_pick(menu_desk, reg, "desktop", "Status") == 1
+    assert menu_desk.notified()[-1][-2:] == [
+        "desktop: Status failed",
+        "exit 4 (failed): meta desktop: vault-query unreachable",
+    ]
+    assert not any(a[:1] == ["alacritty"] for a in menu_desk.detached)
+
+
+@pytest.mark.parametrize("output", ["view", "notify", "none"])
+def test_exit_5_is_a_not_found_notice(menu_desk: Desk, output: str) -> None:
+    reg = reg_of(menu_desk, "desktop")
+    status_as(menu_desk, output)
+    menu_desk.put("status-rc", "5")
+    assert quick_pick(menu_desk, reg, "desktop", "Status") == 0
+    assert menu_desk.notified()[-1][-2:] == [
+        "desktop: Status: not found",
+        "meta desktop: status broke",
+    ]
+    assert failures(menu_desk) == []
+    assert not any(a[:1] == ["alacritty"] for a in menu_desk.detached)
+
+
+@pytest.mark.parametrize(("code", "means"), [(2, "usage"), (3, "refused")])
+def test_refused_and_usage_say_so_with_the_reason(menu_desk: Desk, code: int, means: str) -> None:
+    reg = reg_of(menu_desk, "desktop")
+    status_as(menu_desk, "none")
+    menu_desk.put("status-rc", str(code))
+    assert quick_pick(menu_desk, reg, "desktop", "Status") == 1
+    assert menu_desk.notified()[-1][-2:] == [
+        "desktop: Status failed",
+        f"exit {code} ({means}): meta desktop: status broke",
+    ]
+
+
+def test_a_failure_with_no_reason_never_says_a_dash(menu_desk: Desk) -> None:
+    reg = reg_of(menu_desk, "desktop")
+    serve(menu_desk, "desktop", DESKTOP_MENU)
+    menu_desk.put("status-rc", "4")
+    menu_desk.put("status-stdout", "")
+    assert quick_pick(menu_desk, reg, "desktop", "Status") == 1
+    assert menu_desk.notified()[-1][-1] == "exit 4 (failed): no reason given"
+
+
+# ---------------------------------------------------------------- meta's second-level lists
+
+
+def test_parse_reads_a_nested_list() -> None:
+    found = items.parse(PLATFORM_MENU)
+    assert found is not None
+    repos = next(i for i in found if i.id == "repos")
+    assert (repos.kind, repos.label, repos.when) == (items.LIST, "Repos on GitHub", "always")
+    assert [i.label for i in repos.items] == [f"andronics/example-{n}" for n in range(1, 8)]
+    assert all(i.kind == "open" for i in repos.items)
+
+
+def test_a_nested_list_is_one_row_and_escape_goes_back(menu_desk: Desk) -> None:
+    reg = reg_of(menu_desk, "platform")
+    serve(menu_desk, "platform", PLATFORM_MENU)
+    answers(menu_desk, "")
+    menus.quick(reg, "platform")
+    rows = rofi_rows(menu_desk, 0)
+    assert rows[-1] == "Repos on GitHub" and rows.count("Repos on GitHub") == 1
+    assert not any("example" in r for r in rows)
+    repos = str(len(rows) - 1)
+    clear_rofi(menu_desk)
+    answers(menu_desk, repos, "2")
+    assert menus.quick(reg, "platform") == 0
+    assert rofi_rows(menu_desk, 1) == [f"andronics/example-{n}" for n in range(1, 8)]
+    assert ["xdg-open", "https://github.com/andronics/example-3"] in menu_desk.detached
+    clear_rofi(menu_desk)
+    answers(menu_desk, repos, "", "")  # Escape on the list: back to the first level, Escape
+    assert menus.quick(reg, "platform") == 0
+    assert rofi_rows(menu_desk, 2) == rows
+
+
+def test_an_invalid_nested_item_is_dropped_and_the_rest_stay(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    envelope = json.loads(json.dumps(PLATFORM_MENU))
+    repos = next(i for i in envelope["data"]["items"] if i["id"] == "repos")
+    repos["items"].insert(1, {"id": "bad", "label": "Bad", "run": {"shell": "ls"}})
+    found = items.parse(envelope) or []
+    assert [i.id for i in next(i for i in found if i.id == "repos").items] == [
+        f"repo-andronics-example-{n}" for n in range(1, 8)
+    ]
+    assert "menu: bad: run 'shell' is not something crew can run" in capsys.readouterr().err
+    repos["items"].append({"id": "deeper", "label": "Deeper", "items": [repos["items"][0]]})
+    found = items.parse(envelope) or []
+    assert "deeper" not in [i.id for i in next(i for i in found if i.id == "repos").items]
+    assert "menu: repos: deeper: a list in a list, dropped" in capsys.readouterr().err
+    repos["items"] = [{"id": "bad", "label": "Bad"}]
+    found = items.parse(envelope) or []
+    assert "repos" not in [i.id for i in found] and "status" in [i.id for i in found]
+    assert "menu: repos: a list with no items crew can run" in capsys.readouterr().err
 
 
 def test_edit_opens_vs_code(menu_desk: Desk) -> None:
@@ -506,8 +648,8 @@ def test_a_refused_forced_stop_notifies(menu_desk: Desk, verb: str) -> None:
     assert menu_desk.notified()[-1][-2] == f"desktop: not {done}"
 
 
-@pytest.mark.parametrize("code", [3, 4])
-def test_a_refused_or_failed_stop_notifies(menu_desk: Desk, code: int) -> None:
+@pytest.mark.parametrize(("code", "means"), [(3, "refused"), (4, "failed")])
+def test_a_refused_or_failed_stop_notifies(menu_desk: Desk, code: int, means: str) -> None:
     reg = reg_of(menu_desk, "desktop")
     menu_desk.session("desktop-coordinator")
     serve(menu_desk, "desktop", DESKTOP_MENU)
@@ -515,7 +657,7 @@ def test_a_refused_or_failed_stop_notifies(menu_desk: Desk, code: int) -> None:
     assert quick_pick(menu_desk, reg, "desktop", "Stop", "Yes") == code
     assert menu_desk.notified()[-1][-2:] == [
         "desktop: not stopped",
-        f"meta desktop exited {code}: meta desktop: refused",
+        f"meta desktop exited {code} ({means}): meta desktop: refused",
     ]
 
 
@@ -536,7 +678,27 @@ def test_the_brain_is_always_asked_about(menu_desk: Desk) -> None:
     assert asked[asked.index("-p") + 1] == "the brain coordinator: stop it?"
     assert meta_calls(menu_desk)[-1] == ["brain", "stop", "--check"]
     assert quick_pick(menu_desk, reg, "brain", "Stop", "Yes") == 0
-    assert meta_calls(menu_desk)[-1] == ["brain", "stop"]
+    assert meta_calls(menu_desk)[-1] == ["brain", "stop", "--confirmed"]
+
+
+@pytest.mark.parametrize("verb", ["stop", "restart"])
+def test_confirmed_is_only_for_the_brain_and_only_on_yes(menu_desk: Desk, verb: str) -> None:
+    reg = reg_of(menu_desk, "brain", "desktop")
+    menu_desk.session("brain-coordinator", "desktop-coordinator")
+    brain, desktop = reg.get("brain"), reg.get("desktop")
+    assert brain is not None and desktop is not None
+    answers(menu_desk, "No")
+    assert stopping.end(reg, brain, verb, ask_first=False) == stopping.DECLINED  # the full menu's
+    assert meta_calls(menu_desk) == [["brain", "stop", "--check"]]  # judged, nothing ended
+    clear_rofi(menu_desk)
+    answers(menu_desk, "Yes")
+    assert stopping.end(reg, brain, verb, ask_first=False) == 0
+    assert meta_calls(menu_desk)[-1] == ["brain", verb, "--confirmed"]
+    clear_rofi(menu_desk)
+    answers(menu_desk, "Yes")
+    assert stopping.end(reg, desktop, verb, ask_first=True) == 0
+    assert meta_calls(menu_desk)[-1] == ["desktop", verb]
+    assert not any("--confirmed" in c for c in meta_calls(menu_desk) if c[0] != "brain")
 
 
 def test_the_brain_with_unclean_notes_is_asked_with_why(menu_desk: Desk) -> None:
@@ -557,7 +719,34 @@ def test_the_brain_with_unclean_notes_is_asked_with_why(menu_desk: Desk) -> None
         "--force",
         "--reason",
         "Stephen: Yes to restart the brain coordinator anyway",
+        "--confirmed",
     ]
+
+
+@pytest.mark.parametrize("verb", ["stop", "restart"])
+def test_every_one_only_stephen_ends_is_asked_and_confirmed(menu_desk: Desk, verb: str) -> None:
+    """The registry's `ended_by`: the brain, the arbiter and a third, with no crew change."""
+    names = ("brain", "arbiter", "media", "desktop")
+    by_stephen = {"ended_by": "stephen"}
+    reg = reg_of(menu_desk, *names, brain=by_stephen, arbiter=by_stephen, media=by_stephen)
+    menu_desk.session(*(f"{n}-coordinator" for n in names))
+    for name in ("brain", "arbiter", "media"):
+        c = reg.get(name)
+        assert c is not None
+        clear_rofi(menu_desk)
+        answers(menu_desk, "No")
+        assert stopping.end(reg, c, verb, ask_first=False) == stopping.DECLINED
+        asked = rofi_calls(menu_desk)[-1]
+        assert asked[asked.index("-p") + 1] == f"the {name} coordinator: {verb} it?"
+        clear_rofi(menu_desk)
+        answers(menu_desk, "Yes")
+        assert stopping.end(reg, c, verb, ask_first=False) == 0
+        assert meta_calls(menu_desk)[-1] == [name, verb, "--confirmed"]
+    desktop = reg.get("desktop")
+    assert desktop is not None
+    clear_rofi(menu_desk)
+    assert stopping.end(reg, desktop, verb, ask_first=False) == 0  # not asked: clean
+    assert meta_calls(menu_desk)[-1] == ["desktop", verb]
 
 
 # ---------------------------------------------------------------- the full menu

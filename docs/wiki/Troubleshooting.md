@@ -43,7 +43,7 @@ glyph in the bar (`crew toggle --launch <name>`), `crew launch <name> --show`, o
 
 meta refused, and the notification gives its exit code and reason. `1` means the coordinator's resume notes are not
 clean, so nothing was ended: let it write its PAUSED notes, or `crew stop <name> --force`. `3` is a refusal that is
-meta's to make (the brain coordinator is stopped only by Stephen at a terminal, or the caller isn't allowed), `2` a
+meta's to make (one only Stephen ends needs his Yes from a clean session, or the caller isn't allowed), `2` a
 name with no home, `4` a failure (or meta couldn't be run). `meta <name> status` says more.
 
 ### The quick menu says "the rest is unavailable"
@@ -53,8 +53,16 @@ name with no home, `4` a failure (or meta couldn't be run). `meta <name> status`
 
 ### Stopping the brain coordinator from a menu says "not stopped"
 
-`meta brain stop` (and `restart`) only ends the brain coordinator when it is asked at a terminal, so it refuses
-crew's menus even after crew's own Yes. Stop it from a terminal: `meta brain stop`.
+After Yes, crew runs `meta brain stop --confirmed` (or `restart`), and meta takes `--confirmed` only when
+`COORDINATOR`, `CLAUDECODE` and `TESSERA_ACTOR` are all unset. A refusal (`exited 3 (refused)`) means the bar or
+sxhkd was started from a coordinator's or agent's environment: restart it from a clean session. A terminal works
+too: `meta brain stop`. The same goes for the arbiter, and any coordinator the registry marks `ended_by: "stephen"`.
+
+### A quick-menu item says "there is a problem" or "not found"
+
+Neither is a failure. meta's exit 1 is a result whose answer is "there is a problem" (a `status` with a warning):
+the output is shown with a ⚠ line first. Exit 5 is "not found". A failure says `failed` with the code and what it
+means: `2 (usage)`, `3 (refused)`, `4 (failed)` or `6 (the module is broken)`, then meta's reason.
 
 ### crew's strip is missing from the bar
 
