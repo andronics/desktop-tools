@@ -30,6 +30,12 @@ No current theme: `theme ensure`. barctl writes no colours of its own.
 `barctl restart` relaunches a bar that doesn't answer within `BARCTL_POLYBAR_WAIT` seconds. Something long-lived that a
 click started may hold a polybar pipe: start it through `barctl click` or `barmenu run`, which detach it.
 
+### The theme or lock menu shows no state
+
+`Scheme…`, `Toggle dark/light`, or no lock row marked: the provider's query failed or took over 2 s, so the menu
+opened with the rows that name no state. Run the query by hand: `theme current --json` or `lockscreen status --json`
+(a dotfiles older than the lock menu has no `--json`).
+
 ### `error: cannot read DESKTOP_TOOLS_..._FILE`
 
 The file named by a `_FILE` variable doesn't exist, or the process can't read it. Check the path inside the container or unit, and the file's owner and mode: the process runs as uid 1000 / the `desktop-tools` user.

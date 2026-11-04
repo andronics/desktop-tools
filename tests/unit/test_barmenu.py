@@ -6,6 +6,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -29,7 +30,7 @@ def rofi(pick: str, code: int = 0) -> str:
 
 def test_the_zsh_menus_carried_over() -> None:
     menus = bm.load()
-    assert list(menus) == ["layout", "screenshot", "session", "settings", "vpn"]
+    assert list(menus) == ["layout", "lock", "screenshot", "session", "settings", "theme", "vpn"]
     assert [r.label for r in menus["vpn"].rows] == ["CONNECT", "Disconnect", "Information"]
     assert menus["screenshot"].settle == 0.5 and menus["session"].side == "right"
     assert len(menus["layout"].rows) == 8
@@ -72,6 +73,10 @@ def test_override_adds_and_replaces(isolate: Path) -> None:
         "[menus.x]\nrows = [1]",
         '[menus.x]\nrows = [{ label = "" }]',
         '[menus.x]\nrows = [{ label = "a", command = [] }]',
+        '[menus.x]\nrows = [{ label = "a", command = "b", current = "yes" }]',
+        '[menus.x]\nprovider = "nosuch"',
+        "[menus.x]\nprovider = 1",
+        '[menus.x]\nprovider = "lock"\ndynamic = "audio-level"',
         "[menus.x",
     ],
 )
@@ -147,7 +152,9 @@ def test_open_runs_the_pick_detached_after_settling(
     commands: Callable[..., Path], launched: list[list[str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     slept: list[float] = []
-    monkeypatch.setattr("desktop_tools.barmenu.menus.time.sleep", slept.append)
+    # Only barmenu's own `time`: the global time.sleep is subprocess's wait loop too, so
+    # patching it made every query's wait spin and record its polls (a flake under load).
+    monkeypatch.setattr(bm, "time", SimpleNamespace(sleep=slept.append))
     commands(rofi=rofi("3"), xdotool="sys.exit(1)")
     row = bm.open_menu(bm.load()["screenshot"])
     assert row is not None and row.label == "WINDOW"
@@ -186,7 +193,17 @@ def test_the_command_line(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     r = runner.invoke(cli.app, ["--help"])
-    for name in ("layout", "screenshot", "session", "settings", "vpn", "run", "list"):
+    for name in (
+        "layout",
+        "lock",
+        "screenshot",
+        "session",
+        "settings",
+        "theme",
+        "vpn",
+        "run",
+        "list",
+    ):
         assert name in r.stdout
     assert (
         "VPN menu: CONNECT, Disconnect, Information"

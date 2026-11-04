@@ -9,6 +9,11 @@ Bar clicks and polybar's pipes: polybar 3.7 opens its pipes without close-on-exe
 handler can inherit another module's output pipe, and anything long-lived holding it can freeze
 the bar's next restart. So `open_menu` first drops inherited pipes (procs.close_inherited)
 before rofi starts, and the picked command runs detached in its own session on /dev/null.
+
+Rows come from the TOML, from a provider (`provider = "<name>"`: a Python function in
+barmenu/providers/ called when the menu opens, its rows before the static ones) or from a barctl
+module's source (`dynamic`, appended). A row marked `current` is passed to rofi as active
+(`-a`), which the bar-menu theme styles in the accent; the cursor still starts on the first row.
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ import time
 import tomllib
 from pathlib import Path
 
+from desktop_tools.barmenu import providers
 from desktop_tools.common import paths, procs
 
 PACKAGED = Path(__file__).with_name("menus.toml")
@@ -36,10 +42,12 @@ class MenuError(Exception):
 
 
 class Row:
-    __slots__ = ("command", "glyph", "label")
+    __slots__ = ("command", "current", "glyph", "label")
 
-    def __init__(self, glyph: str, label: str, command: str | list[str]) -> None:
-        self.glyph, self.label, self.command = glyph, label, command
+    def __init__(
+        self, glyph: str, label: str, command: str | list[str], *, current: bool = False
+    ) -> None:
+        self.glyph, self.label, self.command, self.current = glyph, label, command, current
 
     def argv(self) -> list[str]:
         """A shell command runs in `zsh -fc`, with the bar's environment, as it did."""
@@ -47,7 +55,7 @@ class Row:
 
 
 class Menu:
-    __slots__ = ("dynamic", "glyph", "name", "rows", "settle", "side", "title")
+    __slots__ = ("dynamic", "glyph", "name", "provider", "rows", "settle", "side", "title")
 
     def __init__(
         self,
@@ -59,12 +67,16 @@ class Menu:
         settle: float = 0.0,
         rows: list[Row] | None = None,
         dynamic: str | None = None,
+        provider: str | None = None,
     ) -> None:
         self.name, self.glyph, self.title = name, glyph, title or name
         self.side, self.settle, self.rows, self.dynamic = side, settle, rows or [], dynamic
+        self.provider = provider
 
     def description(self) -> str:
-        return f"{self.title} menu: " + ", ".join(r.label for r in self.rows)
+        """The CLI help: it names the provider instead of calling it, so --help runs no query."""
+        parts = [f"rows from the {self.provider} provider"] if self.provider else []
+        return f"{self.title} menu: " + ", ".join(parts + [r.label for r in self.rows])
 
 
 def _row(raw: object, where: str) -> Row:
@@ -73,10 +85,13 @@ def _row(raw: object, where: str) -> Row:
     label, glyph, command = raw.get("label"), raw.get("glyph", ""), raw.get("command")
     if not isinstance(label, str) or not label or not isinstance(glyph, str):
         raise MenuError(f"{where}: needs a label (and a glyph, if any, as text)")
+    current = raw.get("current", False)
+    if not isinstance(current, bool):
+        raise MenuError(f"{where}: current is true or false")
     if isinstance(command, list) and command and all(isinstance(c, str) for c in command):
-        return Row(glyph, label, [str(c) for c in command])
+        return Row(glyph, label, [str(c) for c in command], current=current)
     if isinstance(command, str) and command:
-        return Row(glyph, label, command)
+        return Row(glyph, label, command, current=current)
     raise MenuError(f"{where}: command is a shell command or a list of arguments")
 
 
@@ -103,6 +118,11 @@ def parse(data: dict[str, object]) -> dict[str, Menu]:
         dynamic = raw.get("dynamic")
         if dynamic is not None and not isinstance(dynamic, str):
             raise MenuError(f"{where}: dynamic names a barctl module")
+        provider = raw.get("provider")
+        if provider is not None and provider not in providers.NAMES:
+            raise MenuError(f"{where}: provider is one of " + ", ".join(providers.NAMES))
+        if provider is not None and dynamic is not None:
+            raise MenuError(f"{where}: a menu takes provider or dynamic, not both")
         glyph, title = raw.get("glyph", ""), raw.get("title", "")
         if not isinstance(glyph, str) or not isinstance(title, str):
             raise MenuError(f"{where}: glyph and title are text")
@@ -114,6 +134,7 @@ def parse(data: dict[str, object]) -> dict[str, Menu]:
             settle=float(settle),
             rows=[_row(r, f"{where}.rows[{i}]") for i, r in enumerate(rows)],
             dynamic=dynamic,
+            provider=provider,
         )
     return out
 
@@ -236,6 +257,7 @@ def choose(menu: Menu, extra: list[str] | None = None) -> int | None:
     if not menu.rows:
         return None
     prompt = f"{menu.glyph} {menu.title}" if menu.glyph else menu.title
+    active = [str(i) for i, row in enumerate(menu.rows) if row.current]
     args = [
         "-i",
         "-no-custom",
@@ -246,12 +268,28 @@ def choose(menu: Menu, extra: list[str] | None = None) -> int | None:
         *place(menu.side),
         "-p",
         prompt,
+        *(["-a", ",".join(active)] if active else []),
         *(extra or []),
     ]
     picked = pick(lines(menu.rows), args)
     if picked is None or not picked.isdigit() or int(picked) >= len(menu.rows):
         return None
     return int(picked)
+
+
+def with_provider(menu: Menu) -> Menu:
+    """The menu with its provider's rows first, then its static rows. A provider never fails
+    the menu: it gives state-free rows when its queries fail."""
+    if not menu.provider:
+        return menu
+    return Menu(
+        menu.name,
+        glyph=menu.glyph,
+        title=menu.title,
+        side=menu.side,
+        settle=menu.settle,
+        rows=providers.rows(menu.provider) + menu.rows,
+    )
 
 
 def with_dynamic(menu: Menu) -> Menu:
@@ -279,7 +317,7 @@ def with_dynamic(menu: Menu) -> Menu:
 def open_menu(menu: Menu, extra: list[str] | None = None) -> Row | None:
     """Show a menu and launch the pick, detached. Escape runs nothing (and is no failure)."""
     procs.close_inherited()
-    menu = with_dynamic(menu)
+    menu = with_dynamic(with_provider(menu))
     picked = choose(menu, extra)
     if picked is None:
         return None

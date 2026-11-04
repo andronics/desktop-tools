@@ -331,7 +331,15 @@ def test_desktop_tools_mounts_the_tools(isolate: Path, monkeypatch: pytest.Monke
     r = runner.invoke(top, ["barctl", "list"])
     assert r.exit_code == 0 and "audio-level" in r.stdout
     r = runner.invoke(top, ["barmenu", "list"])
-    assert r.stdout.split() == ["layout", "screenshot", "session", "settings", "vpn"]
+    assert r.stdout.split() == [
+        "layout",
+        "lock",
+        "screenshot",
+        "session",
+        "settings",
+        "theme",
+        "vpn",
+    ]
     out = isolate / "completions"
     r = runner.invoke(top, ["completions", "zsh", "--out", str(out)])
     assert r.exit_code == 0

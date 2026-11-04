@@ -43,7 +43,8 @@ flowchart LR
 | `barctl/controller.py` | `barctl run`: sources, control socket, alert and ttl timers |
 | `barctl/doctor.py` | `barctl doctor`'s checks |
 | `barctl/sources/` | The controller's sources: `volume`, `player` |
-| `barmenu/menus.py`, `menus.toml` | Menus as data, rofi placement, the detached launch |
+| `barmenu/menus.py`, `menus.toml` | Menus as data, rofi placement, current rows as rofi's active rows, the detached launch |
+| `barmenu/providers/` | Menus whose rows come from Python when they open (`theme`, `lock`), from read-only queries with a 2 s limit; state-free rows when a query fails (record 0001) |
 | `barmenu/cli.py` | `barmenu`: a subcommand per menu, `run`, `list` |
 | `crew/cli.py`, `crew/fast.py` | `crew`: the fast path for `status` and `bar`, then the Typer app (`crew/app.py`) with run records |
 | `crew/registry.py` | The coordinators from `meta brain coordinators --json`, its kept copy, or the homes; former names; menu keys |
