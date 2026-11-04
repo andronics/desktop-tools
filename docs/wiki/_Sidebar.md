@@ -15,6 +15,7 @@
 <!-- Project pages go here, e.g. - [How Matching Works](How-Matching-Works) -->
 - [CLI Reference](CLI-Reference)
 - [Adding a Module](Adding-A-Module)
+- [Crew](Crew)
 
 ### 🔧 Configuration
 
@@ -44,3 +45,4 @@
 - 🎨 Colours from the theme's roles at draw time
 - 🖱️ Clicks act on what the bar shows, started detached
 - 📋 Right-click menus as data, drawn by rofi above the button
+- 🧭 crew: the coordinator switchboard, docked terminals and the bar strip

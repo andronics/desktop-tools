@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from desktop_tools.config import ENV_PREFIX
+from tests.crew_fakes import Desk, make_desk
 from tests.fakes import (
     FakeBar,
     FakeJournal,
@@ -70,12 +71,22 @@ def isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
         "BARMENU_CONFIG",
         "BARMENU_THEME",
         "BARCTL_POLYBAR_CONFIG",
+        "CREW_ACTORS_DIR",
+        "CREW_TMUX_SOCKET",
+        "CREW_CLASS",
+        "CREW_OLD_CLASS",
+        "CREW_DEBUG",
         "COORDINATOR",
         "POLYBAR_BAR",
         "HOST_MONITOR",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("BARCTL_RETRY", "0.2")
+    # crew never reads the real actors folder or tmux server in a test.
+    monkeypatch.setenv("CREW_ACTORS_DIR", str(tmp_path / "no-actors"))
+    monkeypatch.setenv("CREW_TMUX_SOCKET", "crew-test-unused")
+    # Never the brain's real meta: unless a test fakes it, PATH's tripwire answers.
+    monkeypatch.setenv("BRAIN_BIN", str(tmp_path / "no-brain-bin"))
     yield tmp_path
     tripped = tripwires(tmp_path)
     assert tripped == [], f"a test reached a desktop command it didn't fake: {tripped}"
@@ -143,3 +154,13 @@ def write_config(tmp_path: Path) -> Callable[..., Path]:
         return path
 
     return write
+
+
+@pytest.fixture
+def desk(
+    isolate: Path, monkeypatch: pytest.MonkeyPatch, commands: Callable[..., Path]
+) -> Iterator[Desk]:
+    """crew's fake desktop: bspwm, tmux (its own server only), meta, alacritty, notify-send."""
+    fake = make_desk(isolate, monkeypatch, commands)
+    yield fake
+    assert fake.bare_tmux() == [], "a tmux call didn't name its own server"

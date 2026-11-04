@@ -6,7 +6,8 @@
 - **More logging:** `DESKTOP_TOOLS_LOG_LEVEL=DEBUG`.
 - **The bar:** `barctl doctor` checks everything barctl needs and prints a fix for each problem; `barctl status` shows
   the controller, the bars and every module; `barctl watch` shows each change as it happens.
-- **Errors and runs:** in the user journal, `journalctl --user -t barctl` (brain record 0017).
+- **Errors and runs:** in the user journal, `journalctl --user -t barctl` or `-t crew` (brain record 0017).
+- **crew:** `crew list` shows its windows, `crew names` the coordinators it knows, `CREW_DEBUG=1` its debug lines.
 
 ## Common problems
 
@@ -32,3 +33,19 @@ click started may hold a polybar pipe: start it through `barctl click` or `barme
 ### `error: cannot read DESKTOP_TOOLS_..._FILE`
 
 The file named by a `_FILE` variable doesn't exist, or the process can't read it. Check the path inside the container or unit, and the file's owner and mode: the process runs as uid 1000 / the `desktop-tools` user.
+
+### crew says "<name> is stopped"
+
+That coordinator has no window and no tmux session, and showing never starts one. Start it with a left click on its
+glyph in the bar (`crew toggle --launch <name>`) or `meta <name> launch`.
+
+### crew's strip is missing from the bar
+
+barctl has no `crew` module: `$XDG_CONFIG_HOME/barctl/modules.toml` replaces the packaged one whole, so it needs the
+`[modules.crew]` table, and polybar a `custom/ipc` module whose hook is `barctl render crew`. `crew bar` prints what
+the strip would show.
+
+### `crew width left` from a key prints nothing
+
+sxhkd's stdout may be a terminal that has gone; the width is still set (`crew width` prints it). Every failure says
+why on stderr and in the journal.

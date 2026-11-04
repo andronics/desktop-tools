@@ -7,7 +7,8 @@ from a release tag pinned in the dotfiles. The dotfiles keep only config (the po
 and, while a zsh module still calls a moved function, one-line shims. The design is the dotfiles'
 [record 0003](https://github.com/andronics/dotfiles/blob/main/docs/design/0003-desktop-tools-in-python.md), which amends [record 0001](https://github.com/andronics/dotfiles/blob/main/docs/design/0001-polybar-ipc-module-taxonomy.md) (the Polybar IPC module taxonomy).
 
-The first tools are **barctl**, the bar controller, and **barmenu**, the rofi menus it draws. It is not a general
+The first tools are **barctl**, the bar controller, **barmenu**, the rofi menus it draws, and **crew**, the
+coordinator switchboard ([Crew](Crew)). It is not a general
 status-bar framework: it serves this desktop's polybar 3.7, bspwm and theme.
 
 ## How it works
@@ -18,7 +19,7 @@ socket) only when what it shows changes.
 
 - **The controller** (`barctl run`, from `barctl.service`) follows the event streams: `pactl subscribe` for volume,
   `playerctl -a --follow` for the players. It writes each module's state and pokes the module.
-- **Other tools** change the bar only through `barctl push` (crew's coordinator strip, next), never polybar directly.
+- **Other tools** change the bar only through `barctl push` (crew's coordinator strip), never polybar directly.
 - **`render`** reads the state and the theme's roles at draw time: unavailable `dim`, idle `fg_dim`, active `accent`,
   alert `urgent`. It wraps the text in action tags that run `barctl click <module> <button>`, so every click goes
   through barctl, runs detached, and acts on what the bar shows (the shown player, not playerctl's default).

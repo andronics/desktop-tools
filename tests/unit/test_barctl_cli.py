@@ -228,7 +228,7 @@ def test_verbs_in_process(
     monkeypatch.setenv("TOOL_JOURNAL", "off")
     st.write("audio-level", {"tier": "active", "glyph": "G", "label": "35% ", "updated": 1.0})
     r = invoke(["list"])
-    assert r.stdout.split() == ["audio-level", "player-metadata", "player-play-pause"]
+    assert r.stdout.split() == ["audio-level", "crew", "player-metadata", "player-play-pause"]
     data = json.loads(invoke(["list", "--json"]).stdout)
     assert data[0] == {
         "name": "audio-level",
@@ -335,7 +335,7 @@ def test_desktop_tools_mounts_the_tools(isolate: Path, monkeypatch: pytest.Monke
     out = isolate / "completions"
     r = runner.invoke(top, ["completions", "zsh", "--out", str(out)])
     assert r.exit_code == 0
-    assert sorted(p.name for p in out.iterdir()) == ["_barctl_cmd", "_barmenu_cmd"]
+    assert sorted(p.name for p in out.iterdir()) == ["_barctl_cmd", "_barmenu_cmd", "_crew_cmd"]
     assert runner.invoke(top, ["completions", "bash", "--out", str(out)]).exit_code == 2
 
 

@@ -32,3 +32,18 @@ left = ["player", "play-pause", "{target}"]
 [modules.player-metadata]
 source = "player"
 display = "text"
+
+# The coordinator strip: one cell per coordinator, pushed by crew (brain record 0019 §7, dotfiles
+# record 0003 Part C) with each cell's tier (unavailable stopped, idle running, active busy,
+# alert waiting for input) and the shown one underlined. A left click shows or hides it, starting
+# a stopped one; scrolling cycles through the running ones. The menus (right click on a glyph,
+# `crew quick {segment}`; middle click, `crew menu`) come with crew's menu.
+[modules.crew]
+pusher = "crew"
+display = "icon"
+separator = ""
+
+[modules.crew.segment_clicks]
+left = ["crew", "toggle", "--launch", "{segment}"]
+scroll-up = ["crew", "cycle", "prev"]
+scroll-down = ["crew", "cycle", "next"]

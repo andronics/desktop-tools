@@ -193,6 +193,7 @@ def zsh(tool: Tool) -> str:
 def tools() -> list[Tool]:
     from desktop_tools.barctl.app import app as barctl
     from desktop_tools.barmenu.cli import build
+    from desktop_tools.crew.app import app as crew
 
     return [
         Tool(
@@ -208,6 +209,12 @@ def tools() -> list[Tool]:
             {},
             {"command": "_normal"},
             ("menus", "barmenu list"),
+        ),
+        Tool(
+            "crew",
+            crew,
+            "the coordinator switchboard (brain record 0019).",
+            {"name": ("names", "crew names"), "names_": ("names", "crew names")},
         ),
     ]
 
