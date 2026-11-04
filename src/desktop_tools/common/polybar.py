@@ -2,9 +2,10 @@
 
 polybar 3.7 listens on one Unix stream socket per bar, `$XDG_RUNTIME_DIR/polybar/ipc.<pid>.sock`.
 A message is a 13-byte header then the payload: the magic `polyipc`, a version byte (0), the
-payload's length (uint32, little-endian) and a type byte (0 a command such as `restart`, 1 an
+payload's length (uint32, little-endian) and a type byte (1 a command such as `restart`, 2 an
 action such as `#audio-level.hook.0`). The bar answers with the same header, type 0 for OK or
-255 for an error with its message as the payload.
+255 for an error with its message as the payload; it refuses any other type it is sent,
+0 included.
 
 barctl speaks this itself instead of starting a `polybar-msg` per message. When a bar answers
 in a format it doesn't recognise (another magic or version), it falls back to `polybar-msg`,
@@ -32,10 +33,12 @@ from desktop_tools.common import paths
 MAGIC = b"polyipc"
 VERSION = 0
 HEADER = struct.Struct("<7sBIB")
-TYPE_CMD = 0
-TYPE_ACTION = 1
-TYPE_OK = 0
-TYPE_ERR = 255
+# The type byte, as polybar 3.7's include/ipc/msg.hpp defines it: TYPE_OK and TYPE_ERR, then
+# v0::ipc_type (the protocol's type_t values). tests/fixtures holds a copy the tests pin these to.
+TYPE_CMD = 1  # msg.hpp v0::ipc_type::CMD
+TYPE_ACTION = 2  # msg.hpp v0::ipc_type::ACTION
+TYPE_OK = 0  # msg.hpp TYPE_OK
+TYPE_ERR = 255  # msg.hpp TYPE_ERR
 PING = "#barctl-ping.ping"  # an action no module has: every bar answers it, nothing happens
 TIMEOUT = 2.0
 
@@ -59,7 +62,8 @@ def socket_dir() -> Path:
 
 
 def sockets() -> dict[int, Path]:
-    """pid -> socket of every bar that has one. A stale socket is left for polybar to clear."""
+    """pid -> socket of every running bar that has one. A socket whose bar is gone (killed, so
+    it couldn't remove it) is skipped: kill_bar removes it."""
     out: dict[int, Path] = {}
     try:
         entries = list(socket_dir().iterdir())
@@ -68,7 +72,9 @@ def sockets() -> dict[int, Path]:
     for entry in entries:
         name = entry.name
         if name.startswith("ipc.") and name.endswith(".sock") and name[4:-5].isdigit():
-            out[int(name[4:-5])] = entry
+            pid = int(name[4:-5])
+            if (proc_root() / str(pid)).is_dir():
+                out[pid] = entry
     return dict(sorted(out.items()))
 
 
@@ -242,7 +248,7 @@ def start(launch: Launch) -> int:
 
 
 def kill_bar(pid: int, root: Path | None = None) -> None:
-    """Kill a bar and its scripts (each script is its own process group)."""
+    """Kill a bar and its scripts (each script is its own process group), and remove its socket."""
     kids = children(pid, root)
     with contextlib.suppress(OSError):
         os.kill(pid, signal.SIGKILL)
@@ -257,6 +263,9 @@ def kill_bar(pid: int, root: Path | None = None) -> None:
         if not alive(pid):
             break
         time.sleep(0.05)
+    # A SIGKILLed bar can't remove its socket: barctl does, so nothing finds a dead bar there.
+    with contextlib.suppress(OSError):
+        (socket_dir() / f"ipc.{pid}.sock").unlink()
 
 
 class RestartResult:

@@ -17,6 +17,9 @@ import pytest
 
 ROLES = {"unavailable": "#111111", "idle": "#222222", "active": "#333333", "alert": "#444444"}
 HEADER = struct.Struct("<7sBIB")
+# polybar 3.7's IPC type numbers, written out here and not imported from barctl, so a wrong
+# number in common/polybar.py fails the tests instead of being agreed with.
+OK, CMD, ACTION, ERR = 0, 1, 2, 255
 
 
 def write_theme(state: Path) -> dict[str, str]:
@@ -37,11 +40,14 @@ def write_theme(state: Path) -> dict[str, str]:
 
 
 class FakeBar:
-    """A polybar IPC socket: records every message, answers OK (or as told)."""
+    """A polybar IPC socket: records every message, answers OK (or as told). Like polybar, it
+    answers a type that is neither a command nor an action with an error."""
 
     def __init__(self, folder: Path, pid: int = 4242, version: int = 0, ok: bool = True) -> None:
         folder.mkdir(parents=True, exist_ok=True)
         self.path = folder / f"ipc.{pid}.sock"
+        # The bar's process, as barctl sees it in the fake /proc (BARCTL_PROC).
+        Path(os.environ["BARCTL_PROC"], str(pid)).mkdir(parents=True, exist_ok=True)
         self.pid, self.version, self.ok = pid, version, ok
         self.messages: list[tuple[int, str]] = []
         self.silent = False
@@ -73,14 +79,15 @@ class FakeBar:
                 if self.silent:
                     time.sleep(0.5)
                     continue
-                answer = b"" if self.ok else b"bad"
-                conn.sendall(
-                    HEADER.pack(b"polyipc", self.version, len(answer), 0 if self.ok else 255)
-                    + answer
-                )
+                if kind not in (CMD, ACTION):
+                    rtype, answer = ERR, f"Unrecognized IPC message type {kind}".encode()
+                else:
+                    rtype, answer = (OK, b"") if self.ok else (ERR, b"bad")
+                reply = HEADER.pack(b"polyipc", self.version, len(answer), rtype)
+                conn.sendall(reply + answer)
 
     def actions(self) -> list[str]:
-        return [body for kind, body in self.messages if kind == 1 and "barctl-ping" not in body]
+        return [b for kind, b in self.messages if kind == ACTION and "barctl-ping" not in b]
 
     def pokes(self) -> list[str]:
         return [a.split(".hook")[0].lstrip("#") for a in self.actions()]

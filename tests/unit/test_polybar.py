@@ -4,24 +4,44 @@ fake /proc. Nothing here reaches a real bar."""
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from desktop_tools.common import polybar
+from tests import fakes
 from tests.fakes import FakeBar, calls
+
+MSG_HPP = Path(__file__).resolve().parents[1] / "fixtures" / "polybar-3.7.2-ipc-msg.hpp"
+
+
+def test_type_numbers_match_polybars_own_definition() -> None:
+    """barctl's numbers against polybar 3.7.2's include/ipc/msg.hpp (a copy in tests/fixtures)."""
+    text = MSG_HPP.read_text(encoding="utf-8")
+    found = {k: int(v) for k, v in re.findall(r"\b(TYPE_OK|TYPE_ERR|CMD|ACTION) = (\d+)", text)}
+    assert found == {"TYPE_OK": 0, "TYPE_ERR": 255, "CMD": 1, "ACTION": 2}
+    ours = (polybar.TYPE_OK, polybar.TYPE_ERR, polybar.TYPE_CMD, polybar.TYPE_ACTION)
+    assert ours == (found["TYPE_OK"], found["TYPE_ERR"], found["CMD"], found["ACTION"])
+    assert f"VERSION = {polybar.VERSION};" in text
+    assert (fakes.OK, fakes.CMD, fakes.ACTION, fakes.ERR) == (0, 1, 2, 255)
+
+
+def test_an_unknown_type_is_refused(bar: FakeBar) -> None:
+    reply = polybar.send(bar.path, 0, "show")
+    assert (reply.ok, reply.message) == (False, "Unrecognized IPC message type 0")
 
 
 def test_poke_sends_the_hook_action(bar: FakeBar) -> None:
     assert polybar.sockets() == {4242: bar.path}
     assert polybar.poke("audio-level") == {4242: True}
-    assert bar.messages == [(polybar.TYPE_ACTION, "#audio-level.hook.0")]
+    assert bar.messages == [(fakes.ACTION, "#audio-level.hook.0")]
 
 
 def test_command_and_ping(bar: FakeBar) -> None:
     assert polybar.command("hide") == {4242: True}
-    assert bar.messages[-1] == (polybar.TYPE_CMD, "hide")
+    assert bar.messages[-1] == (fakes.CMD, "hide")
     reply = polybar.ping(4242)
     assert reply is not None and reply.ok and reply.known and reply.version == 0
     assert "ok=True" in repr(reply)
@@ -42,6 +62,8 @@ def test_no_bar_and_a_stale_socket(isolate: Path) -> None:
     folder.mkdir()
     (folder / "ipc.77.sock").touch()  # a socket file nobody listens on
     (folder / "other.txt").touch()
+    assert polybar.sockets() == {}  # no bar 77 runs: a killed bar's socket, skipped
+    (isolate / "proc" / "77").mkdir()  # bar 77 runs but doesn't answer
     assert polybar.poke("x") == {77: False}
     assert polybar.ping(77) is None
 
@@ -75,7 +97,7 @@ def fake_proc(
     root: Path, pid: int, comm: str, ppid: int = 1, argv: list[str] | None = None
 ) -> None:
     d = root / str(pid)
-    d.mkdir()
+    d.mkdir(exist_ok=True)  # a fake bar's pid is there already
     (d / "comm").write_text(comm + "\n")
     (d / "stat").write_text(f"{pid} ({comm}) S {ppid} {pid} {pid} 0\n")
     (d / "cmdline").write_bytes(b"\0".join(a.encode() for a in (argv or [comm])) + b"\0")
@@ -103,7 +125,7 @@ def test_restart_in_place(bar: FakeBar, isolate: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(polybar, "alive", lambda pid: True)
     result = polybar.restart(wait=1, sleep=lambda s: None)
     assert result.ok and result.restarted == [4242]
-    assert (polybar.TYPE_CMD, "restart") in bar.messages
+    assert (fakes.CMD, "restart") in bar.messages
 
 
 def test_restart_relaunches_a_frozen_bar(
@@ -173,6 +195,10 @@ def test_kill_bar_and_alive(isolate: Path, commands: Callable[..., Path]) -> Non
     commands(sleeper="time.sleep(30)")
     pid = polybar.start(polybar.Launch(["sleeper"], dict(os.environ)))
     assert polybar.alive(pid)
+    sock = polybar.socket_dir() / f"ipc.{pid}.sock"
+    sock.parent.mkdir()
+    sock.touch()
     polybar.kill_bar(pid, isolate / "proc")
     os.waitpid(pid, 0)
     assert not polybar.alive(pid)
+    assert not sock.exists()  # the dead bar's socket is gone
