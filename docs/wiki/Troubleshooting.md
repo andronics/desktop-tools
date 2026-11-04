@@ -66,7 +66,7 @@ too: `meta brain stop`. The same goes for the arbiter, and any coordinator the r
 
 ### A menu says "couldn't ask: …"
 
-crew's Yes/No (rofi's `prompt` theme) closed before it could be answered, twice, so nothing was done and crew
+crew's Yes/No (rofi's `confirm` theme, else `prompt`) closed before it could be answered, twice, so nothing was done and crew
 exited 1. The reason is rofi's own line (another rofi running, a keyboard it couldn't grab, no display) or "closed after
 … ms": a rofi that opens while the menu's click is still landing takes that click as one outside it. crew waits
 0.3 s for it first; each try is a warning in `journalctl --user -t crew`. Try the item again; if it keeps happening,

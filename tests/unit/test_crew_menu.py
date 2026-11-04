@@ -577,21 +577,49 @@ def test_a_confirmed_item_asks_first(menu_desk: Desk) -> None:
     assert quick_pick(menu_desk, reg, "desktop", "Status", "No") == 0
     assert ["desktop", "status"] not in meta_calls(menu_desk)
     question = rofi_calls(menu_desk)[-1]
-    assert question[question.index("-p") + 1] == "desktop: Status?"
+    assert question[question.index("-mesg") + 1] == "desktop: Status?"
     assert question[question.index("-selected-row") + 1] == "1"  # No is selected
     assert quick_pick(menu_desk, reg, "desktop", "Status", "Yes") == 0
     assert ["desktop", "status"] in meta_calls(menu_desk)
 
 
-def test_the_question_uses_the_prompt_theme(menu_desk: Desk, isolate: Path) -> None:
+def test_the_question_uses_the_confirm_theme(menu_desk: Desk, isolate: Path) -> None:
     themes = isolate / "xdg" / "config" / "rofi" / "themes"
     themes.mkdir(parents=True)
     (themes / "prompt.rasi").write_text("")
+    (themes / "confirm.rasi").write_text("")
     assert not stopping.confirm("go?")
     argv = rofi_calls(menu_desk)[-1]
-    assert argv[argv.index("-theme") + 1] == str(themes / "prompt.rasi")
+    assert argv[argv.index("-theme") + 1] == str(themes / "confirm.rasi")
+    assert argv[argv.index("-mesg") + 1] == "go?"  # the question in full, over the rows
+    assert argv[argv.index("-p") + 1] == "crew"
     assert argv[argv.index("-selected-row") + 1] == "1"  # No is selected
+    assert {"-no-custom", "-i"} <= set(argv)
+    assert argv[argv.index("-format") + 1] == "s"
     assert rofi_rows(menu_desk, 0)[:2] == ["Yes", "No"]
+
+
+def test_without_confirm_the_question_falls_back_to_prompt(menu_desk: Desk, isolate: Path) -> None:
+    themes = isolate / "xdg" / "config" / "rofi" / "themes"
+    themes.mkdir(parents=True)
+    (themes / "prompt.rasi").write_text("")
+    answers(menu_desk, "Yes")
+    assert stopping.confirm("go?")
+    argv = rofi_calls(menu_desk)[-1]
+    assert argv[argv.index("-theme") + 1] == str(themes / "prompt.rasi")
+    assert argv[argv.index("-mesg") + 1] == "go?"
+    assert argv[argv.index("-p") + 1] == "go?"  # prompt.rasi shows no message: the -p as before
+    (themes / "prompt.rasi").unlink()
+    assert not stopping.confirm("go?")
+    argv = rofi_calls(menu_desk)[-1]
+    assert "-theme" not in argv  # neither: rofi's own
+    assert argv[argv.index("-p") + 1] == "go?"
+
+
+def test_the_question_is_pango_escaped(menu_desk: Desk) -> None:
+    assert not stopping.confirm("a <b> & c?")
+    argv = rofi_calls(menu_desk)[-1]
+    assert argv[argv.index("-mesg") + 1] == "a &lt;b&gt; &amp; c?"
 
 
 # ---------------------------------------------------------------- stop and restart
@@ -625,7 +653,7 @@ def test_unclean_notes_ask_again_and_yes_forces(menu_desk: Desk, verb: str) -> N
         ["desktop", v, "--force", "--reason", f"Stephen: Yes to {v} anyway"],
     ]
     again = rofi_calls(menu_desk)[-1]
-    assert again[again.index("-p") + 1] == f"desktop: no PAUSED notes: {v} anyway?"
+    assert again[again.index("-mesg") + 1] == f"desktop: no PAUSED notes: {v} anyway?"
 
 
 def test_unclean_notes_and_no_stops_nothing(menu_desk: Desk) -> None:
@@ -676,7 +704,7 @@ def test_the_brain_is_always_asked_about(menu_desk: Desk) -> None:
     serve(menu_desk, "brain", brain_menu())
     assert quick_pick(menu_desk, reg, "brain", "Stop", "No") == 0
     asked = rofi_calls(menu_desk)[-1]
-    assert asked[asked.index("-p") + 1] == "the brain coordinator: stop it?"
+    assert asked[asked.index("-mesg") + 1] == "the brain coordinator: stop it?"
     assert meta_calls(menu_desk)[-1] == ["brain", "stop", "--check"]
     assert quick_pick(menu_desk, reg, "brain", "Stop", "Yes") == 0
     assert meta_calls(menu_desk)[-1] == ["brain", "stop", "--confirmed"]
@@ -710,7 +738,7 @@ def test_the_brain_with_unclean_notes_is_asked_with_why(menu_desk: Desk) -> None
     menu_desk.put("check-why", "newest heading is RESUMED, not PAUSED")
     assert quick_pick(menu_desk, reg, "brain", "Restart", "No") == 0
     asked = rofi_calls(menu_desk)[-1]
-    assert asked[asked.index("-p") + 1] == (
+    assert asked[asked.index("-mesg") + 1] == (
         "the brain coordinator: newest heading is RESUMED, not PAUSED: restart it anyway?"
     )
     assert quick_pick(menu_desk, reg, "brain", "Restart", "Yes") == 0
@@ -738,7 +766,7 @@ def test_every_one_only_stephen_ends_is_asked_and_confirmed(menu_desk: Desk, ver
         answers(menu_desk, "No")
         assert stopping.end(reg, c, verb, ask_first=False) == stopping.DECLINED
         asked = rofi_calls(menu_desk)[-1]
-        assert asked[asked.index("-p") + 1] == f"the {name} coordinator: {verb} it?"
+        assert asked[asked.index("-mesg") + 1] == f"the {name} coordinator: {verb} it?"
         clear_rofi(menu_desk)
         answers(menu_desk, "Yes")
         assert stopping.end(reg, c, verb, ask_first=False) == 0
@@ -987,7 +1015,7 @@ def test_stop_all_is_crews_stop_all(menu_desk: Desk) -> None:
     answers(menu_desk, "4", "Yes")
     assert menus.full(reg) == 0
     asked = rofi_calls(menu_desk)[-1]
-    assert asked[asked.index("-p") + 1] == (
+    assert asked[asked.index("-mesg") + 1] == (
         "desktop: newest heading is RESUMED, not PAUSED: stop all anyway?"
     )
     assert meta_calls(menu_desk) == [
@@ -1006,7 +1034,8 @@ def test_stop_all_no_stops_nothing(menu_desk: Desk) -> None:
     answers(menu_desk, "2", "No")
     assert menus.full(reg) == 1  # life.stop_all: declined is 1, nothing stopped
     asked = rofi_calls(menu_desk)[1]
-    assert asked[asked.index("-p") + 1] == "notes not clean for desktop, homelab: stop all anyway?"
+    q = "notes not clean for desktop, homelab: stop all anyway?"
+    assert asked[asked.index("-mesg") + 1] == q
     assert all("--check" in m for m in meta_calls(menu_desk))
 
 

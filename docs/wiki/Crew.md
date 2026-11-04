@@ -74,7 +74,7 @@ stay. crew knows how to run an item, not which items exist, so a new item needs 
 | `output: none` | Shows nothing |
 | meta's exit | 0 and 1 are results: the output is shown, and 1 adds a warn line or title ("⚠ brain: Status: there is a problem"). 5 is a "not found" notice. 2, 3, 4 and 6 are failures, which always notify with the code, what it means (usage, refused, failed, the module is broken) and meta's reason: stderr's first line, else stdout's |
 | `when` | `always`, `running`, `stopped` or `exists:<path>`: meta judges it, and crew judges it again as the menu opens |
-| `confirm` | Asks Yes/No first (rofi's `prompt` theme, No selected), once the menu's click has landed. A question that couldn't be shown is asked once more, then notified "couldn't ask"; it never counts as No, and nothing runs without a Yes |
+| `confirm` | Asks Yes/No first (the question in full over two rows, Yes and No, in rofi's `confirm` theme, else `prompt`; No selected; nothing to type), once the menu's click has landed. A question that couldn't be shown is asked once more, then notified "couldn't ask"; it never counts as No, and nothing runs without a Yes |
 
 **Stop and Restart** ask Yes/No first. If the brain's stop script finds the resume notes aren't clean, crew asks again
 with its reason, and Yes reruns it with `--force`. One only Stephen ends is always asked about, clean or not, and

@@ -13,7 +13,8 @@ What the menus add to `life` is the asking, ported from coord's `_coord-end-aski
   the caller is no coordinator or agent (meta's own check, on the caller's environment, which
   crew passes on untouched). Never for any other coordinator.
 
-Stop all is `life.stop_all`. The questions are `life.confirm`: rofi's `prompt` theme, No selected.
+Stop all is `life.stop_all`. The questions are `life.confirm`: rofi's `confirm` theme (else
+`prompt`), No selected.
 """
 
 from __future__ import annotations
