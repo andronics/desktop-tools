@@ -17,10 +17,12 @@ from __future__ import annotations
 import json
 import subprocess
 from collections.abc import Iterator
-from dataclasses import dataclass, field
-from typing import Any
 
 from desktop_tools.crew import conf, log
+
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from typing import Any
 
 TIMEOUT = 3.0
 
@@ -37,43 +39,60 @@ def parse_id(text: str) -> int | None:
         return None
 
 
-@dataclass
 class Window:
-    id: int
-    cls: str
-    instance: str
-    hidden: bool
-    floating: bool
-    monitor: int
-    border: int
-    rect: tuple[int, int, int, int]  # the floating rectangle: x, y, width, height
+    """A client window. Plain classes here, not dataclasses: see registry.Coordinator."""
+
+    __slots__ = ("border", "cls", "floating", "hidden", "id", "instance", "monitor", "rect")
+
+    def __init__(
+        self,
+        id: int,  # bspwm's own name for it
+        cls: str,
+        instance: str,
+        hidden: bool,
+        floating: bool,
+        monitor: int,
+        border: int,
+        rect: tuple[int, int, int, int],  # the floating rectangle: x, y, width, height
+    ) -> None:
+        self.id, self.cls, self.instance, self.hidden = id, cls, instance, hidden
+        self.floating, self.monitor, self.border, self.rect = floating, monitor, border, rect
 
     @property
     def node(self) -> str:
         return node_id(self.id)
 
 
-@dataclass
 class Monitor:
-    id: int
-    name: str
-    rect: tuple[int, int, int, int]
-    padding: dict[str, int]
-    gap: int  # the focused desktop's window gap
-    desk_padding: dict[str, int]
-    layout: str
-    focused_node: int | None
+    __slots__ = ("desk_padding", "focused_node", "gap", "id", "layout", "name", "padding", "rect")
+
+    def __init__(
+        self,
+        id: int,  # bspwm's own name for it
+        name: str,
+        rect: tuple[int, int, int, int],
+        padding: dict[str, int],
+        gap: int,  # the focused desktop's window gap
+        desk_padding: dict[str, int],
+        layout: str,
+        focused_node: int | None,
+    ) -> None:
+        self.id, self.name, self.rect, self.padding = id, name, rect, padding
+        self.gap, self.desk_padding, self.layout = gap, desk_padding, layout
+        self.focused_node = focused_node
 
     @property
     def node(self) -> str:
         return node_id(self.id)
 
 
-@dataclass
 class Tree:
-    windows: list[Window] = field(default_factory=list)
-    monitors: dict[int, Monitor] = field(default_factory=dict)
-    focused_monitor: int | None = None
+    __slots__ = ("focused_monitor", "monitors", "windows")
+
+    def __init__(self) -> None:
+        self.windows: list[Window] = []
+        self.monitors: dict[int, Monitor] = {}
+        self.focused_monitor: int | None = None
 
     def focused(self, win: Window) -> bool:
         """Whether `win` is the focused window of the focused monitor's desktop."""

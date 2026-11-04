@@ -18,15 +18,18 @@ under it is the same coordinator.
 from __future__ import annotations
 
 import contextlib
-import datetime as dt
 import json
 import os
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from desktop_tools.crew import conf, log
+
+# typing and datetime cost milliseconds the hooks run on every event: annotations only.
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    import datetime as dt
+    from typing import Any
 
 KEPT = "coordinators.json"
 META_TIMEOUT = 5.0
@@ -50,16 +53,38 @@ def glyph_of(text: object) -> str:
         return ""
 
 
-@dataclass(frozen=True)
 class Coordinator:
-    name: str
-    home: Path
-    session: str
-    glyph: str = ""
-    old_names: tuple[str, ...] = ()
-    order: int = 0
-    status: str = ""
-    stopped_by_default: bool = False
+    """One coordinator as the registry gives it. A plain class, not a dataclass: importing
+    dataclasses costs the hooks about 7 ms."""
+
+    __slots__ = (
+        "glyph",
+        "home",
+        "name",
+        "old_names",
+        "order",
+        "session",
+        "status",
+        "stopped_by_default",
+    )
+
+    def __init__(
+        self,
+        name: str,
+        home: Path,
+        session: str,
+        glyph: str = "",
+        old_names: tuple[str, ...] = (),
+        order: int = 0,
+        status: str = "",
+        stopped_by_default: bool = False,
+    ) -> None:
+        self.name, self.home, self.session, self.glyph = name, home, session, glyph
+        self.old_names, self.order, self.status = old_names, order, status
+        self.stopped_by_default = stopped_by_default
+
+    def __repr__(self) -> str:
+        return f"Coordinator({self.name!r})"
 
     @property
     def sessions(self) -> tuple[str, ...]:
@@ -72,10 +97,14 @@ class Coordinator:
         return self.glyph or self.name[0]
 
 
-@dataclass
 class Registry:
-    coordinators: list[Coordinator] = field(default_factory=list)
-    source: str = "homes"  # meta, kept or homes
+    __slots__ = ("coordinators", "source")
+
+    def __init__(
+        self, coordinators: list[Coordinator] | None = None, source: str = "homes"
+    ) -> None:
+        self.coordinators = coordinators or []
+        self.source = source  # meta, kept or homes
 
     @property
     def names(self) -> list[str]:
@@ -137,10 +166,12 @@ def _entries(data: Any) -> list[Any] | None:
 
 
 def _until_passed(value: object, today: dt.date) -> bool:
+    import datetime
+
     if not isinstance(value, str) or not value:
         return False
     try:
-        return dt.date.fromisoformat(value[:10]) < today
+        return datetime.date.fromisoformat(value[:10]) < today
     except ValueError:
         return False
 
@@ -148,10 +179,12 @@ def _until_passed(value: object, today: dt.date) -> bool:
 def parse(data: Any, today: dt.date | None = None) -> list[Coordinator] | None:
     """The coordinators in `meta brain coordinators --json`, in menu order; None if it isn't
     that shape. Entries without a usable name are dropped."""
+    import datetime
+
     entries = _entries(data)
     if entries is None:
         return None
-    today = today or dt.date.today()
+    today = today or datetime.date.today()
     out: list[tuple[int, int, Coordinator]] = []
     seen: set[str] = set()
     for i, raw in enumerate(entries):

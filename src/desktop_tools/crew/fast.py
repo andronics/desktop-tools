@@ -19,12 +19,13 @@ def bar(args: list[str]) -> int:
     if any(a != "--quiet" for a in args):
         sys.stderr.write(USAGE_BAR + "\n")
         return 2
-    from desktop_tools.crew import registry, strip, switch
+    from desktop_tools.crew import registry, strip
+    from desktop_tools.crew.out import say
 
     reg = registry.load(refresh=False)
     ok = strip.push(reg)
     if "--quiet" not in args:
-        switch.say(strip.line())
+        say(strip.line())
     return 0 if ok else 1
 
 

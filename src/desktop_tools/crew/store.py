@@ -15,7 +15,6 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import os
-import shutil
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -40,6 +39,8 @@ def copy_from_coord() -> list[str]:
     mark = folder / COPIED_MARK
     if mark.exists():
         return []
+    import shutil
+
     copied = []
     try:
         folder.mkdir(parents=True, exist_ok=True)

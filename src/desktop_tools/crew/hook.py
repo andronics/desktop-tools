@@ -23,11 +23,15 @@ Standard library only, with the registry's kept copy (never `meta`): this is a h
 
 from __future__ import annotations
 
-import json
 import sys
-from typing import IO, Any
 
-from desktop_tools.crew import conf, registry, store
+from desktop_tools.crew import conf
+
+# The hook runs on every Claude event: json, the registry and the state files are imported only
+# once a session is known to be under the actors folder, and typing never.
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from typing import IO, Any
 
 BUSY = ("UserPromptSubmit", "PostToolUse", "PostToolUseFailure")
 IDLE = ("Stop", "StopFailure", "SessionStart")
@@ -72,6 +76,8 @@ def coordinator_of(cwd: str) -> str | None:
     name = cwd[len(prefix) :].split("/", 1)[0]
     if not name:
         return None
+    from desktop_tools.crew import registry
+
     reg = registry.load(refresh=False)
     resolved = reg.resolve(name)
     return resolved if resolved in reg.names else None
@@ -88,6 +94,10 @@ def run(args: list[str], stdin: IO[str] | None = None) -> int:
     prefix = '"' + str(conf.actors_dir()).rstrip("/") + "/"
     if '"cwd"' not in raw or prefix not in raw:
         return 0
+    import json
+
+    from desktop_tools.crew import store
+
     try:
         data = json.loads(raw)
     except ValueError:

@@ -12,6 +12,7 @@ from typing import Annotated
 import typer
 
 from desktop_tools.crew import fast, registry, switch
+from desktop_tools.crew.out import say
 
 app = typer.Typer(
     name="crew",
@@ -152,7 +153,7 @@ def bar(
 def list_() -> None:
     """List crew's windows and whether each is hidden or visible."""
     for line in switch.windows():
-        switch.say(line)
+        say(line)
 
 
 @app.command()
@@ -163,7 +164,7 @@ def names(
     reg = registry.load()
     found = reg.keys()
     for name in reg.names:
-        switch.say(f"{found[name]} {name}" if keys else name)
+        say(f"{found[name]} {name}" if keys else name)
 
 
 @app.command()

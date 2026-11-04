@@ -13,8 +13,6 @@ Standard library only: `crew bar` and every Claude hook's refresh run it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 from desktop_tools.crew import conf, log, store, tmux, wm
 from desktop_tools.crew.registry import Registry
 
@@ -23,10 +21,12 @@ SOURCE = "crew"
 TIERS = {"off": "unavailable", "idle": "idle", "busy": "active", "waiting": "alert"}
 
 
-@dataclass
 class Scan:
-    running: set[str] = field(default_factory=set)
-    shown: set[str] = field(default_factory=set)
+    __slots__ = ("running", "shown")
+
+    def __init__(self) -> None:
+        self.running: set[str] = set()
+        self.shown: set[str] = set()
 
     def activity(self, name: str) -> str:
         """off, idle, busy or waiting. A stale file (not running) is removed."""

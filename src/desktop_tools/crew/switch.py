@@ -18,32 +18,17 @@ and gives its strip back. Every show starts the guard (`crew guard`), which keep
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
 import time
 
 from desktop_tools.crew import conf, log, store, strip, tmux, wm
+from desktop_tools.crew.out import say
 from desktop_tools.crew.registry import Coordinator, Registry, valid_name
 
 OK, FAILED, USAGE = 0, 1, 2
 LAUNCH_TIMEOUT = 30.0  # for `meta <name> launch` itself: it starts a tmux session and returns
-
-
-def say(text: str) -> bool:
-    """One line on stdout, unbuffered. False when stdout is gone (sxhkd's dead pty, a full
-    disk): the caller decides whether that matters."""
-    try:
-        if sys.stdout is sys.__stdout__:
-            # Unbuffered, so nothing is left for Python to fail flushing at exit (exit 120).
-            os.write(1, (text + "\n").encode())
-        else:  # a caller's own stream (a test's runner)
-            sys.stdout.write(text + "\n")
-            sys.stdout.flush()
-    except (OSError, ValueError):
-        return False
-    return True
 
 
 def crew_argv(*args: str) -> list[str]:
