@@ -131,8 +131,11 @@ def act(reg: Registry, c: Coordinator, row: Row) -> int:
     target = reg.get(life[0]) if life else None
     if life and target is not None:
         return stopping.end(reg, target, life[1], ask_first=item.confirm)
-    if item.confirm and not stopping.confirm(f"{c.name}: {item.label}?"):
-        return stopping.DECLINED
+    try:
+        if item.confirm and not stopping.confirm(f"{c.name}: {item.label}?"):
+            return stopping.DECLINED
+    except stopping.Unasked:
+        return switch.FAILED  # Stephen has been told it couldn't ask
     return items.run(c, item)
 
 

@@ -273,16 +273,39 @@ sys.exit(1)
 """
 
 # rofi answers from `rofi-answers`, one line per call in order (an empty line, or none left, is
-# Escape), and keeps each call's rows in rofi-in.<n>.
+# Escape), and keeps each call's rows in rofi-in.<n>. Two ways it can fail to be shown, neither
+# using up an answer, each logged as a line in `rofi-unshown`:
+# - `rofi-race` (seconds): started that soon after the last rofi closed, it closes at once with
+#   exit 1 and nothing said, as the real one does when the menu's own click lands on it;
+# - `rofi-fails` (a count): the next that many Yes/No questions fail as a grab failure does,
+#   exit 1 and rofi's own line on stderr.
 ROFI_SEQ = r"""
+stamp = os.path.join(here, "rofi-closed")
+def close(code, unshown=""):
+    if unshown:
+        open(os.path.join(here, "rofi-unshown"), "a").write(unshown + "\n")
+    open(stamp, "w").write(repr(time.monotonic()))
+    sys.exit(code)
+sys_in = sys.stdin.read()
+race = os.path.join(here, "rofi-race")
+if os.path.exists(race) and os.path.exists(stamp):
+    if time.monotonic() - float(open(stamp).read()) < float(open(race).read()):
+        close(1, "race")
+fails = os.path.join(here, "rofi-fails")
+left = int(open(fails).read()) if os.path.exists(fails) else 0
+if sys_in == "Yes\nNo\n" and left > 0:
+    open(fails, "w").write(str(left - 1))
+    sys.stderr.write("Failed to grab keyboard after 500 times. Giving up.\n")
+    close(1, "grab")
 path = os.path.join(here, "rofi-answers")
 answers = open(path).read().split("\n") if os.path.exists(path) else []
 n = len([f for f in os.listdir(here) if f.startswith("rofi-in.")])
-open(os.path.join(here, f"rofi-in.{n}"), "w").write(sys.stdin.read())
+open(os.path.join(here, f"rofi-in.{n}"), "w").write(sys_in)
 answer = answers[n] if n < len(answers) else ""
 if not answer:
-    sys.exit(1)
+    close(1)
 print(answer)
+close(0)
 """
 
 # xclip keeps what it was given on stdin in `clipboard`.
@@ -488,6 +511,12 @@ def make_desk(
     monkeypatch.setenv("CREW_GUARD_SETTLE", "0.05")
     for key in ("CREW_CLASS", "CREW_OLD_CLASS", "CREW_REGISTRY_MAX_AGE", "CREW_BAR_TTL"):
         monkeypatch.delenv(key, raising=False)
+    from desktop_tools.crew import life
+
+    # The Yes/No's waits, off: a fake rofi answers at once, so its Escape would read as unshown.
+    # The tests of those waits set them back (test_crew_menu's REAL_WAITS).
+    monkeypatch.setattr(life, "SETTLE", 0.0, raising=False)
+    monkeypatch.setattr(life, "UNSHOWN", 0.0, raising=False)
 
     from desktop_tools.common import procs
 

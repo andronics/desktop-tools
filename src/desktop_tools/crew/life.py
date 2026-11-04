@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import time
 
 from desktop_tools.common import paths
 from desktop_tools.crew import log, metacall, switch, tmux, wm
@@ -32,6 +33,11 @@ CONFIRM_THEME = "prompt"  # coord's confirm theme, ~/.config/rofi/themes/prompt.
 FORCED = "Stephen: crew stop --force"
 ALL_YES = "Stephen: Yes to stop all anyway"
 ALL_FLAG = "Stephen: crew stop --all --yes"
+SETTLE = 0.3  # seconds a Yes/No waits for the click that picked it to land (barmenu's settle)
+UNSHOWN = 0.25  # an unanswered Yes/No that closed sooner than this was never seen
+# What rofi says when it can't show itself: its single-instance lock, a keyboard or pointer it
+# couldn't grab, no display.
+UNSHOWN_SAYS = ("already running", "Failed to grab", "Giving up", "open display")
 
 
 def _known(reg: Registry, name: str) -> Coordinator | None:
@@ -54,15 +60,25 @@ def _running(c: Coordinator, sessions: set[str]) -> bool:
     return any(s in sessions for s in c.sessions)
 
 
-def confirm(question: str) -> bool:
-    """Yes only on an explicit Yes, as coord's: No is selected, so Return on open, Escape, or
-    rofi missing or failing all mean No."""
+class Unasked(Exception):
+    """The Yes/No couldn't be shown, twice (Stephen notified): nothing is done. It is no No: the
+    caller fails instead of going back a level."""
+
+
+def _ask(question: str) -> bool | str:
+    """One Yes/No: True on Yes, False on No (Escape, Return on the selected No), else why it
+    couldn't be shown. It opens only once the click that picked it has landed (`SETTLE`): a rofi
+    started the instant the menu's rofi closed takes that click's release as a click outside
+    it and closes at once, unseen (the click-test's Stop that did nothing)."""
     if shutil.which("rofi") is None:
-        log.error(f"cannot ask ({question}): rofi is not on PATH")
-        return False
+        return "rofi is not on PATH"
+    from desktop_tools.barmenu import menus as bm
+
+    bm.settle(SETTLE)
     theme = paths.config_home() / "rofi" / "themes" / f"{CONFIRM_THEME}.rasi"
     argv = ["rofi", "-dmenu", "-i", "-no-custom", "-format", "s", "-selected-row", "1"]
     argv += ["-theme", str(theme)] if theme.is_file() else []
+    started = time.monotonic()
     try:
         # S603/S607: rofi with crew's fixed options; it blocks until answered.
         done = subprocess.run(  # noqa: S603
@@ -73,9 +89,39 @@ def confirm(question: str) -> bool:
             check=False,
         )
     except OSError as e:
-        log.error(f"cannot ask ({question}): {e.strerror}")
-        return False
-    return done.returncode == 0 and done.stdout.strip() == "Yes"
+        return f"rofi: {e.strerror}"
+    took = time.monotonic() - started
+    answer = done.stdout.strip()
+    if done.returncode == 0 and answer:
+        return answer == "Yes"
+    said = [line.strip() for line in done.stderr.splitlines() if line.strip()]
+    if done.returncode not in (0, 1):
+        return f"rofi exited {done.returncode}" + (f": {said[-1]}" if said else "")
+    failed = [line for line in said if any(m in line for m in UNSHOWN_SAYS)]
+    if failed:
+        return failed[-1]
+    if took < UNSHOWN:
+        return f"rofi closed after {took * 1000:.0f} ms, before it could be answered"
+    return False
+
+
+def confirm(question: str) -> bool:
+    """Yes only on an explicit Yes, as coord's: No is selected, so Return on open or Escape mean
+    No. A question that couldn't be shown is asked once more; shown neither time, Stephen is
+    told and `Unasked` raised, so nothing runs without his Yes and nothing reads it as No."""
+    got = _ask(question)
+    if isinstance(got, str):
+        log.warning(f"cannot ask ({question}): {got}; asking again")
+        got = _ask(question)
+    if isinstance(got, str):
+        log.warning(f"cannot ask ({question}): {got}; nothing done")
+        switch.notify(
+            f"couldn't ask: {got}",
+            f"{question} Nothing was done.",
+            "--hint=string:x-dunst-stack-tag:crew-alert",
+        )
+        raise Unasked(got)
+    return got
 
 
 # ---------------------------------------------------------------- one coordinator
@@ -160,7 +206,11 @@ def stop_all(reg: Registry, *, yes: bool = False) -> int:
             question = f"{only}: {why}"
         else:
             question = f"notes not clean for {', '.join(unclean)}"
-        if not confirm(f"{question}: stop all anyway?"):
+        try:
+            agreed = confirm(f"{question}: stop all anyway?")
+        except Unasked:
+            return FAILED
+        if not agreed:
             log.info("stop all: declined, nothing stopped")
             return FAILED
     code = OK
