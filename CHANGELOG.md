@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/andronics/desktop-tools/compare/v0.1.4...v0.1.5) (2026-11-04)
+
+
+### ✨ Features
+
+* **barmenu:** theme and lock menus, with menu providers and current rows ([#15](https://github.com/andronics/desktop-tools/issues/15)) ([5f77fcd](https://github.com/andronics/desktop-tools/commit/5f77fcd3e4d01ec882971d9e664c9958c73e7ab6))
+
 ## [0.1.4](https://github.com/andronics/desktop-tools/compare/v0.1.3...v0.1.4) (2026-11-04)
 
 
