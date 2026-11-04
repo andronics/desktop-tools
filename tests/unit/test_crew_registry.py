@@ -20,9 +20,9 @@ NEW += ["incubator", "security", "ventures"]
 
 def test_reads_meta_in_menu_order_and_keeps_a_copy(desk: Desk) -> None:
     desk.coordinators("brain", "media")
-    entries = json.loads((desk.base / "registry.json").read_text())
-    entries[0]["menu_order"], entries[1]["menu_order"] = 20, 10
-    desk.put("registry.json", json.dumps(entries))
+    envelope = json.loads((desk.base / "registry.json").read_text())
+    envelope["data"][0]["menu_order"], envelope["data"][1]["menu_order"] = 20, 10
+    desk.put("registry.json", json.dumps(envelope))
     reg = rg.load()
     assert (reg.names, reg.source) == (["media", "brain"], "meta")
     assert rg.kept_path().is_file()
@@ -219,3 +219,28 @@ def test_a_copy_that_cant_be_kept_warns(desk: Desk, capsys: pytest.CaptureFixtur
     conf.state_dir().write_text("not a folder")
     assert rg.load().names == ["brain"]
     assert "registry: cannot keep a copy in" in capsys.readouterr().err
+
+
+def test_a_stale_answer_is_used_with_a_warning(
+    desk: Desk, capsys: pytest.CaptureFixture[str]
+) -> None:
+    desk.coordinators("brain")
+    envelope = json.loads((desk.base / "registry.json").read_text())
+    envelope.update(stale=True, age_s=900)
+    desk.put("registry.json", json.dumps(envelope))
+    reg = rg.load()
+    assert (reg.names, reg.source) == (["brain"], "meta")
+    assert "registry: meta's answer is stale (900s old)" in capsys.readouterr().err
+
+
+def test_the_live_registrys_answer_parses() -> None:
+    """A copy of the live `meta brain coordinators --json` (2026-11-04): names, order, glyphs."""
+    from pathlib import Path as P
+
+    data = json.loads(
+        (P(__file__).parent.parent / "fixtures" / "meta-coordinators.json").read_text()
+    )
+    found = rg.parse(data)
+    assert found is not None
+    assert [c.name for c in found] == NEW
+    assert found[6].icon == "\U000f0493" and found[0].session == "brain-coordinator"

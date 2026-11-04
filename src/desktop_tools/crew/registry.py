@@ -309,6 +309,9 @@ def ask_meta() -> Any | None:
     if not parse(data):
         log.warning("registry: meta brain coordinators listed no coordinator")
         return None
+    if isinstance(data, dict) and data.get("stale"):
+        # meta served its last good copy because the vault couldn't be read: still usable.
+        log.warning(f"registry: meta's answer is stale ({data.get('age_s', '?')}s old)")
     return data
 
 

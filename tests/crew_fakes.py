@@ -258,10 +258,29 @@ class Desk:
                 "bar_glyph": "",
                 "old_names": [],
                 "old_names_until": "2999-12-04",
+                "note": f"{name} Coordinator",
+                "note_path": f"/vault/{name} Coordinator.md",
+                "centre": name,
+                "status": "active",
+                "stopped_by_default": False,
+                "icon": "",
+                "meta_module": "",
+                "repos": [],
                 **extra.get(name, {}),
             }
             entries.append(entry)
-        self.put("registry.json", json.dumps(entries))
+        # The envelope the live `meta brain coordinators --json` prints (brain PR 151).
+        envelope = {
+            "meta": 1,
+            "centre": "brain",
+            "verb": "coordinators",
+            "generated": "2026-11-04T04:37:38+00:00",
+            "cached": True,
+            "age_s": 33,
+            "stale": False,
+            "data": entries,
+        }
+        self.put("registry.json", json.dumps(envelope))
         return entries
 
     # ------------------------------------------------------------ windows and sessions

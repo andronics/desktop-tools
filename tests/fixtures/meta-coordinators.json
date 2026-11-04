@@ -1,0 +1,239 @@
+{
+ "meta": 1,
+ "centre": "brain",
+ "verb": "coordinators",
+ "generated": "2026-11-04T04:37:38+00:00",
+ "cached": true,
+ "age_s": 33,
+ "stale": false,
+ "data": [
+  {
+   "name": "brain",
+   "slug": "brain-coordinator",
+   "tmux_session": "brain-coordinator",
+   "home": "/actors/brain",
+   "note": "🧠 Brain Coordinator",
+   "note_path": "/vault/brain.md",
+   "centre": "🧠 Brain",
+   "status": "active",
+   "stopped_by_default": false,
+   "icon": "🧠",
+   "old_names": [],
+   "old_names_until": "2026-12-04",
+   "menu_order": 10,
+   "bar_glyph": "U+F09D1",
+   "meta_module": "/mnt/brain/meta/brain",
+   "repos": []
+  },
+  {
+   "name": "platform",
+   "slug": "platform-coordinator",
+   "tmux_session": "platform-coordinator",
+   "home": "/actors/platform",
+   "note": "🧱 Platform Coordinator",
+   "note_path": "/vault/platform.md",
+   "centre": "🧱 Platform",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "🧱",
+   "old_names": [
+    "template"
+   ],
+   "old_names_until": "2026-12-04",
+   "menu_order": 20,
+   "bar_glyph": "U+F1517",
+   "meta_module": "/pool/distributed/dev/template-base/meta/platform",
+   "repos": [
+    "andronics/template-base",
+    "andronics/template-obsidian",
+    "andronics/template-python",
+    "andronics/template-typescript",
+    "andronics/template-container",
+    "andronics/template-actors",
+    "andronics/template-go"
+   ]
+  },
+  {
+   "name": "personal",
+   "slug": "personal-coordinator",
+   "tmux_session": "personal-coordinator",
+   "home": "/actors/personal",
+   "note": "👪 Personal Coordinator",
+   "note_path": "/vault/personal.md",
+   "centre": "👪 Personal",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "👪",
+   "old_names": [
+    "folio"
+   ],
+   "old_names_until": "2026-12-04",
+   "menu_order": 30,
+   "bar_glyph": "U+F00D6",
+   "meta_module": null,
+   "repos": [
+    "metalayerlab/folio",
+    "metalayerlab/folio-lab"
+   ]
+  },
+  {
+   "name": "homelab",
+   "slug": "homelab-coordinator",
+   "tmux_session": "homelab-coordinator",
+   "home": "/actors/homelab",
+   "note": "🏗️ Homelab Coordinator",
+   "note_path": "/vault/homelab.md",
+   "centre": "🏠 Homelab",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "🏗️",
+   "old_names": [],
+   "old_names_until": "2026-12-04",
+   "menu_order": 40,
+   "bar_glyph": "U+F048D",
+   "meta_module": "/pool/distributed/dev/homelab/meta/homelab",
+   "repos": [
+    "andronics/homelab",
+    "andronics/homelab-k8s",
+    "andronics/homelab-etc",
+    "andronics/homelab-talos",
+    "andronics/homelab-portal",
+    "andronics/homelab-docker-compose",
+    "andronics/homelab-docker-images",
+    "andronics/homelab-docker-mods"
+   ]
+  },
+  {
+   "name": "network-tools",
+   "slug": "network-tools-coordinator",
+   "tmux_session": "network-tools-coordinator",
+   "home": "/actors/network-tools",
+   "note": "🌐 Network Tools Coordinator",
+   "note_path": "/vault/network-tools.md",
+   "centre": "🌐 Network Tools",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "🌐",
+   "old_names": [
+    "metalayerlab"
+   ],
+   "old_names_until": "2026-12-04",
+   "menu_order": 50,
+   "bar_glyph": "U+F0F58",
+   "meta_module": "/pool/distributed/dev/interpose/meta/network-tools",
+   "repos": [
+    "metalayerlab/interpose",
+    "metalayerlab/sluice",
+    "metalayerlab/mitm-proxy"
+   ]
+  },
+  {
+   "name": "media",
+   "slug": "media-coordinator",
+   "tmux_session": "media-coordinator",
+   "home": "/actors/media",
+   "note": "📺 Media Coordinator",
+   "note_path": "/vault/media.md",
+   "centre": "📺 Media",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "📺",
+   "old_names": [
+    "apps"
+   ],
+   "old_names_until": "2026-12-04",
+   "menu_order": 60,
+   "bar_glyph": "U+F003B",
+   "meta_module": null,
+   "repos": [
+    "andronics/trackie",
+    "andronics/qbt-rules",
+    "andronics/ferryman",
+    "andronics/unraid-templates"
+   ]
+  },
+  {
+   "name": "desktop",
+   "slug": "desktop-coordinator",
+   "tmux_session": "desktop-coordinator",
+   "home": "/actors/desktop",
+   "note": "🖥️ Desktop Coordinator",
+   "note_path": "/vault/desktop.md",
+   "centre": "🖥️ Desktop",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "🖥️",
+   "old_names": [
+    "dotfiles"
+   ],
+   "old_names_until": "2026-12-04",
+   "menu_order": 70,
+   "bar_glyph": "U+F0493",
+   "meta_module": null,
+   "repos": [
+    "andronics/dotfiles",
+    "andronics/ssh",
+    "andronics/desktop-tools"
+   ]
+  },
+  {
+   "name": "incubator",
+   "slug": "incubator-coordinator",
+   "tmux_session": "incubator-coordinator",
+   "home": "/actors/incubator",
+   "note": "💡 Incubator Coordinator",
+   "note_path": "/vault/incubator.md",
+   "centre": "💡 Incubator",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "💡",
+   "old_names": [
+    "ideas"
+   ],
+   "old_names_until": "2026-12-04",
+   "menu_order": 80,
+   "bar_glyph": "U+F0335",
+   "meta_module": "/pool/distributed/dev/incubator/meta/incubator",
+   "repos": [
+    "andronics/virtual-organisations",
+    "andronics/incubator"
+   ]
+  },
+  {
+   "name": "security",
+   "slug": "security-coordinator",
+   "tmux_session": "security-coordinator",
+   "home": "/actors/security",
+   "note": "🔐 Security & Identity Coordinator",
+   "note_path": "/vault/security.md",
+   "centre": "🔐 Security & Identity",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "🔐",
+   "old_names": [],
+   "old_names_until": "2026-12-04",
+   "menu_order": 90,
+   "bar_glyph": "U+F0306",
+   "meta_module": null,
+   "repos": []
+  },
+  {
+   "name": "ventures",
+   "slug": "ventures-coordinator",
+   "tmux_session": "ventures-coordinator",
+   "home": "/actors/ventures",
+   "note": "💼 Ventures Coordinator",
+   "note_path": "/vault/ventures.md",
+   "centre": "💼 Ventures",
+   "status": "active",
+   "stopped_by_default": true,
+   "icon": "💼",
+   "old_names": [],
+   "old_names_until": "2026-12-04",
+   "menu_order": 100,
+   "bar_glyph": "U+F1494",
+   "meta_module": null,
+   "repos": []
+  }
+ ]
+}
