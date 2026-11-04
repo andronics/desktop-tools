@@ -22,6 +22,9 @@ The tools run as Stephen on his desktop and open no network port. What they trus
 - CI scans every commit with gitleaks, and secrets in history fail the build.
 
 This project has no secrets; the journal helper redacts anything that looks like one before logging (brain record 0017).
+A tool's arguments never reach the journal: the helper drops them from what it logs, and before its first entry it
+rewrites its own process's command line to the program alone, since journald copies that into `_CMDLINE`. Where it
+can't, it writes no journal entry (brain PR 170). From then on `ps` shows the tool without its arguments.
 
 ## Hardening
 

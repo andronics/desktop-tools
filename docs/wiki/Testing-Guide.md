@@ -33,6 +33,9 @@ the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_
 - **Commands** (`pactl`, `playerctl`, `rofi`, ...): `commands(name="python body")` writes a script first on PATH that
   logs its arguments; `calls(log)` reads them back. A followed stream is a FIFO the test writes (`Feed`).
 - **polybar**: the `bar` fixture listens on `ipc.4242.sock`; `bar.pokes()` and `bar.wait(n)` give the modules poked.
+- **journald's own fields**: `tests/unit/test_journal.py`'s `journald` fixture asks the fake journal socket for the
+  sender's credentials (`SO_PASSCRED`) and reads its `/proc/<pid>/cmdline` while it is alive, as journald fills
+  `_CMDLINE`; the sender waits on stdin after each entry. Linux only: skipped elsewhere.
 - **Detached launches**: the `launched` fixture records `procs.detach` instead of running it.
 - **`--help` runs nothing**: `test_help_runs_nothing` runs every command's help in a real process with every command
   faked to fail, and checks nothing was called, written or sent.

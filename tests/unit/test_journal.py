@@ -12,14 +12,18 @@ shell helper and its own tools stay in the brain.
 
 from __future__ import annotations
 
+import builtins
 import datetime as dt
 import json
 import os
+import socket
 import struct
 import subprocess
 import sys
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -313,6 +317,9 @@ PLANTED = {
     "github_pat_11ABCDEFG0123456789_abcdefghijkl": "[redacted]",
     "fp 0123456789abcdef0123456789abcdef01234567": "fp [redacted]",
     "b64 dGhpcyBpcyBhIHNlY3JldCB2YWx1ZSBmb3IgdGVzdHM9PQ==": "b64 [redacted]",
+    "nmcli --password hunter2": "nmcli --password [redacted]",
+    "password = hunter2": "password = [redacted]",
+    "gh-token: abc123": "gh-token: [redacted]",
 }
 
 
@@ -338,6 +345,20 @@ def test_spaced_fingerprint_and_paths_untouched() -> None:
         "short abc123 sha",
         "a-very-long-path-component-with-only-letters-in-it",
         "",
+    ):
+        assert journal.redact(s) == s
+
+
+def test_pass_paths_with_their_ages_untouched() -> None:
+    """A pass path and its age in days: a path ending in a keyword (token, api-key, secret,
+    password) is a name, not a key and its value (the brain's planted defect, PR 158)."""
+    for s in (
+        "accounts/github.com/gh-cli-token  312",
+        "accounts/last.fm/api-key  312",
+        "accounts/last.fm/shared-secret  4",
+        "accounts/nordvpn.com/cli-password  27",
+        "services/github/token 12",
+        "actors/tagwarden/api_key  9",
     ):
         assert journal.redact(s) == s
 
@@ -422,3 +443,195 @@ def test_exit_codes_and_outcomes() -> None:
     assert journal._exit_code("message") == 1
     assert journal.outcome(5, {5}) == "result"
     assert journal.signature("failed 123 at deadbeef01") == "failed N at N"
+
+
+# ---------------------------------------------------------------- the fields journald adds itself
+#
+# journald adds _CMDLINE (the sender's /proc/<pid>/cmdline) to every entry: the helper's own
+# redaction can't reach it, so the helper rewrites its command line before its first entry. The
+# fake journald below reads the command line the way journald does, while the sender is alive.
+
+linux_only = pytest.mark.skipif(
+    not sys.platform.startswith("linux"), reason="/proc and SO_PASSCRED are Linux's"
+)
+CMDLINE_SECRET = "SHOULDNOTAPPEAR"  # noqa: S105 - a planted argument, the point of the tests
+RAW_SENDER = """import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+s.sendto(b"MESSAGE=raw\\nSYSLOG_IDENTIFIER=jc-raw\\n", sys.argv[1])
+sys.stdin.readline()
+"""
+PROBE = """import sys
+from desktop_tools.common import journal
+
+def main():
+    journal.error("probe error")
+    sys.stdin.readline()  # alive while the fake journald reads our command line
+    return 0
+
+code = journal.run(main, tool="jc-probe", owner="desktop-coordinator")
+sys.stdin.readline()
+sys.exit(code)
+"""
+# Loaded first by every Python started with this folder on PYTHONPATH: after each entry it sends,
+# the real tool waits for a line on stdin, so the fake journald can read its command line.
+PAUSE = """import sys
+from desktop_tools.common import journal
+
+_send = journal._send
+
+
+def _paused(fields):
+    _send(fields)
+    sys.stdin.readline()
+
+
+journal._send = _paused
+"""
+
+
+@pytest.fixture
+def journald(journal_sock: FakeJournal) -> FakeJournal:
+    """The fake journal socket, asking for the sender's credentials as journald does."""
+    journal_sock.sock.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
+    return journal_sock
+
+
+def receive(fake: FakeJournal, timeout: float = 10.0) -> dict[str, str]:
+    """One entry, with the fields journald would add from the sender's credentials and /proc."""
+    end = time.time() + timeout
+    while True:
+        try:
+            data, anc, _, _ = fake.sock.recvmsg(1 << 20, socket.CMSG_SPACE(12))
+            break
+        except BlockingIOError:
+            if time.time() > end:
+                raise AssertionError("no entry arrived") from None
+            time.sleep(0.01)
+    ((pid, _uid, _gid),) = [
+        struct.unpack("iII", d[:12])
+        for lvl, kind, d in anc
+        if lvl == socket.SOL_SOCKET and kind == socket.SCM_CREDENTIALS
+    ]
+    fields = decode(data)
+    fields["_PID"] = str(pid)
+    raw = Path(f"/proc/{pid}/cmdline").read_bytes().rstrip(b"\0").split(b"\0")
+    fields["_CMDLINE"] = " ".join(a.decode(errors="replace") for a in raw)
+    fields["_COMM"] = Path(f"/proc/{pid}/comm").read_text().strip()
+    fields["_EXE"] = os.readlink(f"/proc/{pid}/exe")
+    return fields
+
+
+def hits(entries: list[dict[str, str]]) -> int:
+    return sum(CMDLINE_SECRET in v for e in entries for v in e.values())
+
+
+def entries_of(fake: FakeJournal, p: subprocess.Popen[str], n: int) -> list[dict[str, str]]:
+    """n entries from a sender that waits for a line on stdin after each, then its exit."""
+    assert p.stdin is not None
+    got = []
+    try:
+        for _ in range(n):
+            got.append(receive(fake))
+            p.stdin.write("\n")
+            p.stdin.flush()
+        p.communicate("\n", timeout=30)
+    finally:
+        p.kill()
+    return got
+
+
+@linux_only
+def test_the_fake_journald_sees_a_command_line_secret(journald: FakeJournal) -> None:
+    """The planted defect: a sender without the helper has its argument in _CMDLINE."""
+    p = fakes.start(
+        [sys.executable, "-c", RAW_SENDER, str(journald.path), f"--token={CMDLINE_SECRET}"],
+        stdin=subprocess.PIPE,
+    )
+    (e,) = entries_of(journald, p, 1)
+    assert hits([e]) == 1
+    assert CMDLINE_SECRET in e["_CMDLINE"]
+
+
+@linux_only
+def test_no_argument_in_any_field_of_a_tool_entry(journald: FakeJournal, isolate: Path) -> None:
+    script = isolate / "jc-probe.py"
+    script.write_text(PROBE)
+    p = fakes.start(
+        [sys.executable, str(script), f"--token={CMDLINE_SECRET}", "other words"],
+        stdin=subprocess.PIPE,
+    )
+    got = entries_of(journald, p, 2)  # the error while main() waits, the run while the tool does
+    assert p.returncode == 0
+    assert [e["TOOL_EVENT"] for e in got] == ["error", "run"]
+    assert hits(got) == 0
+    assert {e["_CMDLINE"] for e in got} == {f"{sys.executable} {script}"}  # the program alone
+    assert CMDLINE_SECRET not in raw_store(isolate)
+
+
+def _paused_env(isolate: Path) -> dict[str, str]:
+    site = isolate / "pause"
+    site.mkdir()
+    (site / "sitecustomize.py").write_text(PAUSE)
+    path = os.pathsep.join(p for p in (str(site), os.environ.get("PYTHONPATH", "")) if p)
+    return {**os.environ, "PYTHONPATH": path}
+
+
+@linux_only
+@pytest.mark.parametrize("form", ["module", "script"])
+def test_a_desktop_tools_tool_keeps_its_arguments_out(
+    journald: FakeJournal, isolate: Path, form: str
+) -> None:
+    """crew itself, as `python -m desktop_tools.crew` and as the installed `crew` script (what a
+    `uv tool` shim or `uv run crew` runs): a usage error's warning and its run entry name the
+    program and none of its arguments."""
+    if form == "module":
+        argv, program = [sys.executable, "-m", "desktop_tools.crew"], None
+    else:
+        crew = Path(sys.executable).parent / "crew"
+        if not crew.is_file():
+            pytest.skip("no installed crew script in this environment")
+        argv, program = [str(crew)], str(crew)
+    p = fakes.start(
+        [*argv, "no-such-verb", f"--token={CMDLINE_SECRET}"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        env=_paused_env(isolate),
+    )
+    got = entries_of(journald, p, 2)
+    assert p.returncode == 2
+    assert [e["TOOL_EVENT"] for e in got] == ["warning", "run"]
+    assert {e["SYSLOG_IDENTIFIER"] for e in got} == {"crew"}
+    assert hits(got) == 0
+    (cmdline,) = {e["_CMDLINE"] for e in got}
+    if program is None:
+        assert cmdline == f"{sys.executable} -m desktop_tools.crew"
+    else:
+        # The script's shebang interpreter, then the script: never the verb or the option.
+        assert cmdline.split(" ")[-1] == program
+        assert len(cmdline.split(" ")) == 2
+    assert CMDLINE_SECRET not in raw_store(isolate)
+
+
+@linux_only
+def test_no_entry_when_the_command_line_cant_be_rewritten(
+    journald: FakeJournal, isolate: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal.setup("demo", "desktop-coordinator", argv=[f"--token={CMDLINE_SECRET}"])
+    real_open = builtins.open
+
+    def refuse(path: object, *a: Any, **k: Any) -> Any:
+        if str(path) == "/proc/self/mem":
+            raise PermissionError(path)
+        return real_open(path, *a, **k)  # type: ignore[call-overload]  # open's own arguments
+
+    with monkeypatch.context() as m:
+        m.setattr(sys, "argv", [sys.argv[0], f"--token={CMDLINE_SECRET}"])
+        # A program this process isn't, so the rewrite can't find it already done by an
+        # earlier test's entry (which rewrote pytest's own command line to its program).
+        m.setattr(sys, "orig_argv", [sys.executable, "/nonexistent/jc-demo", *sys.argv[1:]])
+        m.setattr(builtins, "open", refuse)
+        journal.error("boom")
+        journal.record(1, 5)
+    assert journald.received() == []
+    assert len(runs(isolate)) == 1  # the run store still has its line

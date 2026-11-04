@@ -1,15 +1,17 @@
 """The journal helper (brain record 0017, with its 2026-11-04 amendment).
 
-Copied from andronics/brain `tools/journal.py` at commit 9544ce8d625f4eac9a0b7918427d080a1806db26
-(PR 128, 2026-11-04), as dotfiles record 0003 §A8 decided (its open question 6: a copy, not a
-shared package). Changes from the brain's copy, and only these:
+Copied from andronics/brain `tools/journal.py` at commit 1aa3be646a9d43867364b864d2cca85063c931a9
+(PR 170, 2026-11-04; first copied at 9544ce8, PR 128), as dotfiles record 0003 §A8 decided (its
+open question 6: a copy, not a shared package). Changes from the brain's copy, and only these:
 
 - typed for `mypy --strict`, and `except Exception: pass` written as `contextlib.suppress`;
 - TOOL_VERSION is the installed package's version, not a checkout's commit (record 0003 §A8:
   `uv tool` installs have no checkout to ask git);
 - the readers (`parse_since`, `read_runs`, `oldest_run`, `journalctl`, `owner_map`) and the
   `journal.sh` command line are left out: they serve the brain's `tool-errors`, `tool-stats`
-  and shell tools, which live in the brain.
+  and shell tools, which live in the brain;
+- `allow_commands`, `owner`, `current_owner` and `SLUG_COMMAND` are left out: they serve the
+  brain's `meta`, which names its commands and owners at run time.
 
 A tool wraps its main in run() and gets, without changing its output or its exit code:
 
@@ -30,6 +32,14 @@ TOOL_RUN (8 random hex characters, one per run), TOOL_EVENT and, when it is one 
 fixed names, TOOL_COMMAND. Never the arguments: each value is redacted (redact()), every argument
 the tool was given (4 characters or more) is replaced by `[arg]` wherever it appears, and a
 CalledProcessError or TimeoutExpired is logged as its program's name and code only.
+
+Nor in the fields journald adds itself: it reads the sender's /proc/<pid>/cmdline into
+_CMDLINE. So before its first entry the helper rewrites its own process's argument area to the
+program alone (`python3 /…/bin/crew`, the arguments dropped), through /proc/self/mem: about
+0.1 ms, once per run, and only in a run that writes an entry. From then on `ps` shows the
+tool without its arguments; sys.argv is a copy and is unchanged. Where the area can't be
+rewritten, the helper writes no journal entry at all rather than one carrying the arguments
+(the run store still gets its line).
 
 The helper never fails the tool: every error of its own is swallowed.
 
@@ -86,10 +96,19 @@ _PATTERNS = [
     (re.compile(r"(?i)\b(bearer\s+)[^\s'\"]+"), r"\1" + REDACTED),
     # URL user-info.
     (re.compile(r"(://)[^/\s:@]+:[^/\s@]*@"), r"\1" + REDACTED + "@"),
-    # password=…, token: …, secret …: the keyword stays, the word after it goes.
+    # password=…, token: …, secret …: the keyword stays, the word after it goes. With `=` or `:` the
+    # keyword may end a longer name (gh-token:, my.password=); with only a space it must stand alone
+    # (`password hunter2`, `--password x`), so a name that merely ends in one, such as a pass path
+    # (accounts/last.fm/api-key 312) or gh-cli-token, keeps the word after it.
     (
         re.compile(
-            r"(?i)\b(password|passwd|secret|token|api[_-]?key)(\s*[=:]\s*|\s+)(['\"]?)[^\s'\",;]+"
+            r"(?i)\b(password|passwd|secret|token|api[_-]?key)(\s*[=:]\s*)(['\"]?)[^\s'\",;]+"
+        ),
+        r"\1\2\3" + REDACTED,
+    ),
+    (
+        re.compile(
+            r"(?i)(?<![\w/.@])(?<!\w-)(password|passwd|secret|token|api[_-]?key)(\s+)(?![=:])(['\"]?)[^\s'\",;]+"
         ),
         r"\1\2\3" + REDACTED,
     ),
@@ -142,6 +161,7 @@ class _Run:
         self.errors = 0  # error, warning and exception events this run, written or suppressed
         self.died = False  # die() or sys.exit("message"): a fail, whatever the code
         self._version: str | None = None
+        self.hidden: bool | None = None  # the command line rewritten (None: not yet tried)
 
     def version(self) -> str:
         if self._version is None:
@@ -237,8 +257,64 @@ def _encode(fields: dict[str, str]) -> bytes:
     return bytes(out)
 
 
+def _program_words() -> list[str]:
+    """This process's command line without the tool's arguments: the interpreter, its options
+    and the script, or `-m module`; for `-c` the code goes too. Read from the interpreter's own
+    command line (sys.orig_argv), not sys.argv, which a tool may have changed."""
+    orig = list(getattr(sys, "orig_argv", None) or [])
+    i = 1
+    while i < len(orig):
+        w = orig[i]
+        if w.startswith("-c"):
+            return [*orig[:i], "-c"]
+        if w == "-m":
+            return orig[: i + 2]
+        if w.startswith("-m"):
+            return orig[: i + 1]
+        if w in ("-X", "-W", "--check-hash-based-pycs"):
+            i += 2
+        elif w == "--":
+            return orig[: i + 2]
+        elif w.startswith("-") and w != "-":
+            i += 1
+        else:
+            return orig[: i + 1]  # the script (or `-`, stdin)
+    return orig or [_state.tool]
+
+
+def _hide_arguments() -> bool:
+    """Rewrite this process's argument area, which journald copies into _CMDLINE, to the program
+    alone. True when /proc/self/cmdline then holds no argument (or there were none)."""
+    if _state.hidden is not None:
+        return _state.hidden
+    want = b"\0".join(os.fsencode(w) for w in _program_words())
+    try:
+        with open("/proc/self/cmdline", "rb") as fh:
+            now = fh.read()
+        if now.rstrip(b"\0") == want:
+            _state.hidden = True  # nothing to hide, or done before in this process
+            return True
+        with open("/proc/self/stat", "rb") as fh:
+            stat = fh.read()
+        fields = stat[stat.rfind(b")") + 2 :].split()
+        start, end = int(fields[45]), int(fields[46])  # arg_start, arg_end (proc(5) fields 48, 49)
+        size = end - start
+        if not 0 < len(want) < size:
+            want = os.fsencode(_state.tool)[: max(0, size - 1)]
+        with open("/proc/self/mem", "r+b", buffering=0) as mem:
+            mem.seek(start)
+            mem.write(want + b"\0" * (size - len(want)))  # ends in NUL: the kernel reads it all
+        with open("/proc/self/cmdline", "rb") as fh:
+            _state.hidden = fh.read().rstrip(b"\0") == want
+    except Exception:
+        _state.hidden = False
+    return _state.hidden
+
+
 def _send(fields: dict[str, str]) -> None:
     path = os.environ.get("TOOL_JOURNAL_SOCKET") or SOCKET
+    if not _hide_arguments():
+        return  # never an entry whose _CMDLINE would carry the arguments
     with (
         contextlib.suppress(Exception),
         socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s,
