@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.6](https://github.com/andronics/desktop-tools/compare/v0.1.5...v0.1.6) (2026-11-04)
+
+
+### 🐛 Bug Fixes
+
+* **journal:** mask hyphenated secret options and headers (brain PR 193) ([#22](https://github.com/andronics/desktop-tools/issues/22)) ([9251c32](https://github.com/andronics/desktop-tools/commit/9251c32e4cf245cf6c25296510dad8178fe40706))
+
+
+### 📚 Documentation
+
+* **design:** record 0001 Implemented ([#20](https://github.com/andronics/desktop-tools/issues/20)) ([f92c6dd](https://github.com/andronics/desktop-tools/commit/f92c6dd92a25dbfbd3ab9aab413c7c0e8ec2d17f))
+
 ## [0.1.5](https://github.com/andronics/desktop-tools/compare/v0.1.4...v0.1.5) (2026-11-04)
 
 
