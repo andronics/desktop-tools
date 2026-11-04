@@ -18,7 +18,9 @@ tmp_path. Nothing reaches a real window, session or coordinator.
 - **rofi** prints `rofi-answer` if it exists (the row picked), else exits 1 (Escape). The menus'
   tests use `ROFI_SEQ` instead: one answer per call from `rofi-answers`, each call's rows kept.
 - **meta** also answers `<name> menu --json` from `menu-<name>.json` (exit `menu-rc[-<name>]`) and
-  any other verb with six lines echoing it (exit `<verb>-rc[-<name>]`, two lines on stderr).
+  any other verb with six lines echoing it (exit `<verb>-rc[-<name>]`: 1 keeps the six lines, as
+  meta's "there is a problem" result; any other code two lines on stderr instead, or
+  `<verb>-stdout` on stdout and nothing on stderr).
 - **alacritty** adds a hidden floating window of its `--class` to `wm.json`, as bspwmrc's rule
   makes it (none when `no-window` exists).
 - **notify-send** prints `notify-answer` if it exists (what a click on the action returns).
@@ -246,13 +248,17 @@ if verb == "menu":
         sys.exit(code)
     print(open(os.path.join(here, f"menu-{name}.json")).read())
     sys.exit(0)
-if verb:  # a read-only verb: six lines echoing it, or `<verb>-rc` and two lines on stderr
+if verb:  # a read-only verb: six lines echoing it, exit `<verb>-rc` (1 keeps the lines: a result)
     code = rc(verb, name)
-    if code:
-        sys.stderr.write(f"meta {name}: {verb} broke\nmore\n")
+    said = os.path.join(here, f"{verb}-stdout")
+    if code not in (0, 1):
+        if os.path.exists(said):  # its reason on stdout, nothing on stderr
+            print(open(said).read().strip())
+        else:
+            sys.stderr.write(f"meta {name}: {verb} broke\nmore\n")
         sys.exit(code)
     print(f"{' '.join(args)}\nline 2\nline 3\nline 4\nline 5\nline 6")
-    sys.exit(0)
+    sys.exit(code)
 sys.exit(2)
 """
 )

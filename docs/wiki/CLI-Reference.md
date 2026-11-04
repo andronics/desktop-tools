@@ -357,7 +357,7 @@ Open one coordinator's quick menu above the pointer (its glyph's right click).
 Show or Hide first, then what `meta <name> menu --json` offers for it, in meta's order:
 Launch or Stop and Restart, its home in VS Code, status, inbox, resume notes and more. With
 meta failing, Show, Launch, Stop and Restart from crew's own state. Stop and Restart ask
-first; the brain coordinator is always asked about.
+first; one only Stephen ends (the brain coordinator, the arbiter) is always asked about.
 
 | Argument | Description |
 |---|---|
@@ -418,7 +418,7 @@ exit code and reason reach the notification and crew's exit status.
 | Option | Environment variable | Description |
 |---|---|---|
 | `--force` |  | End it even if its resume notes are not clean. |
-| `--all` |  | Every running coordinator but the brain coordinator. |
+| `--all` |  | Every running coordinator but those only Stephen ends. |
 | `--yes`, `-y` |  | With --all: don't ask, stop the unclean ones too. |
 
 ### `desktop-tools crew stopped`

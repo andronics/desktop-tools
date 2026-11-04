@@ -1,0 +1,189 @@
+{
+  "meta": 1,
+  "centre": "platform",
+  "verb": "menu",
+  "generated": "2026-11-04T05:44:20+00:00",
+  "cached": false,
+  "age_s": 0,
+  "stale": false,
+  "data": {
+    "running": true,
+    "items": [
+      {
+        "when": "running",
+        "output": "notify",
+        "confirm": true,
+        "id": "stop",
+        "label": "Stop",
+        "run": {
+          "meta": [
+            "platform",
+            "stop"
+          ]
+        }
+      },
+      {
+        "when": "running",
+        "output": "notify",
+        "confirm": true,
+        "id": "restart",
+        "label": "Restart",
+        "run": {
+          "meta": [
+            "platform",
+            "restart"
+          ]
+        }
+      },
+      {
+        "when": "always",
+        "output": "none",
+        "confirm": false,
+        "id": "home",
+        "label": "Open home in VS Code",
+        "run": {
+          "edit": "/actors/platform"
+        }
+      },
+      {
+        "when": "always",
+        "output": "view",
+        "confirm": false,
+        "id": "status",
+        "label": "Status",
+        "run": {
+          "meta": [
+            "platform",
+            "status"
+          ]
+        }
+      },
+      {
+        "when": "always",
+        "output": "view",
+        "confirm": false,
+        "id": "inbox",
+        "label": "Inbox",
+        "glyph": "U+F02FA",
+        "run": {
+          "meta": [
+            "brain",
+            "inbox",
+            "platform"
+          ]
+        }
+      },
+      {
+        "when": "always",
+        "output": "none",
+        "confirm": false,
+        "id": "note",
+        "label": "Actor note in Obsidian",
+        "run": {
+          "open": "obsidian://open?path=%2Fvault%2FCoordinator.md"
+        }
+      },
+      {
+        "when": "always",
+        "output": "view",
+        "confirm": false,
+        "id": "notes",
+        "label": "Resume notes",
+        "run": {
+          "meta": [
+            "platform",
+            "notes"
+          ]
+        }
+      },
+      {
+        "when": "always",
+        "output": "notify",
+        "confirm": false,
+        "id": "attach",
+        "label": "Copy attach command",
+        "run": {
+          "copy": "tmux attach -t platform-coordinator"
+        }
+      },
+      {
+        "when": "always",
+        "output": "view",
+        "confirm": false,
+        "id": "agents",
+        "label": "Agents and work",
+        "run": {
+          "meta": [
+            "platform",
+            "agents"
+          ]
+        }
+      },
+      {
+        "when": "always",
+        "output": "none",
+        "confirm": false,
+        "id": "repos",
+        "label": "Repos on GitHub",
+        "items": [
+          {
+            "id": "repo-andronics-example-1",
+            "label": "andronics/example-1",
+            "run": {
+              "open": "https://github.com/andronics/example-1"
+            },
+            "output": "none"
+          },
+          {
+            "id": "repo-andronics-example-2",
+            "label": "andronics/example-2",
+            "run": {
+              "open": "https://github.com/andronics/example-2"
+            },
+            "output": "none"
+          },
+          {
+            "id": "repo-andronics-example-3",
+            "label": "andronics/example-3",
+            "run": {
+              "open": "https://github.com/andronics/example-3"
+            },
+            "output": "none"
+          },
+          {
+            "id": "repo-andronics-example-4",
+            "label": "andronics/example-4",
+            "run": {
+              "open": "https://github.com/andronics/example-4"
+            },
+            "output": "none"
+          },
+          {
+            "id": "repo-andronics-example-5",
+            "label": "andronics/example-5",
+            "run": {
+              "open": "https://github.com/andronics/example-5"
+            },
+            "output": "none"
+          },
+          {
+            "id": "repo-andronics-example-6",
+            "label": "andronics/example-6",
+            "run": {
+              "open": "https://github.com/andronics/example-6"
+            },
+            "output": "none"
+          },
+          {
+            "id": "repo-andronics-example-7",
+            "label": "andronics/example-7",
+            "run": {
+              "open": "https://github.com/andronics/example-7"
+            },
+            "output": "none"
+          }
+        ]
+      }
+    ]
+  }
+}

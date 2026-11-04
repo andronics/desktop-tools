@@ -18,14 +18,21 @@ live until the cut-over, and for 30 days after it as an alias.
   (record 0019 §3a), never with tmux itself. `crew launch <name>` starts one hidden; `--show` then shows it docked.
   `crew stop <name>` has meta judge its resume notes and end it; `--force` ends it even when they are not clean.
   `crew restart <name>` stops and starts it, and shows it again if it was shown (else it stays hidden).
-  `crew stop --all` stops every running coordinator but the brain coordinator: it checks each first
+  `crew stop --all` stops every running coordinator but those only Stephen ends (see below): it checks each first
   (`meta <name> stop --check`) and, if any is not clean, asks once with a rofi Yes/No (No selected) before stopping
   them all, the unclean ones with `--force`; `--yes` skips the question. Declined, nothing stops; one that meta
   refuses doesn't stop the rest.
 - **meta's rules are meta's.** Who may start or stop which coordinator, the brain coordinator, the resume notes and
   the old names are all decided by meta; crew passes on its answer. A refusal shows a notification with meta's exit
-  code and its one-line reason (`desktop: not stopped` / `meta desktop exited 1: <why>`), and crew exits with that
-  code: 1 not clean (nothing ended), 2 usage or no home, 3 refused, 4 failed (also when meta can't be run).
+  code, what it means and its one-line reason (`desktop: not stopped` / `meta desktop exited 3 (refused): <why>`),
+  and crew exits with that code: 1 not clean (nothing ended), 2 usage or no home, 3 refused, 4 failed (also when
+  meta can't be run).
+- **Who only Stephen ends.** A coordinator whose registry entry has `ended_by: "stephen"` (the brain coordinator and
+  the arbiter) is left out of `crew stop --all`, and the menus always ask about it. Only after Yes do they add
+  `--confirmed` to its `meta <name> stop` or `restart`; meta accepts that only from a caller that is no coordinator
+  or agent (`COORDINATOR`, `CLAUDECODE` and `TESSERA_ACTOR` unset), which crew passes on untouched. `crew stop brain`
+  on the command line never adds it. Until the registry carries `ended_by` on any coordinator, the brain coordinator
+  alone counts.
 - **The dock.** `crew width [N|+N|-N|left [N]|right [N]]` prints or sets the panel's width (640 to 2560, default
   1280); `left` and `right` move its inner edge by 128 or N. `crew side [left|right]` prints or sets the side. While a
   coordinator is shown, its strip of the screen is reserved with bspwm's padding, so tiled windows move aside.
@@ -51,8 +58,10 @@ barmenu does.
 pointer in barmenu's look. crew's own **Show** (or **Hide**, when it is the shown and focused one) comes first. Then
 come the items `meta <name> menu --json` offers for it, in meta's order (brain record 0019 §7a): Launch when it is
 stopped; Stop and Restart when it runs; Open home in VS Code; Status; Inbox; Actor note in Obsidian; Resume notes;
-Copy attach command; Agents and work; and its repos on GitHub. More than four repos fold into one "Repos on GitHub"
-row with its own list. crew knows how to run an item, not which items exist, so a new item needs no crew change.
+Copy attach command; Agents and work; and its repos on GitHub. meta folds more than four repos into one "Repos on
+GitHub" item holding them (`items`, no `run`): one row with its own list, where Escape goes back. If meta sends them
+unfolded, crew folds more than four itself; an item in a list that crew can't run is dropped (logged), and the rest
+stay. crew knows how to run an item, not which items exist, so a new item needs no crew change.
 
 | An item's | What crew does |
 |---|---|
@@ -62,12 +71,14 @@ row with its own list. crew knows how to run an item, not which items exist, so 
 | `run: copy` | Puts the text on the clipboard (`xclip -selection clipboard`) and says what it copied |
 | `output: view` | Shows the output in a floating alacritty of class `crew-view`, in `less` |
 | `output: notify` | Sends the first five lines as a notification |
-| `output: none` | Shows nothing. A failure always notifies, with the exit code and the first line on stderr |
+| `output: none` | Shows nothing |
+| meta's exit | 0 and 1 are results: the output is shown, and 1 adds a warn line or title ("⚠ brain: Status: there is a problem"). 5 is a "not found" notice. 2, 3, 4 and 6 are failures, which always notify with the code, what it means (usage, refused, failed, the module is broken) and meta's reason: stderr's first line, else stdout's |
 | `when` | `always`, `running`, `stopped` or `exists:<path>`: meta judges it, and crew judges it again as the menu opens |
 | `confirm` | Asks Yes/No first (rofi's `prompt` theme, No selected) |
 
 **Stop and Restart** ask Yes/No first. If the brain's stop script finds the resume notes aren't clean, crew asks again
-with its reason, and Yes reruns it with `--force`. The brain coordinator is always asked about, clean or not. When
+with its reason, and Yes reruns it with `--force`. One only Stephen ends is always asked about, clean or not, and
+its Yes adds `--confirmed`. When
 `meta` fails, the quick menu still offers Show, Launch, Stop and Restart from crew's own state, and a line saying the
 rest is unavailable.
 
@@ -76,7 +87,7 @@ one lists every coordinator with its state, the shown one marked. Type a coordin
 --keys`). The last cell is Stop all. Level two offers Start for a stopped coordinator, and Show (or Hide), Stop and
 Restart for a running one. Escape on level two, or No to a Stop or Restart question, goes back to level one. Start
 is `crew toggle --launch`, which also shows it. Stop and Restart ask only when the notes aren't clean, as coord's
-did, and always for the brain. Stop all is `crew stop --all`: it leaves the brain coordinator running, asks once if
+did, and always for one only Stephen ends. Stop all is `crew stop --all`: it leaves those running, asks once if
 any notes aren't clean, and No to it closes the menu.
 
 ## Where it gets the coordinators

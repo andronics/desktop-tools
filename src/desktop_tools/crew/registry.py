@@ -13,6 +13,10 @@ shouldn't wait on the vault each time.
 A coordinator is shown only once its home exists, as coord did. A former name (`old_names`, until
 `old_names_until`) resolves to the coordinator it was renamed to, so a session or a window left
 under it is the same coordinator.
+
+A coordinator with `ended_by: "stephen"` is one only Stephen ends (`stephen_only`): left out of
+`stop --all`, and always asked about in the menus, which then pass meta `--confirmed`. Until the
+registry carries `ended_by` on any coordinator, the brain coordinator alone is (`STEPHEN_ONLY`).
 """
 
 from __future__ import annotations
@@ -33,6 +37,9 @@ if TYPE_CHECKING:
 
 KEPT = "coordinators.json"
 META_TIMEOUT = 5.0
+# The one only Stephen ends while no entry in the registry carries `ended_by` at all: goes once
+# the field is on every registry.
+STEPHEN_ONLY = "brain"
 
 
 def valid_name(name: str) -> bool:
@@ -65,6 +72,7 @@ class Coordinator:
         "order",
         "session",
         "status",
+        "stephen_only",
         "stopped_by_default",
     )
 
@@ -78,10 +86,13 @@ class Coordinator:
         order: int = 0,
         status: str = "",
         stopped_by_default: bool = False,
+        stephen_only: bool | None = None,
     ) -> None:
         self.name, self.home, self.session, self.glyph = name, home, session, glyph
         self.old_names, self.order, self.status = old_names, order, status
         self.stopped_by_default = stopped_by_default
+        # Only Stephen ends it (`ended_by: "stephen"`); None: the registry doesn't say.
+        self.stephen_only = name == STEPHEN_ONLY if stephen_only is None else stephen_only
 
     def __repr__(self) -> str:
         return f"Coordinator({self.name!r})"
@@ -185,6 +196,8 @@ def parse(data: Any, today: dt.date | None = None) -> list[Coordinator] | None:
     if entries is None:
         return None
     today = today or datetime.date.today()
+    # `ended_by` anywhere: the registry says who only Stephen ends; nowhere: STEPHEN_ONLY.
+    told = any(isinstance(raw, dict) and "ended_by" in raw for raw in entries)
     out: list[tuple[int, int, Coordinator]] = []
     seen: set[str] = set()
     for i, raw in enumerate(entries):
@@ -222,6 +235,7 @@ def parse(data: Any, today: dt.date | None = None) -> list[Coordinator] | None:
                     order=order,
                     status=status if isinstance(status, str) else "",
                     stopped_by_default=raw.get("stopped_by_default") is True,
+                    stephen_only=raw.get("ended_by") == "stephen" if told else None,
                 ),
             )
         )

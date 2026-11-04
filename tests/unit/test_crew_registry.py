@@ -255,3 +255,28 @@ def test_meta_is_found_in_the_brains_bin_first(
     assert conf.meta() == str(isolate / "bin" / "meta")
     monkeypatch.setenv("BRAIN_BIN", str(isolate / "nowhere"))
     assert conf.meta() == "meta"
+
+
+# ---------------------------------------------------------------- who only Stephen ends
+
+
+def stephen_only(reg: rg.Registry) -> list[str]:
+    return [c.name for c in reg.coordinators if c.stephen_only]
+
+
+def test_ended_by_says_who_only_stephen_ends(desk: Desk) -> None:
+    by_stephen = {"ended_by": "stephen"}
+    desk.coordinators("brain", "arbiter", "media", brain=by_stephen, arbiter=by_stephen)
+    assert stephen_only(rg.load()) == ["brain", "arbiter"]
+
+
+def test_ended_by_anywhere_is_the_whole_answer(desk: Desk) -> None:
+    """A third with the field needs no crew change; the brain without it is not one."""
+    desk.coordinators("brain", "media", media={"ended_by": "stephen"})
+    assert stephen_only(rg.load()) == ["media"]
+
+
+def test_ended_by_nowhere_falls_back_to_the_brain(desk: Desk) -> None:
+    desk.coordinators("brain", "arbiter", "media")
+    assert stephen_only(rg.load()) == [rg.STEPHEN_ONLY] == ["brain"]
+    assert [c.name for c in rg.from_homes() if c.stephen_only] == ["brain"]

@@ -15,7 +15,9 @@ import subprocess
 
 from desktop_tools.crew import conf
 
-FAILED = 4
+RESULT, FAILED, NOT_FOUND = 1, 4, 5
+# What meta's failure codes mean, in words (record 0019's exit codes). 0, 1 and 5 are results.
+MEANS = {2: "usage", 3: "refused", 4: "failed", 6: "the module is broken"}
 TIMEOUTS = {"launch": 30.0, "stop": 90.0, "restart": 150.0}  # restart: a stop, up to 30 s, a launch
 _WHY = re.compile(r' why=(?:"((?:[^"\\]|\\.)*)"|(\S+))')
 
@@ -29,6 +31,11 @@ class Result:
     @property
     def ok(self) -> bool:
         return self.code == 0
+
+
+def exited(code: int) -> str:
+    """`exited 3 (refused)`: the code, and what it means when it is one of meta's failures."""
+    return f"exited {code} ({MEANS[code]})" if code in MEANS else f"exited {code}"
 
 
 def reason(stdout: str, stderr: str) -> str:

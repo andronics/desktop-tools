@@ -3,9 +3,10 @@
 - **The quick menu** (`crew quick <name>`, a right click on a glyph): one level for one
   coordinator, above the pointer and in barmenu's look (barmenu's own rofi call, theme and
   placement). crew's own Show/Hide comes first, then meta's items in meta's order
-  (`items.ask`); more than four repos fold into one "Repos on GitHub" row with a list of its
-  own. With meta failing, crew draws Show/Hide, Launch, Stop and Restart from its own state, and a
-  line saying the rest is unavailable.
+  (`items.ask`). An item that holds items (meta folds many repos into one "Repos on GitHub"
+  item) is a row with a list of its own, and Escape there goes back; when meta sends its repos
+  unfolded, more than four fold the same way. With meta failing, crew draws Show/Hide, Launch,
+  Stop and Restart from its own state, and a line saying the rest is unavailable.
 - **The full menu** (`crew menu`, a middle click on the strip and `super + c`): coord's two
   levels, ported. The first lists every coordinator with its state (type its key to filter: `b`
   brain, `pl` platform) and Stop all; the second offers Show or Hide, Start, Stop, Restart.
@@ -25,6 +26,7 @@ from desktop_tools.crew.registry import Coordinator, Registry
 
 REPOS_FOLD = 4  # more repos than this become a second-level list (record 0019 §7a, item 12)
 UNAVAILABLE = "the rest is unavailable (meta failed)"
+BACK = -3  # Escape on a second-level list: the quick menu shows its first level again
 STOP_GLYPH = "\U000f0667"  # md-stop_circle_outline
 CELL_SIZE = 36864  # pango size in 1024ths of a point: 36pt, about 48px
 COLOUR_ROLES = {
@@ -81,12 +83,19 @@ def quick_rows(c: Coordinator, found: list[Item] | None, running: bool, hide: bo
         fallback(c, running) if found is None else [i for i in found if items.applies(i, running)]
     )
     repos = [i for i in offered if i.id.startswith("repo-") and i.kind == "open"]
-    folded = len(repos) > REPOS_FOLD
+    folded = len(repos) > REPOS_FOLD  # meta's own folding sends them nested, so none here
     for item in offered:
         if folded and item in repos:
             if item is repos[0]:
                 sub = [Row(i.label, glyph=i.glyph, item=i) for i in repos]
-                rows.append(Row("Repos on GitHub", action="repos", sub=sub))
+                rows.append(Row("Repos on GitHub", action="list", sub=sub))
+            continue
+        if item.kind == items.LIST:
+            sub = [
+                Row(i.label, glyph=i.glyph, item=i) for i in item.items if items.applies(i, running)
+            ]
+            if sub:
+                rows.append(Row(item.label, glyph=item.glyph, action="list", sub=sub))
             continue
         rows.append(Row(item.label, glyph=item.glyph, item=item))
     if found is None:
@@ -112,9 +121,9 @@ def choose(c: Coordinator, rows: list[Row], title: str) -> Row | None:
 def act(reg: Registry, c: Coordinator, row: Row) -> int:
     if row.action == "toggle":
         return switch.toggle(reg, c.name)
-    if row.action == "repos":
-        picked = choose(c, row.sub, f"{c.name}: repos")
-        return switch.OK if picked is None else act(reg, c, picked)
+    if row.action == "list":
+        picked = choose(c, row.sub, f"{c.name}: {row.label}")
+        return BACK if picked is None else act(reg, c, picked)
     if row.item is None:  # the "unavailable" line: nothing to run
         return switch.OK
     item = row.item
@@ -138,11 +147,13 @@ def quick(reg: Registry, name: str) -> int:
     found = strip.scan(reg, tree)
     running = c.name in found.running
     rows = quick_rows(c, items.ask(c.name), running, _shown_and_focused(tree, reg, c.name))
-    picked = choose(c, rows, c.name)
-    if picked is None:
-        return switch.OK
-    code = act(reg, c, picked)
-    return switch.OK if code == stopping.DECLINED else code
+    while True:
+        picked = choose(c, rows, c.name)
+        if picked is None:
+            return switch.OK
+        code = act(reg, c, picked)
+        if code != BACK:
+            return switch.OK if code == stopping.DECLINED else code
 
 
 # ---------------------------------------------------------------- the full menu

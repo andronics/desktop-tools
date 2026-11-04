@@ -11,10 +11,11 @@ tidy) is `switch.stopped`, unchanged.
 - `stop <name> [--force]`: meta judges the resume notes; --force ends it anyway, with a reason.
 - `restart <name>`: meta stops and launches it; if it was shown, crew shows it again once the old
   window has closed (coord's Restart, "was shown" branch). If it was hidden, it stays hidden.
-- `stop --all [--yes]`: every running coordinator but the brain coordinator. Each is checked with
+- `stop --all [--yes]`: every running coordinator but those only Stephen ends (the registry's
+  `ended_by`, `Coordinator.stephen_only`). Each is checked with
   `meta <name> stop --check`; if any is not clean, crew asks once (a rofi Yes/No, or --yes),
   then stops the clean ones plainly and the others with --force. One that meta refuses doesn't
-  stop the rest. As coord's "Stop all", less the brain, which meta never stops for crew.
+  stop the rest. As coord's "Stop all", less those only Stephen ends.
 """
 
 from __future__ import annotations
@@ -27,7 +28,6 @@ from desktop_tools.crew import log, metacall, switch, tmux, wm
 from desktop_tools.crew.registry import Coordinator, Registry, valid_name
 
 OK, FAILED, USAGE = 0, 1, 2
-BRAIN = "brain"  # the one meta never stops for crew (record 0019 §3a): left out of stop --all
 CONFIRM_THEME = "prompt"  # coord's confirm theme, ~/.config/rofi/themes/prompt.rasi
 FORCED = "Stephen: crew stop --force"
 ALL_YES = "Stephen: Yes to stop all anyway"
@@ -46,7 +46,7 @@ def _known(reg: Registry, name: str) -> Coordinator | None:
 
 def _failed(c: Coordinator, what: str, done: metacall.Result) -> int:
     """meta said no, or couldn't be run: the notification says why, crew exits with its code."""
-    switch.alert(f"{c.name}: {what}", f"meta {c.name} exited {done.code}: {done.why}")
+    switch.alert(f"{c.name}: {what}", f"meta {c.name} {metacall.exited(done.code)}: {done.why}")
     return done.code
 
 
@@ -95,27 +95,35 @@ def launch(reg: Registry, name: str, *, showing: bool = False) -> int:
     return OK
 
 
-def stop(reg: Registry, name: str, *, force: bool = False) -> int:
-    """`meta <name> stop`, or with force `--force --reason`: meta judges and ends it."""
+def stop(reg: Registry, name: str, *, force: bool = False, confirmed: bool = False) -> int:
+    """`meta <name> stop`, or with force `--force --reason`: meta judges and ends it.
+    `confirmed` (`--confirmed`) is only the menus' own, after Stephen's Yes to stopping one only
+    he ends; meta takes it only from a caller that is no coordinator or agent."""
     c = _known(reg, name)
     if c is None:
         return USAGE
-    done = metacall.run(c.name, "stop", *(("--force", "--reason", FORCED) if force else ()))
+    flags = (("--force", "--reason", FORCED) if force else ()) + _confirmed(confirmed)
+    done = metacall.run(c.name, "stop", *flags)
     if not done.ok:
         return _failed(c, "not stopped", done)
     switch.refresh(reg)
     return OK
 
 
-def restart(reg: Registry, name: str) -> int:
+def _confirmed(confirmed: bool) -> tuple[str, ...]:
+    return ("--confirmed",) if confirmed else ()
+
+
+def restart(reg: Registry, name: str, *, confirmed: bool = False) -> int:
     """`meta <name> restart`, then shown again if it was shown. No lock is held across meta:
-    the stop script's desktop tidy (`crew stopped`) takes the switch lock itself."""
+    the stop script's desktop tidy (`crew stopped`) takes the switch lock itself. `confirmed`
+    as for `stop`."""
     c = _known(reg, name)
     if c is None:
         return USAGE
     win = switch.find(wm.look(), reg, c.name)
     shown = win is not None and not win.hidden
-    done = metacall.run(c.name, "restart")
+    done = metacall.run(c.name, "restart", *_confirmed(confirmed))
     if not done.ok:
         return _failed(c, "not restarted", done)
     if not shown:
@@ -134,12 +142,12 @@ def restart(reg: Registry, name: str) -> int:
 
 
 def stop_all(reg: Registry, *, yes: bool = False) -> int:
-    """Stop every running coordinator but the brain coordinator, asking once if any is not
+    """Stop every running coordinator but those only Stephen ends, asking once if any is not
     clean. Declined: 1, nothing stopped. Else 0, or the exit code of the first that failed."""
     sessions = tmux.sessions()
-    targets = [c for c in reg.coordinators if c.name != BRAIN and _running(c, sessions)]
+    targets = [c for c in reg.coordinators if not c.stephen_only and _running(c, sessions)]
     if not targets:
-        log.info("no coordinator is running (but the brain coordinator)")
+        log.info("no coordinator is running (but those only Stephen ends)")
         return OK
     unclean: dict[str, str] = {}
     for c in targets:

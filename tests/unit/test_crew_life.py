@@ -4,6 +4,10 @@ the notification and the exit status, and the brain coordinator is never in stop
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from typing import Any
+
 import pytest
 
 from desktop_tools.crew import life, metacall, registry
@@ -11,8 +15,8 @@ from desktop_tools.crew.registry import Registry
 from tests.crew_fakes import Desk
 
 
-def reg_of(desk: Desk, *names: str) -> Registry:
-    desk.coordinators(*names)
+def reg_of(desk: Desk, *names: str, **extra: dict[str, Any]) -> Registry:
+    desk.coordinators(*names, **extra)
     return registry.load()
 
 
@@ -50,8 +54,8 @@ def test_launch_show_of_a_running_one_shows_it(desk: Desk) -> None:
     assert alerts(desk) == []
 
 
-@pytest.mark.parametrize("code", [2, 3, 4])
-def test_launch_refusal_reaches_alert_and_exit(desk: Desk, code: int) -> None:
+@pytest.mark.parametrize(("code", "means"), [(2, "usage"), (3, "refused"), (4, "failed")])
+def test_launch_refusal_reaches_alert_and_exit(desk: Desk, code: int, means: str) -> None:
     reg = reg_of(desk, "desktop")
     desk.put("launch-rc", str(code))
     desk.put("launch-why", "not for this caller (claude): ask the brain coordinator")
@@ -59,7 +63,7 @@ def test_launch_refusal_reaches_alert_and_exit(desk: Desk, code: int) -> None:
     assert alerts(desk) == [
         (
             "desktop: not started",
-            f"meta desktop exited {code}: meta desktop: not for this caller (claude): "
+            f"meta desktop exited {code} ({means}): meta desktop: not for this caller (claude): "
             "ask the brain coordinator",
         )
     ]
@@ -84,7 +88,9 @@ def test_meta_missing_is_failed_and_alerted(desk: Desk) -> None:
     reg = reg_of(desk, "desktop")
     (desk.base / "bin" / "meta").unlink()
     assert life.stop(reg, "desktop") == metacall.FAILED
-    assert alerts(desk) == [("desktop: not stopped", "meta desktop exited 4: meta is not on PATH")]
+    assert alerts(desk) == [
+        ("desktop: not stopped", "meta desktop exited 4 (failed): meta is not on PATH")
+    ]
 
 
 # ---------------------------------------------------------------- stop
@@ -130,6 +136,22 @@ def test_stop_of_the_brain_is_left_to_meta(desk: Desk) -> None:
     assert life.stop(reg, "brain") == 3
     assert desk.lifecycle() == [["brain", "stop"]]
     assert alerts(desk)[0][1].endswith("is Stephen's, at a terminal")
+
+
+def test_crew_stop_brain_on_the_command_line_is_never_confirmed(desk: Desk) -> None:
+    """`--confirmed` is the menus' alone, after a Yes: `crew stop brain` never sends it."""
+    reg_of(desk, "brain")
+    for verb in ("stop", "restart"):
+        desk.session("brain-coordinator")
+        # S603: crew itself, a fixed argument list.
+        done = subprocess.run(  # noqa: S603
+            [sys.executable, "-m", "desktop_tools.crew", verb, "brain"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert done.returncode == 0, done.stderr
+    assert desk.lifecycle() == [["brain", "stop"], ["brain", "restart"]]
 
 
 # ---------------------------------------------------------------- restart
@@ -273,7 +295,7 @@ def test_stop_all_one_refusal_stops_the_rest(desk: Desk) -> None:
     assert alerts(desk) == [
         (
             "desktop: not stopped",
-            "meta desktop exited 3: meta desktop: outside tmux: close it with /exit",
+            "meta desktop exited 3 (refused): meta desktop: outside tmux: close it with /exit",
         )
     ]
 
@@ -306,3 +328,15 @@ def test_stop_all_without_rofi_is_a_no(desk: Desk) -> None:
 )
 def test_reason(stdout: str, stderr: str, why: str) -> None:
     assert metacall.reason(stdout, stderr) == why
+
+
+@pytest.mark.parametrize("third", [False, True])
+def test_stop_all_leaves_out_every_one_only_stephen_ends(desk: Desk, third: bool) -> None:
+    """From the registry's `ended_by`: the brain, the arbiter and any other that carries it."""
+    by_stephen = {"ended_by": "stephen"}
+    extra = {"brain": by_stephen, "arbiter": by_stephen, **({"media": by_stephen} if third else {})}
+    reg = reg_of(desk, "brain", "arbiter", "media", "desktop", **extra)
+    desk.session(*(f"{n}-coordinator" for n in ("brain", "arbiter", "media", "desktop")))
+    assert life.stop_all(reg) == 0
+    ended = [c[0] for c in desk.lifecycle() if c[1:] == ["stop"]]
+    assert ended == (["desktop"] if third else ["media", "desktop"])

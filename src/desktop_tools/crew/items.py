@@ -10,8 +10,14 @@ crew knows how to run an item, and nothing about which items exist. Each item is
   `xdg-open`, `https://` and `obsidian://` only), `edit` (a path for `code`) or `copy` (text put on
   the clipboard with `xclip`). Nothing is ever a shell string: every child gets an argument list.
 - `output`: `view` (the output in a floating alacritty of class `crew-view`, in a pager),
-  `notify` (its first lines as a notification) or `none`. A failure always notifies, with the
-  exit code and the first line on stderr.
+  `notify` (its first lines as a notification) or `none`.
+- meta's exit codes (record 0019): 0 and 1 are results, so the output is shown, 1 with a warn
+  line ("there is a problem"); 5 (not found) is a notice; the rest (2 usage, 3 refused, 4
+  failed, 6 the module is broken) are failures, which always notify with the code, its meaning
+  and meta's reason (stderr's first line, else stdout's).
+- An item with `items` (a non-empty list) and no `run` is a second-level list, as meta folds
+  many repos into one "Repos on GitHub" item; each of its items is parsed like any other, and
+  one crew can't run is dropped (logged) while the rest stay.
 - `when`: `always`, `running`, `stopped` or `exists:<path>`. meta judges it when it builds the
   menu; crew judges it again from its own state as the menu opens.
 
@@ -33,6 +39,7 @@ from desktop_tools.crew import conf, log, metacall, switch
 from desktop_tools.crew.registry import Coordinator, glyph_of
 
 KINDS = ("meta", "open", "edit", "copy")
+LIST = "list"  # an item that holds items: a second-level list, never run itself
 OUTPUTS = ("view", "notify", "none")
 SCHEMES = ("https://", "obsidian://")
 MENU_TIMEOUT = 5.0  # meta caches the menu for 30 seconds, so this is the uncached worst case
@@ -47,7 +54,7 @@ class Item:
     """One menu item as meta gives it. `value` is the meta arguments (a list) or the URL, path or
     text (a string)."""
 
-    __slots__ = ("confirm", "glyph", "id", "kind", "label", "output", "value", "when")
+    __slots__ = ("confirm", "glyph", "id", "items", "kind", "label", "output", "value", "when")
 
     def __init__(
         self,
@@ -60,9 +67,11 @@ class Item:
         when: str = "always",
         output: str = "none",
         confirm: bool = False,
+        items: list[Item] | None = None,
     ) -> None:
         self.id, self.label, self.kind, self.value = id, label, kind, value
         self.glyph, self.when, self.output, self.confirm = glyph, when, output, confirm
+        self.items = items or []
 
     def __repr__(self) -> str:
         return f"Item({self.id!r})"
@@ -88,6 +97,8 @@ def _item(raw: object) -> Item | None:
     if not isinstance(ident, str) or not ident or not isinstance(label, str) or not label:
         log.warning(f"menu: an item without an id or a label: {raw!r:.80}")
         return None
+    if run is None and "items" in raw:
+        return _list(raw, ident, label)
     if not isinstance(run, dict) or len(run) != 1:
         log.warning(f"menu: {ident}: run is not exactly one of {', '.join(KINDS)}")
         return None
@@ -116,14 +127,22 @@ def _item(raw: object) -> Item | None:
     )
 
 
-def parse(data: Any) -> list[Item] | None:
-    """The items in `meta <name> menu --json` (its envelope, or `data` alone), in meta's order;
-    None if it isn't that shape. An item crew can't run is dropped, as is a repeated id."""
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
-    raw = data.get("items") if isinstance(data, dict) else None
-    if not isinstance(raw, list):
+def _list(raw: dict[str, Any], ident: str, label: str) -> Item | None:
+    """A second-level list (`items`, no `run`): its items crew can run, or None (logged)."""
+    nested = raw.get("items")
+    found = _items(nested) if isinstance(nested, list) else []
+    for deeper in [f for f in found if f.kind == LIST]:  # one level of lists only
+        log.warning(f"menu: {ident}: {deeper.id}: a list in a list, dropped")
+        found.remove(deeper)
+    when = raw.get("when", "always")
+    if not found or not isinstance(when, str):
+        log.warning(f"menu: {ident}: a list with no items crew can run")
         return None
+    return Item(ident, label, LIST, "", glyph=glyph_of(raw.get("glyph")), when=when, items=found)
+
+
+def _items(raw: list[Any]) -> list[Item]:
+    """The items crew can run, in order; a repeated id is dropped."""
     out: list[Item] = []
     seen: set[str] = set()
     for entry in raw:
@@ -132,6 +151,17 @@ def parse(data: Any) -> list[Item] | None:
             seen.add(item.id)
             out.append(item)
     return out
+
+
+def parse(data: Any) -> list[Item] | None:
+    """The items in `meta <name> menu --json` (its envelope, or `data` alone), in meta's order;
+    None if it isn't that shape. An item crew can't run is dropped, as is a repeated id."""
+    if isinstance(data, dict) and "data" in data:
+        data = data["data"]
+    raw = data.get("items") if isinstance(data, dict) else None
+    if not isinstance(raw, list):
+        return None
+    return _items(raw)
 
 
 def ask(name: str) -> list[Item] | None:
@@ -179,10 +209,23 @@ def meta(args: list[str], timeout: float = RUN_TIMEOUT) -> subprocess.CompletedP
     return done
 
 
-def failed(c: Coordinator, item: Item, code: int, stderr: str) -> int:
-    """The one failure notice: exit code and the first stderr line."""
-    switch.alert(f"{c.name}: {item.label} failed", f"exit {code}: {first_line(stderr) or '-'}")
+def reason(done: subprocess.CompletedProcess[str]) -> str:
+    """meta's one-line reason: stderr's first line, else stdout's."""
+    return first_line(done.stderr) or first_line(done.stdout)
+
+
+def failed(c: Coordinator, item: Item, code: int, why: str, means: str = "") -> int:
+    """The one failure notice: the exit code, what it means (for meta's codes) and the reason."""
+    head = f"exit {code} ({means})" if means else f"exit {code}"
+    switch.alert(
+        f"{c.name}: {item.label} failed", f"{head}: {first_line(why) or 'no reason given'}"
+    )
     return switch.FAILED
+
+
+def warned(c: Coordinator, item: Item) -> str:
+    """The warn line for meta's exit 1: a result, and the result is a problem."""
+    return f"⚠ {c.name}: {item.label}: there is a problem"
 
 
 def notify_lines(title: str, text: str) -> None:
@@ -210,9 +253,13 @@ def _prune(folder: Path, now: float) -> None:
             continue
 
 
-def view(c: Coordinator, item: Item, text: str) -> int:
+def view(c: Coordinator, item: Item, text: str, *, warn: bool = False) -> int:
     """The text in a floating terminal (class crew-view) with a pager. The text goes in a file
-    in crew's runtime folder, which the pager reads; files older than an hour are dropped."""
+    in crew's runtime folder, which the pager reads; files older than an hour are dropped.
+    `warn` (meta's exit 1) puts the warn line first and in the title."""
+    title = f"{c.name}: {item.label}"
+    if warn:
+        title, text = warned(c, item), f"{warned(c, item)}\n\n{text}"
     folder = view_dir()
     now = time.time()
     try:
@@ -228,7 +275,7 @@ def view(c: Coordinator, item: Item, text: str) -> int:
         "--class",
         f"{VIEW_CLASS},{c.name}",
         "--title",
-        f"{c.name}: {item.label}",
+        title,
         "-e",
         *PAGER,
         str(path),
@@ -240,13 +287,21 @@ def view(c: Coordinator, item: Item, text: str) -> int:
 
 
 def run_meta(c: Coordinator, item: Item) -> int:
+    """A meta verb, its output shown as the item says. 0 and 1 are results (1 warned), 5 a
+    not-found notice, any other code a failure."""
     done = meta(item.args)
-    if done.returncode != 0:
-        return failed(c, item, done.returncode, done.stderr)
+    code = done.returncode
+    if code == metacall.NOT_FOUND:
+        notify_lines(f"{c.name}: {item.label}: not found", reason(done) or "not found")
+        return switch.OK
+    if code not in (0, metacall.RESULT):
+        return failed(c, item, code, reason(done), metacall.MEANS.get(code, ""))
+    warn = code == metacall.RESULT
     if item.output == "view":
-        return view(c, item, done.stdout)
+        return view(c, item, done.stdout, warn=warn)
     if item.output == "notify":
-        notify_lines(f"{c.name}: {item.label}", done.stdout)
+        title = warned(c, item) if warn else f"{c.name}: {item.label}"
+        notify_lines(title, done.stdout)
     return switch.OK
 
 
@@ -316,5 +371,5 @@ RUNNERS = {"meta": run_meta, "open": run_open, "edit": run_edit, "copy": run_cop
 
 
 def run(c: Coordinator, item: Item) -> int:
-    """Run an item that isn't a stop or a restart; 0 done, 1 failed (notified)."""
+    """Run an item that isn't a stop, a restart or a list; 0 done, 1 failed (notified)."""
     return RUNNERS[item.kind](c, item)

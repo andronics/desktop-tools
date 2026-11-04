@@ -134,7 +134,10 @@ def launch(reg: Registry, c: Coordinator) -> wm.Window | None:
         return None
     session = session_of(c, tmux.sessions())
     if not done.ok and not (done.code == 3 and session):
-        alert(f"{c.name}: not started", f"meta {c.name} launch exited {done.code}: {done.why}")
+        alert(
+            f"{c.name}: not started",
+            f"meta {c.name} launch {metacall.exited(done.code)}: {done.why}",
+        )
         return None
     if session is None:
         alert(f"{c.name}: not started", f"no tmux session {c.session} after meta launch")

@@ -222,7 +222,7 @@ def test_launch_refused_because_already_running_attaches(desk: Desk) -> None:
 @pytest.mark.parametrize(
     ("setup", "why"),
     [
-        ("launch-rc=4", "meta desktop launch exited 4: meta desktop: refused"),
+        ("launch-rc=4", "meta desktop launch exited 4 (failed): meta desktop: refused"),
         ("launch-rc=3", "meta desktop launch exited 3"),
         ("no-meta", "meta is not on PATH"),
     ],
