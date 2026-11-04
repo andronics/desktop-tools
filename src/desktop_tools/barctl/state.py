@@ -9,7 +9,8 @@ wrote it:
     count        a number shown after the glyph when above 0
     detail       a longer line for people (status, show), never on the bar
     target       what a click acts on (the shown player, the sink)
-    segments     cells of a module made of several, each {id, tier, glyph, label, alert_until}
+    segments     cells of a module made of several, each {id, tier, glyph, label, alert_until,
+                 underline}; underline (true) marks one, as crew marks the coordinator shown
     alert_until  epoch seconds: until then the module (or a segment) blinks to urgent
     expires      epoch seconds: past it the state is stale (push --ttl) and shows unavailable
     source       who wrote it
@@ -35,7 +36,7 @@ from desktop_tools.common import paths
 TIERS = ("unavailable", "idle", "active", "alert")
 ROLES = {"unavailable": "dim", "idle": "fg_dim", "active": "accent", "alert": "urgent"}
 FIELDS = ("tier", "glyph", "label", "count", "detail", "target", "segments", "alert_until")
-SEGMENT_FIELDS = ("id", "tier", "glyph", "label", "alert_until")
+SEGMENT_FIELDS = ("id", "tier", "glyph", "label", "alert_until", "underline")
 BLINK = 0.5  # seconds per half of a blink
 
 State = dict[str, Any]
@@ -162,6 +163,11 @@ def validate(data: object) -> State:
                     item[key] = value
             if seg.get("alert_until") is not None:
                 item["alert_until"] = _time(seg["alert_until"], f"segments[{i}].alert_until")
+            if "underline" in seg and seg["underline"] is not None:
+                if not isinstance(seg["underline"], bool):
+                    raise StateError(f"segments[{i}].underline must be true or false")
+                if seg["underline"]:
+                    item["underline"] = True
             clean.append(item)
         out["segments"] = clean
     return out

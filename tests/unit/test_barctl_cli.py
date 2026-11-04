@@ -228,7 +228,7 @@ def test_verbs_in_process(
     monkeypatch.setenv("TOOL_JOURNAL", "off")
     st.write("audio-level", {"tier": "active", "glyph": "G", "label": "35% ", "updated": 1.0})
     r = invoke(["list"])
-    assert r.stdout.split() == ["audio-level", "player-metadata", "player-play-pause"]
+    assert r.stdout.split() == ["audio-level", "crew", "player-metadata", "player-play-pause"]
     data = json.loads(invoke(["list", "--json"]).stdout)
     assert data[0] == {
         "name": "audio-level",

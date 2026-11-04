@@ -153,3 +153,69 @@ def test_render_reads_the_files(theme: dict[str, str], isolate: Path) -> None:
     assert ops.render_line("audio-level") == ""
     with pytest.raises(ops.Failure):
         ops.render_line("../etc")
+
+
+# ---------------------------------------------------------------- crew's strip (record 0019 §7)
+
+
+def test_packaged_crew_module_is_crews_strip(modules: dict[str, mods.Module]) -> None:
+    crew = modules["crew"]
+    assert (crew.pusher, crew.source, crew.separator) == ("crew", None, "")
+    # The glyph's left click is the deliberate one: it starts a stopped coordinator.
+    assert crew.segment_clicks["left"] == ["crew", "toggle", "--launch", "{segment}"]
+    assert crew.segment_clicks["scroll-up"] == ["crew", "cycle", "prev"]
+    assert crew.segment_clicks["scroll-down"] == ["crew", "cycle", "next"]
+
+
+def test_underlined_segment(theme: dict[str, str], modules: dict[str, mods.Module]) -> None:
+    state = {
+        "segments": [
+            {"id": "brain", "tier": "idle", "glyph": " B ", "underline": True},
+            {"id": "media", "tier": "alert", "glyph": " M "},
+        ]
+    }
+    out = rd.render(modules["crew"], state, controller=False)
+    brain, media = (
+        f"%{{u{theme['active']}}}%{{+u}}%{{F{theme['idle']}}} B %{{F-}}%{{-u}}",
+        f"%{{F{theme['alert']}}} M %{{F-}}",
+    )
+    assert strip_actions(out) == brain + media
+    assert "%{A1:barctl click crew left --segment brain:}" in out
+
+
+def test_underline_without_a_theme_still_marks(modules: dict[str, mods.Module]) -> None:
+    state = {"segments": [{"id": "brain", "tier": "idle", "glyph": "B", "underline": True}]}
+    out = rd.render(modules["crew"], state, controller=False, colours={})
+    assert strip_actions(out) == "%{+u}B%{-u}"
+
+
+def test_stale_strip_drops_the_underline(
+    theme: dict[str, str], modules: dict[str, mods.Module]
+) -> None:
+    state = {"expires": 1.0, "segments": [{"id": "b", "glyph": "B", "underline": True}]}
+    out = strip_actions(rd.render(modules["crew"], state, now=2.0, controller=False))
+    assert out == f"%{{F{theme['unavailable']}}}B%{{F-}}"
+
+
+def test_underline_is_checked_and_kept() -> None:
+    clean = st.validate(
+        {"segments": [{"id": "a", "underline": True}, {"id": "b", "underline": False}]}
+    )
+    assert clean["segments"] == [
+        {"id": "a", "tier": "idle", "underline": True},
+        {"id": "b", "tier": "idle"},
+    ]
+    with pytest.raises(st.StateError, match="underline"):
+        st.validate({"segments": [{"id": "a", "underline": "yes"}]})
+
+
+def test_a_moved_underline_is_a_change_to_show(modules: dict[str, mods.Module]) -> None:
+    from desktop_tools.barctl import store
+
+    before = {
+        "segments": [{"id": "a", "tier": "idle", "underline": True}, {"id": "b", "tier": "idle"}]
+    }
+    after = {
+        "segments": [{"id": "a", "tier": "idle"}, {"id": "b", "tier": "idle", "underline": True}]
+    }
+    assert store.shown(modules["crew"], before, 0.0) != store.shown(modules["crew"], after, 0.0)

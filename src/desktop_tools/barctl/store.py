@@ -29,7 +29,14 @@ def shown(module: Module, state: st.State | None, now: float | None = None) -> t
     else:
         parts = (glyph, state.get("count"), state.get("label"))
     segments = tuple(
-        (s.get("id"), s.get("tier"), s.get("glyph"), s.get("label"), s.get("alert_until"))
+        (
+            s.get("id"),
+            s.get("tier"),
+            s.get("glyph"),
+            s.get("label"),
+            s.get("alert_until"),
+            bool(s.get("underline")),
+        )
         for s in state.get("segments") or []
     )
     return (state.get("tier"), *parts, segments, stale, alerting)

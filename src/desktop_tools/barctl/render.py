@@ -15,6 +15,7 @@ from desktop_tools.barctl.modules import BUTTONS, Module
 from desktop_tools.common import theme
 
 METADATA_MAX = 40
+UNDERLINE_ROLE = "accent"  # a marked segment's underline: record 0001's "shown" accent
 
 
 def escape(text: str) -> str:
@@ -61,6 +62,10 @@ def _paint(text: str, tier: str, colours: dict[str, str]) -> str:
     return f"%{{F{hex_}}}{text}%{{F-}}" if hex_ else text
 
 
+def _underline(text: str, colour: str | None) -> str:
+    return f"%{{u{colour}}}%{{+u}}{text}%{{-u}}" if colour else f"%{{+u}}{text}%{{-u}}"
+
+
 def text_of(module: Module, state: st.State | None, now: float) -> tuple[str, str]:
     """(tier, plain text) of a module without segments, staleness applied."""
     if state is None:
@@ -88,7 +93,7 @@ def render(
         return ""
     now = time.time() if now is None else now
     if colours is None:
-        colours = theme.roles(st.ROLES)
+        colours = theme.roles({**st.ROLES, "underline": UNDERLINE_ROLE})
     if controller is None:
         controller = st.controller() is not None
     segments = (state or {}).get("segments")
@@ -103,7 +108,10 @@ def render(
             tier = "unavailable" if stale else str(seg.get("tier") or "idle")
             until = seg.get("alert_until") or module_alert
             tier = colour(tier, None if stale else until, now, controller)
-            cells.append(_actions(module, _paint(escape(text), tier, colours), seg["id"]))
+            cell = _paint(escape(text), tier, colours)
+            if seg.get("underline") and not stale:
+                cell = _underline(cell, colours.get("underline"))
+            cells.append(_actions(module, cell, seg["id"]))
         return module.separator.join(cells)
     tier, text = text_of(module, state, now)
     if not text:
