@@ -1,0 +1,27 @@
+# Template-owned: template-python (a slot: the stack overlay adds its ecosystems).
+# Weekly dependency PRs; "chore(deps)" keeps them out of the changelog's headline sections.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore(deps)
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-dependencies:
+        dependency-type: development
+    # interpose is pinned to a git tag, which Dependabot can't update: it would look the name
+    # up on PyPI instead. python-tag-check.yml bumps it (template-python decisions 0002, 0003).
+    ignore:
+      - dependency-name: interpose
+    commit-message:
+      prefix: chore(deps)

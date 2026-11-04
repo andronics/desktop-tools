@@ -1,0 +1,19 @@
+# Written by Copier: never edit by hand. `copier update` reads it to know
+# which template version and answers this project was made from.
+_commit: v2.4.6
+_src_path: gh:andronics/template-python
+base_answers:
+    code_owners: '@andronics'
+    dependabot_automerge: 'off'
+    description: 'Stephen''s desktop tools in Python: barctl (the Polybar controller),
+        barmenu and the rest of the dotfiles'' tools'
+    github_owner: andronics
+    license: Unlicense
+    owner_is_org: false
+    personal_data_guard: false
+    project_name: desktop-tools
+container_image: false
+integration_ci: false
+kind: cli
+package_name: desktop_tools
+python_version: '3.13'

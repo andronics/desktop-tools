@@ -1,0 +1,6 @@
+# GitHub's About box. Project-owned: edit it, then apply it with
+#   python3 scripts/repo-metadata.py
+# CI warns on each push to main while GitHub differs from this file.
+description = "Desktop tools in Python: barctl, the Polybar controller, barmenu and the other tools from andronics/dotfiles"
+homepage = ""
+topics = ["polybar", "bspwm", "desktop", "dotfiles", "python", "cli"]

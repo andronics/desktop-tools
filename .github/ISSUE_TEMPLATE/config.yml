@@ -1,0 +1,9 @@
+# Template-owned: template-python (a slot: base requires the security-advisory link).
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/andronics/desktop-tools/wiki
+    about: Configuration, deployment, troubleshooting and FAQ.
+  - name: Security vulnerability
+    url: https://github.com/andronics/desktop-tools/security/advisories/new
+    about: Report privately, never in a public issue.
