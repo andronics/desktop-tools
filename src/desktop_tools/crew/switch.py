@@ -23,12 +23,11 @@ import subprocess
 import sys
 import time
 
-from desktop_tools.crew import conf, log, store, strip, tmux, wm
+from desktop_tools.crew import conf, log, metacall, store, strip, tmux, wm
 from desktop_tools.crew.out import say
 from desktop_tools.crew.registry import Coordinator, Registry, valid_name
 
 OK, FAILED, USAGE = 0, 1, 2
-LAUNCH_TIMEOUT = 30.0  # for `meta <name> launch` itself: it starts a tmux session and returns
 
 
 def crew_argv(*args: str) -> list[str]:
@@ -126,32 +125,16 @@ def open_window(c: Coordinator, session: str) -> bool:
 
 
 def launch(reg: Registry, c: Coordinator) -> wm.Window | None:
-    """The one way crew starts a coordinator (brain record 0019 §3a): `meta <name> launch`
+    """The one way a show starts a coordinator (brain record 0019 §3a): `meta <name> launch`
     starts its tmux session, then crew opens its window and waits for it. A coordinator that is
     already running (exit 3) gets its window. Every failure is logged and notified."""
-    argv = [conf.meta(), c.name, "launch"]
-    try:
-        # S603/S607: a fixed argument list; `meta` is found on PATH, as the brain installs it.
-        done = subprocess.run(  # noqa: S603
-            argv,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            errors="replace",
-            timeout=LAUNCH_TIMEOUT,
-            check=False,
-        )
-    except FileNotFoundError:
-        alert(f"{c.name}: not started", "meta is not on PATH")
+    done = metacall.run(c.name, "launch")
+    if not done.ran:
+        alert(f"{c.name}: not started", done.why)
         return None
-    except (OSError, subprocess.TimeoutExpired) as e:
-        alert(f"{c.name}: not started", f"meta {c.name} launch: {type(e).__name__}")
-        return None
-    sessions = tmux.sessions()
-    session = session_of(c, sessions)
-    if done.returncode != 0 and not (done.returncode == 3 and session):
-        why = (done.stderr.strip().splitlines() or [""])[-1]
-        alert(f"{c.name}: not started", f"meta {c.name} launch exited {done.returncode}: {why}")
+    session = session_of(c, tmux.sessions())
+    if not done.ok and not (done.code == 3 and session):
+        alert(f"{c.name}: not started", f"meta {c.name} launch exited {done.code}: {done.why}")
         return None
     if session is None:
         alert(f"{c.name}: not started", f"no tmux session {c.session} after meta launch")

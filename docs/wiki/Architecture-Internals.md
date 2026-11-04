@@ -47,7 +47,9 @@ flowchart LR
 | `barmenu/cli.py` | `barmenu`: a subcommand per menu, `run`, `list` |
 | `crew/cli.py`, `crew/fast.py` | `crew`: the fast path for `status` and `bar`, then the Typer app (`crew/app.py`) with run records |
 | `crew/registry.py` | The coordinators from `meta brain coordinators --json`, its kept copy, or the homes; former names; menu keys |
-| `crew/switch.py` | Show, hide, toggle, cycle, width, side, list, stopped; `launch()`, the one call to `meta <name> launch` |
+| `crew/switch.py` | Show, hide, toggle, cycle, width, side, list, stopped; `launch()`, a show's start through `meta <name> launch` |
+| `crew/life.py` | `crew launch`, `stop`, `restart` and `stop --all`: each only through `meta <name> launch\|stop\|restart` |
+| `crew/metacall.py` | The one way crew runs a lifecycle verb: `meta <name> <verb>`, its exit code and one-line reason |
 | `crew/wm.py` | bspwm: one `bspc wm -d` per look; placing the panel and reserving its strip |
 | `crew/tmux.py` | Which sessions exist, on the server `CREW_TMUX_SOCKET` names |
 | `crew/strip.py` | The bar strip: running, shown and activity per coordinator, pushed to barctl's `crew` module |

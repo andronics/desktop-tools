@@ -10,7 +10,12 @@ tmp_path. Nothing reaches a real window, session or coordinator.
   (`-L` or `-S`), so a test that would reach the live server fails instead. Sessions are lines
   in `sessions`.
 - **meta** answers `brain coordinators --json` from `registry.json` (exit `meta-rc` if that file
-  exists) and `<name> launch` by adding `<name>-coordinator` to `sessions` (exit `launch-rc`).
+  exists); `<name> launch` by adding `<name>-coordinator` to `sessions`; `<name> stop` by removing
+  it and the window attached to it; `<name> restart` by both; `<name> stop --check` with 0. Each
+  verb exits as `<verb>-rc-<name>` or `<verb>-rc` say (`check` for `--check`), giving the reason in
+  `<verb>-why[-<name>]`: on stdout as the stop script's log line for 1, else on stderr; a 1 for
+  `stop` or `restart` with `--force` ends it anyway.
+- **rofi** prints `rofi-answer` if it exists (the row picked), else exits 1 (Escape).
 - **alacritty** adds a hidden floating window of its `--class` to `wm.json`, as bspwmrc's rule
   makes it (none when `no-window` exists).
 - **notify-send** prints `notify-answer` if it exists (what a click on the action returns).
@@ -162,26 +167,84 @@ if rest[:1] == ["has-session"]:
 sys.exit(0)
 """
 
-META = r"""
-def rc(name, default=0):
-    p = os.path.join(here, name)
-    return int(open(p).read().strip()) if os.path.exists(p) else default
+META = (
+    _WM_IO
+    + r"""
+def rc(verb, name, default=0):
+    for f in (f"{verb}-rc-{name}", f"{verb}-rc"):
+        p = os.path.join(here, f)
+        if os.path.exists(p):
+            return int(open(p).read().strip())
+    return default
+def why(verb, name):
+    for f in (f"{verb}-why-{name}", f"{verb}-why"):
+        p = os.path.join(here, f)
+        if os.path.exists(p):
+            return open(p).read().strip()
+    return "refused"
+def sessions():
+    p = os.path.join(here, "sessions")
+    return open(p).read().split() if os.path.exists(p) else []
+def end(name):
+    # The session goes, and with it the window attached to it.
+    keep = [s for s in sessions() if s != f"{name}-coordinator"]
+    with open(os.path.join(here, "sessions"), "w") as fh:
+        fh.write("".join(f"{s}\n" for s in keep))
+    d = load_wm()
+    d["windows"] = [w for w in d["windows"] if w["instance"] != name]
+    save_wm(d)
+def start(name):
+    with open(os.path.join(here, "sessions"), "a") as fh:
+        fh.write(f"{name}-coordinator\n")
+lockf.close()
 if args[:2] == ["brain", "coordinators"]:
-    code = rc("meta-rc")
+    code = rc("meta", "brain")
     if code:
         sys.stderr.write("meta brain: vault-query failed\n")
         sys.exit(code)
     print(open(os.path.join(here, "registry.json")).read())
     sys.exit(0)
-if len(args) >= 2 and args[1] == "launch":
-    code = rc("launch-rc")
+name, verb = (args + ["", ""])[:2]
+if verb == "launch":
+    code = rc("launch", name)
     if code:
-        sys.stderr.write(f"meta {args[0]}: refused\n")
+        sys.stderr.write(f"meta {name}: {why('launch', name)}\n")
         sys.exit(code)
-    with open(os.path.join(here, "sessions"), "a") as fh:
-        fh.write(f"{args[0]}-coordinator\n")
+    start(name)
+    sys.exit(0)
+if verb == "stop" and "--check" in args:
+    code = rc("check", name)
+    if code == 1:
+        print(f'2026-11-04T05:00:00+00:00 by=meta result=not-clean why="{why("check", name)}"')
+        print(f"{name}: {why('check', name)}")
+    elif code:
+        sys.stderr.write(f"meta {name}: {why('check', name)}\n")
+    sys.exit(code)
+if verb in ("stop", "restart"):
+    code = rc(verb, name)
+    if code == 1 and "--force" in args:  # not clean, ended anyway, as the stop script does
+        code = 0
+    if code == 1:
+        print(f'2026-11-04T05:00:00+00:00 by=meta result=refused why="{why(verb, name)}"')
+    elif code:
+        sys.stderr.write(f"meta {name}: {why(verb, name)}\n")
+    if code:
+        sys.exit(code)
+    end(name)
+    if verb == "restart":
+        start(name)
     sys.exit(0)
 sys.exit(2)
+"""
+)
+
+ROFI = r"""
+p = os.path.join(here, "rofi-answer")
+sys.stdin.read()
+if os.path.exists(p):
+    print(open(p).read().strip())
+    sys.exit(0)
+sys.exit(1)
 """
 
 ALACRITTY = (
@@ -346,6 +409,14 @@ class Desk:
         """The coordinators `meta <name> launch` was asked to start."""
         return [c[1] for c in self.calls("meta") if c[2:3] == ["launch"]]
 
+    def lifecycle(self) -> list[list[str]]:
+        """Every `meta <name> launch|stop|restart ...` call, without `meta` itself."""
+        return [c[1:] for c in self.calls("meta") if c[2:3] in (["launch"], ["stop"], ["restart"])]
+
+    def sessions(self) -> list[str]:
+        path = self.base / "sessions"
+        return path.read_text().split() if path.exists() else []
+
     def notified(self) -> list[list[str]]:
         return [c[1:] for c in self.detached if c[:1] == ["notify-send"]]
 
@@ -359,7 +430,9 @@ def make_desk(
     monkeypatch: pytest.MonkeyPatch,
     commands: Callable[..., Path],
 ) -> Desk:
-    log = commands(bspc=BSPC, tmux=TMUX, meta=META, alacritty=ALACRITTY, **{"notify-send": NOTIFY})
+    log = commands(
+        bspc=BSPC, tmux=TMUX, meta=META, alacritty=ALACRITTY, rofi=ROFI, **{"notify-send": NOTIFY}
+    )
     desk = Desk(isolate, log)
     monkeypatch.setenv("CREW_ACTORS_DIR", str(desk.actors))
     monkeypatch.setenv("CREW_TMUX_SOCKET", "crew-test")

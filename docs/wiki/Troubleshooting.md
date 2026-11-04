@@ -37,7 +37,14 @@ The file named by a `_FILE` variable doesn't exist, or the process can't read it
 ### crew says "<name> is stopped"
 
 That coordinator has no window and no tmux session, and showing never starts one. Start it with a left click on its
-glyph in the bar (`crew toggle --launch <name>`) or `meta <name> launch`.
+glyph in the bar (`crew toggle --launch <name>`), `crew launch <name> --show`, or `meta <name> launch`.
+
+### crew says "<name>: not stopped" (or not started, not restarted)
+
+meta refused, and the notification gives its exit code and reason. `1` means the coordinator's resume notes are not
+clean, so nothing was ended: let it write its PAUSED notes, or `crew stop <name> --force`. `3` is a refusal that is
+meta's to make (the brain coordinator is stopped only by Stephen at a terminal, or the caller isn't allowed), `2` a
+name with no home, `4` a failure (or meta couldn't be run). `meta <name> status` says more.
 
 ### crew's strip is missing from the bar
 

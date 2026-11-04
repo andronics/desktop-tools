@@ -12,7 +12,20 @@ live until the cut-over, and for 30 days after it as an alias.
 - **Showing never starts a coordinator.** A coordinator is running when its window or its tmux session exists. A
   running one with no window gets a window that attaches to its session. A stopped one is not started: crew shows a
   short "<name> is stopped" notification and exits 1. `cycle` skips stopped ones. Only `crew toggle --launch <name>`
-  starts one, through `meta <name> launch`; it is what a left click on a coordinator's glyph in the bar runs.
+  (what a left click on a coordinator's glyph in the bar runs) and `crew launch` start one, through
+  `meta <name> launch`.
+- **Start, stop and restart.** crew starts and stops coordinators only through `meta <name> launch|stop|restart`
+  (record 0019 §3a), never with tmux itself. `crew launch <name>` starts one hidden; `--show` then shows it docked.
+  `crew stop <name>` has meta judge its resume notes and end it; `--force` ends it even when they are not clean.
+  `crew restart <name>` stops and starts it, and shows it again if it was shown (else it stays hidden).
+  `crew stop --all` stops every running coordinator but the brain coordinator: it checks each first
+  (`meta <name> stop --check`) and, if any is not clean, asks once with a rofi Yes/No (No selected) before stopping
+  them all, the unclean ones with `--force`; `--yes` skips the question. Declined, nothing stops; one that meta
+  refuses doesn't stop the rest.
+- **meta's rules are meta's.** Who may start or stop which coordinator, the brain coordinator, the resume notes and
+  the old names are all decided by meta; crew passes on its answer. A refusal shows a notification with meta's exit
+  code and its one-line reason (`desktop: not stopped` / `meta desktop exited 1: <why>`), and crew exits with that
+  code: 1 not clean (nothing ended), 2 usage or no home, 3 refused, 4 failed (also when meta can't be run).
 - **The dock.** `crew width [N|+N|-N|left [N]|right [N]]` prints or sets the panel's width (640 to 2560, default
   1280); `left` and `right` move its inner edge by 128 or N. `crew side [left|right]` prints or sets the side. While a
   coordinator is shown, its strip of the screen is reserved with bspwm's padding, so tiled windows move aside.
@@ -23,7 +36,8 @@ live until the cut-over, and for 30 days after it as an alias.
 - **The Claude hooks.** `crew status` reads a Claude Code hook's JSON on stdin and records the coordinator busy,
   idle or waiting. Entering waiting raises a notification whose click shows it.
 - **The stop script's tidy.** `crew stopped <name>` drops a stopped coordinator's state, waits for its window to
-  close and gives its strip back.
+  close and gives its strip back. The stop script runs it after it ends a session, so `crew stop` and `crew restart`
+  hold no lock while meta runs.
 
 ## Where it gets the coordinators
 

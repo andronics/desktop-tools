@@ -18,7 +18,8 @@ app = typer.Typer(
     name="crew",
     help="The coordinator switchboard: one hidden terminal per Claude Code coordinator, docked "
     "left or right when shown (brain record 0019). Showing never starts a stopped coordinator; "
-    "only `toggle --launch` (the bar glyph's left click) does.",
+    "only `toggle --launch` (the bar glyph's left click) and `launch` do. Starting and stopping "
+    "go only through `meta <name> launch|stop|restart`.",
     no_args_is_help=True,
     add_completion=False,
     pretty_exceptions_enable=False,
@@ -88,6 +89,66 @@ def cycle(direction: Annotated[Direction, typer.Argument(help="next or prev.")])
     With none running, crew says so and exits 1.
     """
     _done(switch.cycle(registry.load(), direction.value))
+
+
+@app.command("launch")
+def launch_(
+    name: Name,
+    show_: Annotated[
+        bool, typer.Option("--show", help="Then show it docked (also if it was running).")
+    ] = False,
+) -> None:
+    """Start a coordinator through `meta <name> launch`, hidden unless --show.
+
+    meta's refusals are meta's (already running, not for this caller, no home): crew says why in
+    a notification and exits with meta's code.
+    """
+    from desktop_tools.crew import life
+
+    _done(life.launch(registry.load(), name, showing=show_))
+
+
+@app.command()
+def stop(
+    name: Annotated[
+        str | None, typer.Argument(help="A coordinator, as `crew names` lists them.")
+    ] = None,
+    force: Annotated[
+        bool, typer.Option("--force", help="End it even if its resume notes are not clean.")
+    ] = False,
+    all_: Annotated[
+        bool, typer.Option("--all", help="Every running coordinator but the brain coordinator.")
+    ] = False,
+    yes: Annotated[
+        bool, typer.Option("--yes", "-y", help="With --all: don't ask, stop the unclean ones too.")
+    ] = False,
+) -> None:
+    """Stop a coordinator through `meta <name> stop`, or all of them with --all.
+
+    meta judges the resume notes and ends the session; not clean, it exits 1 and nothing ends,
+    unless --force. --all checks each first (`meta <name> stop --check`) and, if any is not
+    clean, asks once (rofi Yes/No) before stopping them all; declined, nothing stops. meta's
+    exit code and reason reach the notification and crew's exit status.
+    """
+    from desktop_tools.crew import life
+
+    if all_ == (name is not None) or (all_ and force) or (yes and not all_):
+        typer.echo("crew stop: give one name [--force], or --all [--yes]", err=True)
+        raise typer.Exit(2)
+    reg = registry.load()
+    _done(life.stop_all(reg, yes=yes) if all_ else life.stop(reg, str(name), force=force))
+
+
+@app.command()
+def restart(name: Name) -> None:
+    """Restart a coordinator through `meta <name> restart`, shown again if it was shown.
+
+    Hidden before, it stays hidden. meta's exit code and reason reach the notification and
+    crew's exit status.
+    """
+    from desktop_tools.crew import life
+
+    _done(life.restart(registry.load(), name))
 
 
 # -N is a width, not an option.
