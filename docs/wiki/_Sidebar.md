@@ -14,6 +14,7 @@
 
 <!-- Project pages go here, e.g. - [How Matching Works](How-Matching-Works) -->
 - [CLI Reference](CLI-Reference)
+- [Adding a Module](Adding-A-Module)
 
 ### 🔧 Configuration
 
@@ -39,4 +40,7 @@
 
 ### 🔑 Key Features
 
-<!-- guidance: three to five one-line features, each starting with an emoji. -->
+- 🎛️ One controller for every Polybar IPC module: event-driven, redraws only on change
+- 🎨 Colours from the theme's roles at draw time
+- 🖱️ Clicks act on what the bar shows, started detached
+- 📋 Right-click menus as data, drawn by rofi above the button

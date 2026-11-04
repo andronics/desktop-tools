@@ -1,0 +1,68 @@
+# barmenu's menus: the default the package ships, from the zsh barmenu's table.
+#
+# $XDG_CONFIG_HOME/barmenu/menus.toml (or the file $BARMENU_CONFIG names) adds menus and replaces
+# whole menus of the same name. Each menu: its bar button's glyph, a title, the side of the
+# screen it falls back to when the pointer can't be read, a settle time (seconds to wait after
+# rofi closes before the command runs, so a screenshot never catches rofi fading out), and its
+# rows. A row's command is a shell command (run with `zsh -fc`, as before) or a list of
+# arguments. `dynamic = "<module>"` appends the rows barctl's source for that module gives.
+# Glyphs are current Nerd Font codepoints (the zsh table's legacy U+F900-U+FAFF ones mapped to
+# their nf-md names), written as escapes.
+
+[menus.layout]
+glyph = "\U000F05B2" # md-window_restore
+title = "Layout"
+side = "left"
+rows = [
+    { label = "DEFAULT", command = "bsp-layout set tiled" },
+    { label = "EVEN", command = "bsp-layout set even" },
+    { label = "GRID HORIZONTAL", command = "bsp-layout set grid" },
+    { label = "GRID VERTICAL", command = "bsp-layout set rgrid" },
+    { label = "TALL LEFT", command = "bsp-layout set tall" },
+    { label = "TALL RIGHT", command = "bsp-layout set rtall" },
+    { label = "WIDE TOP", command = "bsp-layout set wide" },
+    { label = "WIDE BOTTOM", command = "bsp-layout set rwide" },
+]
+
+[menus.screenshot]
+glyph = "\U000F0100" # md-camera
+title = "Screenshot"
+side = "left"
+settle = 0.5
+rows = [
+    { glyph = "", label = "FULLSCREEN", command = "screenshot fullscreen" },
+    { glyph = "", label = "GEOMETRY", command = "screenshot geometry" },
+    { glyph = "", label = "SELECTION", command = "screenshot selection" },
+    { glyph = "", label = "WINDOW", command = "screenshot window" },
+    { glyph = "", label = "DELAYED…", command = "screenshot delayed" },
+]
+
+[menus.settings]
+glyph = "" # fa-gear
+title = "Settings"
+side = "left"
+rows = [
+    { label = "BSPWM", command = "code ~/.config/bspwm" },
+    { label = "POLYBAR", command = "code ~/.config/polybar" },
+    { label = "DOTFILES", command = "code ~/.dotfiles" },
+    { label = "SXHKD", command = "code ~/.config/sxhkd/sxhkdrc" },
+]
+
+[menus.vpn]
+glyph = "\U000F0582" # md-vpn
+title = "VPN"
+side = "left"
+rows = [
+    { glyph = "\U000F0484", label = "CONNECT", command = "nordvpn connect" },                # md-security_network
+    { glyph = "\U000F015B", label = "Disconnect", command = "nordvpn disconnect" },          # md-close_network
+    { glyph = "\U000F02FD", label = "Information", command = 'dunstify -t 0 "VPN Status" "$(nordvpn status)"' }, # md-information_outline
+]
+
+[menus.session]
+glyph = "" # fa-user
+title = "Session"
+side = "right"
+rows = [
+    { glyph = "\U000F05FD", label = "QUIT", command = "power logout" }, # md-logout_variant
+    { glyph = "\U000F0453", label = "COMPOSITOR", command = "killall -eq picom; sleep 1.5; picom --config ~/.config/picom/picom.conf -b" }, # md-reload
+]
