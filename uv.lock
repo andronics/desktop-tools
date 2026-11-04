@@ -186,7 +186,7 @@ wheels = [
 
 [[package]]
 name = "desktop-tools"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "interpose" },
