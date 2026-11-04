@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/andronics/desktop-tools/compare/v0.1.2...v0.1.3) (2026-11-04)
+
+
+### 🐛 Bug Fixes
+
+* **crew:** meta's result exits (1, 5) aren't failures in the quick menu ([#12](https://github.com/andronics/desktop-tools/issues/12)) ([a72feb6](https://github.com/andronics/desktop-tools/commit/a72feb637613777c8ba16dbbfd49d3b9973c3dbb))
+
 ## [0.1.2](https://github.com/andronics/desktop-tools/compare/v0.1.1...v0.1.2) (2026-11-04)
 
 
