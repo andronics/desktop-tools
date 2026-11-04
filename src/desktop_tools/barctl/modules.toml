@@ -1,0 +1,34 @@
+# barctl's modules: the default the package ships (dotfiles record 0003 §B4).
+#
+# The dotfiles' desktop/.config/barctl/modules.toml, linked to $XDG_CONFIG_HOME/barctl/modules.toml,
+# replaces this file whole. Each module here is a polybar `custom/ipc` module whose
+# `hook-0 = barctl render <module>`. Clicks run detached, through `barctl click <module> <button>`;
+# {target} is the module's current target (the shown player, the default sink), filled in as a
+# whole argument. Glyphs are current Nerd Font codepoints, written as escapes.
+
+# The default sink's volume, from `pactl subscribe`.
+[modules.audio-level]
+source = "volume"
+display = "both"
+glyph = "\U000F0581" # md-volume_off: no pulse server yet
+
+[modules.audio-level.clicks]
+left = ["audio", "mute-toggle"]
+right = ["pwvucontrol"]
+scroll-up = ["audio", "volume-increase"]
+scroll-down = ["audio", "volume-decrease"]
+
+# The chosen MPRIS player's icon and play state, from `playerctl -a --follow`: Playing beats
+# Paused beats Stopped, then the latest to change. Clicks act on the player the bar shows.
+[modules.player-play-pause]
+source = "player"
+display = "icon"
+glyph = "" # fa-stop: no player
+
+[modules.player-play-pause.clicks]
+left = ["player", "play-pause", "{target}"]
+
+# The chosen player's "artist: title", cut to 40 characters.
+[modules.player-metadata]
+source = "player"
+display = "text"

@@ -42,6 +42,33 @@ def _load(path: Path | None) -> Config:
         raise typer.Exit(2) from e
 
 
+def _mount() -> None:
+    """Each tool as a sub-app (dotfiles record 0003 §A1): `desktop-tools barctl status` and
+    `barctl status` are the same command."""
+    from desktop_tools.barctl.app import app as barctl
+    from desktop_tools.barmenu.cli import app as barmenu
+
+    app.add_typer(barctl, name="barctl")
+    app.add_typer(barmenu, name="barmenu")
+
+
+_mount()
+
+
+@app.command()
+def completions(
+    shell: Annotated[str, typer.Argument(help="The shell: zsh.")],
+    out: Annotated[Path, typer.Option("--out", help="The folder to write them into.")],
+) -> None:
+    """Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`) for this version."""
+    from desktop_tools import completions as comp
+
+    if shell != "zsh":
+        typer.echo(f"error: no completions for {shell!r} (only zsh)", err=True)
+        raise typer.Exit(2)
+    raise typer.Exit(comp.write(out, emit=typer.echo))
+
+
 @app.command()
 def version() -> None:
     """Print the version."""

@@ -5,14 +5,41 @@
 
 Stephen's desktop tools in Python: barctl (the Polybar controller), barmenu and the rest of the dotfiles' tools
 
-<!-- guidance: two or three sentences: what problem this solves and for whom. Then delete this comment. -->
+Stephen's desktop tools, moved from the dotfiles' zsh library to one Python package, one command per tool, each with
+the name and flags it had before. The design is the dotfiles' [record 0003](https://github.com/andronics/dotfiles/blob/main/docs/design/0003-desktop-tools-in-python.md).
+
+- **`barctl`**, the Polybar controller and the only program that talks to polybar. The controller (`barctl run`, from
+  `barctl.service`) follows volume (`pactl subscribe`) and the media players (`playerctl -a --follow`), holds every
+  `custom/ipc` module's state, and redraws a module only when what it shows changes. Each module's hook,
+  `barctl render <module>`, colours its state from the theme's roles. Other tools change the bar with `barctl push`;
+  every click goes through `barctl click`, runs detached, and acts on what the bar shows. Verbs: `status`, `list`,
+  `show`, `push`, `alert`, `menu`, `click`, `reload`, `restart`, `theme`, `enable`, `disable`, `watch`, `doctor`,
+  `run`, `render`, `hide`, `unhide`.
+- **`barmenu`**, the bar's rofi menus, opened just above the clicked button: `barmenu <menu>`, `barmenu run <command>`.
 
 ## Quick Start
 
+From a release tag, with a uv-managed Python (the dotfiles' `desktop/.postinstall` does this from the version they pin):
+
 ```sh
-uv tool install git+https://github.com/andronics/desktop-tools
-desktop-tools --help
+uv tool install --python 3.13 --managed-python "git+https://github.com/andronics/desktop-tools@v<version>"
+desktop-tools completions zsh --out ~/.config/zsh/completions
+systemctl --user start barctl.service
+barctl doctor
 ```
+
+A polybar module barctl draws is `type = custom/ipc`, `initial = 1`, `hook-0 = barctl render <module>`, listed in
+`$XDG_CONFIG_HOME/barctl/modules.toml`. Adding one: the wiki's
+[Adding a Module](https://github.com/andronics/desktop-tools/wiki/Adding-A-Module).
+
+## Module notes
+
+- **Live today:** `audio-level` (volume), `player-play-pause` and `player-metadata` (players).
+- **Printer and scanner** (next PRs; one Brother device): availability is a 1 to 2 s TCP connect to port 631, at a low
+  rate. Never port 9100 (it can start an empty print job), and never port 54921 or eSCL on a timer (it wakes the
+  scanner). This overrides record 0003 §B8's timed `GET /eSCL/ScannerStatus`, after the homelab coordinator found the
+  printer off the network; the scanner's eSCL query runs only when its menu opens.
+- **VPN, Bluetooth and the counter:** as record 0003 §B8 says, each in its own PR.
 
 The full walk-through is in the wiki's [Quick Start](https://github.com/andronics/desktop-tools/wiki/Quick-Start).
 

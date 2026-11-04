@@ -29,7 +29,13 @@ Never edit `CHANGELOG.md` or the version, and never push tags: release-please do
 - Settings go through `config.SETTINGS`. Secrets come from `_FILE`, and are never logged.
 - Prefer the standard library and existing dependencies. Justify every new one in the PR.
 
-<!-- guidance: project-specific rules (concurrency model, error types, naming), the kind of thing a reviewer keeps repeating. -->
+- Each tool keeps the name, flags, exit codes and output of its zsh version; a change says so in its cut-over PR.
+- `barctl render` and `push` import nothing beyond the standard library (`tests/unit/test_barctl_cli.py` checks).
+- Only `common/polybar.py` talks to polybar (`tests/unit/test_one_owner.py` checks).
+- Child processes start through `common/procs.py`; anything started from a click is detached.
+- Glyphs are current Nerd Font codepoints written as `\U000Fxxxx` escapes.
+- Every tool logs through `common/journal.py` (brain record 0017); `render` and `push` write no run records.
+- After changing a command: `uv run scripts/gen-completions.py` and `uv run scripts/gen-wiki.py`.
 
 ## Working with AI assistants
 

@@ -24,7 +24,47 @@ Generated from the code: don't edit the table, run `uv run scripts/gen-wiki.py`.
 | `log_level` | `DESKTOP_TOOLS_LOG_LEVEL` | `INFO` | Log level: `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
 <!-- generated:end settings -->
 
-<!-- guidance: below the table, explain anything a one-line description can't: how settings interact, valid ranges, performance trade-offs. -->
+The settings above are the template's, for `desktop-tools` itself. The tools read their own files, below, with the
+standard library's `tomllib` (record 0003 §A5), so the bar's hook never loads the settings engine.
+
+### barctl: `modules.toml`
+
+The package ships a default for the live modules (`src/desktop_tools/barctl/modules.toml`);
+`$XDG_CONFIG_HOME/barctl/modules.toml` (the dotfiles' `desktop/.config/barctl/modules.toml`), or the file
+`$BARCTL_CONFIG` names, replaces it whole: it lists every IPC module.
+
+| Key | Meaning |
+|---|---|
+| `source` | One of barctl's own sources (`volume`, `player`; `printer`, `scanner`, `vpn`, `bluetooth`, `counter` are reserved) |
+| `pusher` | Or: the one outside program allowed to `barctl push` the module (`crew`). Exactly one of the two |
+| `display` | `icon` (the glyph, then the count), `text` (the label) or `both` |
+| `glyph` | Shown before anything has written the module |
+| `separator` | Between segments, for a module of several cells |
+| `[modules.<m>.clicks]` | `left`, `middle`, `right`, `scroll-up`, `scroll-down` = a command as a list; `{target}` is filled from the state, as a whole argument |
+| `[modules.<m>.segment_clicks]` | The same per segment, with `{segment}` |
+| `[[modules.<m>.menu]]` | Right-click rows: `glyph`, `label`, `command`. `right` with no command of its own opens the menu |
+
+### barmenu: `menus.toml`
+
+The package ships the zsh barmenu's menus (layout, screenshot, settings, vpn, session);
+`$XDG_CONFIG_HOME/barmenu/menus.toml` (or `$BARMENU_CONFIG`) adds menus and replaces whole menus of the same name.
+A menu has `glyph`, `title`, `side` (`left` or `right`, the corner used when the pointer can't be read), `settle`
+(seconds to wait after rofi closes), `rows` (`glyph`, `label`, `command`: a shell command run with `zsh -fc`, or a
+list of arguments) and `dynamic` (a barctl module whose source's rows are appended).
+
+### Environment
+
+| Variable | What |
+|---|---|
+| `BARCTL_RUNTIME_DIR` | Module states, the lock, the control socket (default `$XDG_RUNTIME_DIR/barctl`) |
+| `BARCTL_SETTINGS_DIR` | Disabled modules (default `$XDG_STATE_HOME/desktop-tools/barctl`) |
+| `BARCTL_CONFIG`, `BARMENU_CONFIG`, `BARMENU_THEME` | Another `modules.toml`, `menus.toml`, rofi theme |
+| `BARCTL_SOURCE` | Who is pushing, when `push` isn't given `--source` |
+| `BARCTL_RETRY` | Seconds before a source whose stream ended is restarted (2) |
+| `BARCTL_POLYBAR_WAIT` | Seconds a restarted bar has to answer before it counts as frozen (6) |
+| `BARCTL_POLYBAR_CONFIG` | The polybar config `doctor` reads (default `$XDG_CONFIG_HOME/polybar`) |
+| `THEME_STATE_DIR` | Where the current theme is (default `$XDG_STATE_HOME/theme`) |
+| `TOOL_STATS=skip`, `TOOL_JOURNAL=off` | No run record; nothing to the journal (brain record 0017) |
 
 ## Secrets
 
@@ -34,10 +74,26 @@ A secret setting is read from all four places, like any other, so nothing stops 
 - Kubernetes: a Secret mounted as a volume (SOPS-encrypted in the GitOps repo)
 - systemd: `LoadCredential=` and `%d/<name>`
 
-<!-- guidance: list this project's secrets, or say there are none. -->
+This project has no secrets.
 
 ## Examples
 
 A complete config file with every default is in [contrib/desktop-tools.example.yaml](https://github.com/andronics/desktop-tools/blob/main/contrib/desktop-tools.example.yaml).
 
-<!-- guidance: two or three real-world configurations, each with a sentence on when you'd use it. -->
+A pushed module, for crew's coordinator strip (a segment per coordinator, each with its own clicks):
+
+```toml
+[modules.crew]
+pusher = "crew"
+display = "icon"
+
+[modules.crew.segment_clicks]
+left = ["crew", "toggle", "{segment}"]
+right = ["crew", "quick", "{segment}"]
+middle = ["crew", "menu"]
+```
+
+```sh
+barctl push crew --json - --ttl 10m <<<'{"source": "crew", "segments": [{"id": "brain", "tier": "alert", "glyph": "…"}]}'
+barctl alert crew --segment brain --for 10s
+```
