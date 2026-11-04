@@ -284,7 +284,8 @@ def test_scan_against_a_real_tmux_on_its_own_socket(
 
     # The binary itself: a wrapper earlier on the developer's PATH (a tmux guard) is not run.
     real = shutil.which("tmux", path="/usr/bin:/bin")
-    if real is None:
+    sleep = shutil.which("sleep", path="/usr/bin:/bin")
+    if real is None or sleep is None:
         pytest.skip("no tmux installed")
     (isolate / "real" / "tmux").symlink_to(real)
     (isolate / "bin" / "tmux").unlink()  # the tripwire
@@ -294,7 +295,9 @@ def test_scan_against_a_real_tmux_on_its_own_socket(
     base = [real, "-S", str(sock), "-f", "/dev/null"]
     try:
         subprocess.run(  # noqa: S603 - the test's own server
-            [*base, "new-session", "-d", "-s", "crewtest-coordinator", "sleep 600"], check=True
+            # The full path: the test's PATH is locked down, and the session must outlive the call.
+            [*base, "new-session", "-d", "-s", "crewtest-coordinator", f"{sleep} 600"],
+            check=True,
         )
         reg = registry.Registry([registry.Coordinator("crewtest", isolate, "crewtest-coordinator")])
         assert strip.scan(reg, tree=wm.Tree()).running == {"crewtest"}
