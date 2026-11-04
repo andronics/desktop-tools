@@ -1,6 +1,6 @@
 # 0001: Theme and lock bar menus on barmenu
 
-Status: Proposed
+Status: Implemented
 Date: 2026-11-04
 Authors: Stephen Cox (direction, through the brain coordinator); written up by the desktop coordinator
 
@@ -153,6 +153,8 @@ record (see open question 3).
 
 ## Open questions
 
+Answered: the brain coordinator approved this record on 2026-11-04 with all five recommendations, (a) each.
+
 1. **Schemes in the theme menu.** (a) One row, `Scheme: <current>…`, opening `theme pick`; (b) every
    scheme as its own row, the current one marked; (c) only the current mode's schemes inline (about 9 dark
    or 4 light), then `theme pick` for the rest. Recommendation: **(a)**: `theme pick` already marks the
@@ -171,3 +173,11 @@ record (see open question 3).
 5. **Forget GPG passphrase.** (a) A `lockscreen forget-passphrase` verb, with a notification;
    (b) the row runs `gpg-connect-agent reloadagent /bye` directly, silently. Recommendation: **(a)**: one
    place for the timeout, and the click gets feedback.
+
+## Change log
+
+| Date | Change |
+|---|---|
+| 2026-11-04 | Proposed by the desktop coordinator |
+| 2026-11-04 | Approved by the brain coordinator, with all five recommendations: one `Scheme: <current>…` row opening `theme pick`; a 1-hour timed pause only; no bar indicator for idle lock off, for now; Suspend stays in the lock menu; a `lockscreen forget-passphrase` verb with a notification |
+| 2026-11-04 | Implemented: providers, `Row.current`, the `theme` and `lock` menus (step 1 of §6) |

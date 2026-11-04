@@ -46,11 +46,29 @@ The package ships a default for the live modules (`src/desktop_tools/barctl/modu
 
 ### barmenu: `menus.toml`
 
-The package ships the zsh barmenu's menus (layout, screenshot, settings, vpn, session);
-`$XDG_CONFIG_HOME/barmenu/menus.toml` (or `$BARMENU_CONFIG`) adds menus and replaces whole menus of the same name.
+The package ships the zsh barmenu's menus (layout, screenshot, settings, vpn, session) and the theme and lock
+menus (design record 0001); `$XDG_CONFIG_HOME/barmenu/menus.toml` (or `$BARMENU_CONFIG`) adds menus and replaces
+whole menus of the same name.
 A menu has `glyph`, `title`, `side` (`left` or `right`, the corner used when the pointer can't be read), `settle`
 (seconds to wait after rofi closes), `rows` (`glyph`, `label`, `command`: a shell command run with `zsh -fc`, or a
-list of arguments) and `dynamic` (a barctl module whose source's rows are appended).
+list of arguments; `current = true` marks a row), and one of `dynamic` or `provider`, never both:
+
+| Key | What |
+|---|---|
+| `dynamic` | A barctl module whose source's rows are appended |
+| `provider` | `theme` or `lock`: a function in `barmenu/providers/` that gives the menu's rows when it opens, the static `rows` following them. It reads state only through read-only queries with a 2 s limit (`theme current --json`, `lockscreen status --json`); when one fails, the rows still come, unmarked and with labels that name no state |
+| `current` (a row's) | Shown as one of rofi's active rows, which the dotfiles' `bar-menu.rasi` colours in the theme's accent; the cursor still starts on the first row. Providers set it from the state they read |
+
+An override can add rows to a provider's menu, for example a 30-minute pause:
+
+```toml
+[menus.lock]
+glyph = "\uF023"
+title = "Lock"
+side = "right"
+provider = "lock"
+rows = [{ label = "Idle lock off for 30 minutes", command = ["lockscreen", "hook-disable", "30m"] }]
+```
 
 ### Environment
 

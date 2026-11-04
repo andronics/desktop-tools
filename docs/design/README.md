@@ -8,4 +8,4 @@ Approved (by a human) → Implemented; supersede an implemented record with a ne
 
 | # | Title | Status | Decision in one line |
 |---|---|---|---|
-| 0001 | [Theme and lock bar menus on barmenu](0001-theme-and-lock-bar-menus.md) | Proposed | The last two `custom/menu` buttons become `barmenu theme` and `barmenu lock`, with menu providers and a current-row mark new in barmenu |
+| 0001 | [Theme and lock bar menus on barmenu](0001-theme-and-lock-bar-menus.md) | Implemented | The last two `custom/menu` buttons become `barmenu theme` and `barmenu lock`, with menu providers and a current-row mark new in barmenu |

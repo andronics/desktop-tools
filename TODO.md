@@ -13,3 +13,6 @@ the team (and its AI assistants) should know at a glance.
 <!-- One line each: the idea, why not, and a link to the issue, PR or design record. For example:
 - Helm chart: kustomize base + Flux overlays cover our clusters; a chart doubles the maintenance (design 0003).
 -->
+- barmenu rows from a command's JSON (`rows_from`): labels and glyphs would move into zsh, and every open pays a zsh start-up; providers are Python (design 0001).
+- Every scheme as its own row in the theme menu: overflows the 8-line window and duplicates `theme pick` without its previews (design 0001).
+- A timed idle-lock pause run by a background `sleep`: nothing can show its end or cancel it; a transient systemd timer does (design 0001).

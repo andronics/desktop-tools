@@ -224,6 +224,10 @@ Layout menu: DEFAULT, EVEN, GRID HORIZONTAL, GRID VERTICAL, TALL LEFT, TALL RIGH
 
 Every menu's name, one per line (for completion).
 
+### `desktop-tools barmenu lock`
+
+Lock menu: rows from the lock provider
+
 ### `desktop-tools barmenu run`
 
 Run a command detached from the bar's pipes (setsid, no inherited descriptors).
@@ -243,6 +247,10 @@ Session menu: QUIT, COMPOSITOR
 ### `desktop-tools barmenu settings`
 
 Settings menu: BSPWM, POLYBAR, DOTFILES, SXHKD
+
+### `desktop-tools barmenu theme`
+
+Theme menu: rows from the theme provider
 
 ### `desktop-tools barmenu vpn`
 

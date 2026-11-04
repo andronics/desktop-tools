@@ -46,6 +46,10 @@ the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_
   the test, so nothing can reach the live server. crew's own detached children (the guard, the strip's refresh,
   notifications) are recorded, not run; alacritty runs (it is the fake) so a window appears.
   `tests/coordinators.zsh`'s cases (in the dotfiles) appear in the docstrings by name.
+- **barmenu's providers** (`tests/unit/test_barmenu_providers.py`): the fake `theme` and `lockscreen` print the
+  JSON their `--json` verbs give, or fail, or sleep past the 2 s limit; each row's label, command and mark are checked
+  for every state, and the state-free rows for every failure. Patch barmenu's own `time` (`bm.time`), never
+  `time.sleep`: subprocess's wait loop sleeps too.
 - **crew's menus** (`tests/unit/test_crew_menu.py`): the quick menu runs on meta's real JSON
   (`tests/fixtures/meta-menu-*.json`, from the live `meta <name> menu --json` with its paths made generic). The fake
   rofi answers from `rofi-answers`, one line per call ("" is Escape), and keeps each call's rows.
