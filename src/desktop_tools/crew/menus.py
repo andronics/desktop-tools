@@ -18,9 +18,7 @@ and stopping through `stopping`, both `meta`.
 
 from __future__ import annotations
 
-import os
-
-from desktop_tools.crew import items, log, registry, stopping, store, strip, switch, wm
+from desktop_tools.crew import conf, items, log, registry, stopping, store, strip, switch, wm
 from desktop_tools.crew.items import Item
 from desktop_tools.crew.registry import Coordinator, Registry
 
@@ -151,8 +149,7 @@ def quick(reg: Registry, name: str) -> int:
 
 def menu_theme() -> list[str]:
     """CREW_MENU_THEME, else crew.rasi, else coord's coord.rasi until the dotfiles rename it."""
-    explicit = os.environ.get("CREW_MENU_THEME")
-    for name in [explicit] if explicit else ["crew", "coord"]:
+    for name in conf.menu_themes():
         found = stopping.theme(name)
         if found:
             return found
@@ -250,7 +247,7 @@ def pick_action(reg: Registry, c: Coordinator) -> str | None:
             ["toggle", "stop", "restart"],
             ["Hide" if shown else "Show", "Stop", "Restart"],
         )
-    args = ["-i", "-no-custom", "-format", "i", *stopping.theme(stopping.confirm_theme())]
+    args = ["-i", "-no-custom", "-format", "i", *stopping.theme(conf.confirm_theme())]
     args += ["-p", f"{c.name} ({state})", "-selected-row", "0"]
     picked = bm.pick(labels, args)
     if picked is None or not picked.isdigit() or int(picked) >= len(actions):

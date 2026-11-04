@@ -46,6 +46,16 @@ clean, so nothing was ended: let it write its PAUSED notes, or `crew stop <name>
 meta's to make (the brain coordinator is stopped only by Stephen at a terminal, or the caller isn't allowed), `2` a
 name with no home, `4` a failure (or meta couldn't be run). `meta <name> status` says more.
 
+### The quick menu says "the rest is unavailable"
+
+`meta <name> menu --json` failed, so crew shows only what it knows itself: Show, Launch, Stop and Restart. Run
+`meta <name> menu --json` in a terminal to see why; the reason is also in `journalctl --user -t crew`.
+
+### Stopping the brain coordinator from a menu says "not stopped"
+
+`meta brain stop` (and `restart`) only ends the brain coordinator when it is asked at a terminal, so it refuses
+crew's menus even after crew's own Yes. Stop it from a terminal: `meta brain stop`.
+
 ### crew's strip is missing from the bar
 
 barctl has no `crew` module: `$XDG_CONFIG_HOME/barctl/modules.toml` replaces the packaged one whole, so it needs the

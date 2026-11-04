@@ -13,10 +13,9 @@ or rofi failing all mean No.
 
 from __future__ import annotations
 
-import os
 import re
 
-from desktop_tools.crew import items, switch, tmux
+from desktop_tools.crew import conf, items, switch, tmux
 from desktop_tools.crew.registry import Coordinator, Registry
 
 BRAIN = "brain"
@@ -31,16 +30,12 @@ def theme(name: str) -> list[str]:
     return bm.theme_args(name)
 
 
-def confirm_theme() -> str:
-    return os.environ.get("CREW_CONFIRM_THEME") or "prompt"
-
-
 def confirm(question: str) -> bool:
     """True only on an explicit Yes."""
     from desktop_tools.barmenu import menus as bm
 
     args = ["-i", "-no-custom", "-format", "s", "-selected-row", "1"]
-    picked = bm.pick(["Yes", "No"], [*args, *theme(confirm_theme()), "-p", question])
+    picked = bm.pick(["Yes", "No"], [*args, *theme(conf.confirm_theme()), "-p", question])
     return picked == "Yes"
 
 
