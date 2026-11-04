@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.2](https://github.com/andronics/desktop-tools/compare/v0.1.1...v0.1.2) (2026-11-04)
+
+
+### ✨ Features
+
+* **crew:** launch, stop, restart and stop --all through meta ([#10](https://github.com/andronics/desktop-tools/issues/10)) ([012d3cc](https://github.com/andronics/desktop-tools/commit/012d3cc3ec55f6693234b1552407eed6dd2ba60c))
+* **crew:** the coordinator switchboard in Python (brain record 0019 §7) ([#8](https://github.com/andronics/desktop-tools/issues/8)) ([0268828](https://github.com/andronics/desktop-tools/commit/0268828285adb0642913b04d82f9cd98267a433e))
+* **crew:** the quick menu on each glyph and the full two-level menu (brain record 0019 §7a) ([#9](https://github.com/andronics/desktop-tools/issues/9)) ([2c5ec0e](https://github.com/andronics/desktop-tools/commit/2c5ec0eef48c5d4e609c0daad682f1c29551bd8d))
+
+
+### 📚 Documentation
+
+* **design:** theme and lock bar menus on barmenu (Proposed) ([#6](https://github.com/andronics/desktop-tools/issues/6)) ([a60ccc8](https://github.com/andronics/desktop-tools/commit/a60ccc831e2d938944941b7c79fc789b9e12fdcb))
+
 ## [0.1.1](https://github.com/andronics/desktop-tools/compare/v0.1.0...v0.1.1) (2026-11-04)
 
 

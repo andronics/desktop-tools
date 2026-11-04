@@ -1,7 +1,7 @@
 [project]
 name = "desktop-tools"
 # Owned by release-please: never edit by hand (see the wiki's Release-Process page).
-version = "0.1.1"
+version = "0.1.2"
 description = "Stephen\u0027s desktop tools in Python: barctl (the Polybar controller), barmenu and the rest of the dotfiles\u0027 tools"
 readme = "README.md"
 requires-python = ">=3.13"
