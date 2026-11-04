@@ -18,7 +18,7 @@ CI runs the unit tests on every supported Python version, together with ruff, my
 | `tests/integration/` | Real dependencies, marked `@pytest.mark.integration`; skipped unless `RUN_INTEGRATION=1` |
 | `tests/conftest.py` | Shared fixtures: `clean_env`, `isolate` (every folder in `tmp_path`, for every test), `theme`, `bar`, `journal_sock`, `commands`, `launched`, `write_config` |
 | `tests/fakes.py` | A fake polybar answering on its IPC socket, the journal's datagram socket, the theme, and fake commands on PATH that log every call |
-| `tests/crew_fakes.py` | crew's fake desktop (the `desk` fixture): a bspwm keeping its windows in a file, a tmux, `meta`, alacritty, rofi and notify-send |
+| `tests/crew_fakes.py` | crew's fake desktop (the `desk` fixture): a bspwm keeping its windows in a file, a tmux, `meta` (lifecycle, `menu` and read-only verbs), alacritty, rofi and notify-send; `ROFI_SEQ` and `XCLIP` for the menus |
 
 Nothing a test runs reaches the live desktop: `isolate` points every XDG folder, barctl's state, the journal socket,
 the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_path`.
@@ -46,3 +46,6 @@ the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_
   the test, so nothing can reach the live server. crew's own detached children (the guard, the strip's refresh,
   notifications) are recorded, not run; alacritty runs (it is the fake) so a window appears.
   `tests/coordinators.zsh`'s cases (in the dotfiles) appear in the docstrings by name.
+- **crew's menus** (`tests/unit/test_crew_menu.py`): the quick menu runs on meta's real JSON
+  (`tests/fixtures/meta-menu-*.json`, from the live `meta <name> menu --json` with its paths made generic). The fake
+  rofi answers from `rofi-answers`, one line per call ("" is Escape), and keeps each call's rows.

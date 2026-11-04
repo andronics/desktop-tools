@@ -10,6 +10,9 @@ The tools run as Stephen on his desktop and open no network port. What they trus
 - **One writer per module.** `push` is refused for a module drawn by barctl's own source or owned by another pusher.
 - **Local sockets only.** The control socket and the state files are in `$XDG_RUNTIME_DIR/barctl` (mode 700, the socket
   600); polybar's sockets are its own. Anyone running as Stephen can already change his bar.
+- **Menu items are data.** crew's quick menu runs what `meta <name> menu --json` offers, but only as argument
+  lists, never through a shell: a `meta` verb with its arguments, `xdg-open` for `https://` and `obsidian://` links
+  only, `code` for an absolute path only, and `xclip` with the text on stdin.
 - **Out of scope:** a hostile process running as Stephen.
 
 ## Secrets

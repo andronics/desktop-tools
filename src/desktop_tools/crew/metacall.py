@@ -46,22 +46,33 @@ def reason(stdout: str, stderr: str) -> str:
     return out[-1] if out else ""
 
 
-def run(name: str, verb: str, *args: str) -> Result:
-    """`meta <name> <verb> [args]`, with no terminal: crew runs from keys, the bar and the menu."""
-    argv = [conf.meta(), name, verb, *args]
+def call(
+    args: list[str], timeout: float | None = None
+) -> subprocess.CompletedProcess[str] | Result:
+    """`meta <args...>` with no terminal, its output kept (the quick menu's items and views): the
+    finished process, or a Result (code 4, ran False) when meta couldn't be run."""
+    argv = [conf.meta(), *args]
+    verb = args[1] if len(args) > 1 else ""
     try:
         # S603: a fixed argument list; meta is $BRAIN_BIN/meta or found on PATH.
-        done = subprocess.run(  # noqa: S603
+        return subprocess.run(  # noqa: S603
             argv,
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             errors="replace",
-            timeout=TIMEOUTS.get(verb, 30.0),
+            timeout=timeout or TIMEOUTS.get(verb, 30.0),
             check=False,
         )
     except FileNotFoundError:
         return Result(FAILED, "meta is not on PATH", ran=False)
     except (OSError, subprocess.TimeoutExpired) as e:
-        return Result(FAILED, f"meta {name} {verb}: {type(e).__name__}", ran=False)
+        return Result(FAILED, f"meta {' '.join(args[:2])}: {type(e).__name__}", ran=False)
+
+
+def run(name: str, verb: str, *args: str) -> Result:
+    """`meta <name> <verb> [args]`, with no terminal: crew runs from keys, the bar and the menu."""
+    done = call([name, verb, *args])
+    if isinstance(done, Result):
+        return done
     return Result(done.returncode, reason(done.stdout, done.stderr))

@@ -20,7 +20,8 @@ the name and flags it had before. The design is the dotfiles' [record 0003](http
   terminal per Claude Code coordinator, docked left or right when shown, with its strip in the bar (pushed to barctl)
   and the Claude hooks' `crew status`. Showing never starts a stopped coordinator; only `crew toggle --launch` (the
   glyph's left click) does, through `meta <name> launch`. Verbs: `toggle`, `show`, `hide`, `cycle`, `width`, `side`,
-  `guard`, `status`, `bar`, `list`, `names`, `stopped`. The wiki's
+  `guard`, `status`, `bar`, `list`, `names`, `stopped`, and the menus: `quick <name>` (a glyph's right click, from
+  `meta <name> menu --json`) and `menu` (the two-level menu, a middle click). The wiki's
   [Crew](https://github.com/andronics/desktop-tools/wiki/Crew) page has the rest.
 
 ## Quick Start

@@ -324,6 +324,15 @@ a notification and exits with meta's code.
 
 List crew's windows and whether each is hidden or visible.
 
+### `desktop-tools crew menu`
+
+Open the full menu, each coordinator then its actions (middle click, super + c).
+
+Level one lists every coordinator with its state (type its key to filter, as `crew names
+--keys` lists them) and Stop all; level two offers Show or Hide, Start, Stop and Restart.
+Escape on level two, or No to a question, goes back to level one. Starting and stopping go
+through `meta`.
+
 ### `desktop-tools crew names`
 
 List the coordinators crew knows, in menu order, from the registry.
@@ -340,6 +349,19 @@ The waiting notification, run detached by `status`; its click shows the coordina
 |---|---|
 | `NAME` | A coordinator, as `crew names` lists them. |
 | `BODY` |  |
+
+### `desktop-tools crew quick`
+
+Open one coordinator's quick menu above the pointer (its glyph's right click).
+
+Show or Hide first, then what `meta <name> menu --json` offers for it, in meta's order:
+Launch or Stop and Restart, its home in VS Code, status, inbox, resume notes and more. With
+meta failing, Show, Launch, Stop and Restart from crew's own state. Stop and Restart ask
+first; the brain coordinator is always asked about.
+
+| Argument | Description |
+|---|---|
+| `NAME` | A coordinator, as `crew names` lists them. |
 
 ### `desktop-tools crew restart`
 

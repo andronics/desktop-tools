@@ -32,8 +32,10 @@ _crew_cmd() {
         'hide:Hide the shown coordinator, focused or not, and give its strip back'
         'launch:Start a coordinator through `meta <name> launch`, hidden unless --show'
         'list:List crew'\''s windows and whether each is hidden or visible'
+        'menu:Open the full menu, each coordinator then its actions (middle click, super + c)'
         'names:List the coordinators crew knows, in menu order, from the registry'
         'notify:The waiting notification, run detached by `status`; its click shows the coordinator'
+        'quick:Open one coordinator'\''s quick menu above the pointer (its glyph'\''s right click)'
         'restart:Restart a coordinator through `meta <name> restart`, shown again if it was shown'
         'show:Show a coordinator docked, never hiding it and never starting it (exit 1 if stopped)'
         'side:Print the dock side, or set it, re-docking a shown coordinator'
@@ -85,6 +87,10 @@ _crew_cmd() {
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]'
                     ;;
+                menu)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]'
+                    ;;
                 names)
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]' \
@@ -95,6 +101,11 @@ _crew_cmd() {
                         '(- *)'{-h,--help}'[Show help and exit]' \
                         ':name:_crew_cmd_names' \
                         '::body: '
+                    ;;
+                quick)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]' \
+                        ':name:_crew_cmd_names'
                     ;;
                 restart)
                     _arguments -s -S \

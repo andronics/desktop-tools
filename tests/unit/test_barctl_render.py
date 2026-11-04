@@ -165,6 +165,41 @@ def test_packaged_crew_module_is_crews_strip(modules: dict[str, mods.Module]) ->
     assert crew.segment_clicks["left"] == ["crew", "toggle", "--launch", "{segment}"]
     assert crew.segment_clicks["scroll-up"] == ["crew", "cycle", "prev"]
     assert crew.segment_clicks["scroll-down"] == ["crew", "cycle", "next"]
+    # Record 0019 §7a: a right click opens that coordinator's quick menu, a middle click the
+    # full menu.
+    assert crew.segment_clicks["right"] == ["crew", "quick", "{segment}"]
+    assert crew.segment_clicks["middle"] == ["crew", "menu"]
+
+
+def test_each_glyph_carries_its_own_click_tags(modules: dict[str, mods.Module]) -> None:
+    state = {"segments": [{"id": "brain", "glyph": "B"}, {"id": "desktop", "glyph": "D"}]}
+    out = rd.render(modules["crew"], state, controller=False, colours={})
+    for name in ("brain", "desktop"):
+        for button in ("left", "middle", "right", "scroll-up", "scroll-down"):
+            assert f":barctl click crew {button} --segment {name}:" in out
+    # Each glyph is wrapped in its own five tags, closed before the next glyph's open.
+    brain, desktop = out.split("B")
+    assert brain.count("%{A") == 5 and desktop.startswith("%{A}" * 5 + "%{A5:")
+    assert "%{A3:barctl click crew right --segment brain:}" in brain
+
+
+def test_a_right_click_on_a_glyph_runs_crew_quick(
+    modules: dict[str, mods.Module], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from desktop_tools.barctl import ops
+    from desktop_tools.common import procs
+
+    seen: list[list[str]] = []
+
+    def detach(argv: list[str], env: object = None, cwd: object = None) -> int:
+        seen.append(argv)
+        return 1
+
+    monkeypatch.setattr(procs, "detach", detach)
+    monkeypatch.setattr(ops, "module", lambda name: modules[name])
+    assert ops.click("crew", "right", "desktop") == ["crew", "quick", "desktop"]
+    assert ops.click("crew", "middle", "desktop") == ["crew", "menu"]
+    assert seen == [["crew", "quick", "desktop"], ["crew", "menu"]]
 
 
 def test_underlined_segment(theme: dict[str, str], modules: dict[str, mods.Module]) -> None:

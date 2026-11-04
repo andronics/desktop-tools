@@ -14,6 +14,10 @@
                                      asked again (0: every start)
     CREW_BAR_TTL           86400     seconds a pushed strip holds before barctl shows it stale: a
                                      day, since a coordinator can wait hours for an answer
+    CREW_MENU_THEME        unset     the full menu's rofi theme (a name in rofi/themes, or a path);
+                                     unset, `crew`, else coord's `coord` until it is renamed
+    CREW_CONFIRM_THEME     prompt    the rofi theme of the full menu's second level (the Yes/No
+                                     questions are `life.confirm`'s, in `prompt`)
 
 Folders: `$XDG_RUNTIME_DIR/crew/` (each coordinator's activity, the locks) and
 `$XDG_STATE_HOME/crew/` (width, side, last shown, the registry's last good copy).
@@ -85,6 +89,15 @@ def registry_max_age() -> float:
 
 def bar_ttl() -> float:
     return _number("CREW_BAR_TTL", 86400.0)
+
+
+def menu_themes() -> list[str]:
+    explicit = os.environ.get("CREW_MENU_THEME")
+    return [explicit] if explicit else ["crew", "coord"]
+
+
+def confirm_theme() -> str:
+    return os.environ.get("CREW_CONFIRM_THEME") or "prompt"
 
 
 def runtime() -> Path:

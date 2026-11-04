@@ -53,6 +53,9 @@ flowchart LR
 | `crew/wm.py` | bspwm: one `bspc wm -d` per look; placing the panel and reserving its strip |
 | `crew/tmux.py` | Which sessions exist, on the server `CREW_TMUX_SOCKET` names |
 | `crew/strip.py` | The bar strip: running, shown and activity per coordinator, pushed to barctl's `crew` module |
+| `crew/menus.py` | `crew quick` (one coordinator's menu, from meta's items) and `crew menu` (the two-level menu) |
+| `crew/items.py` | meta's menu items: parsing, `when`, running each kind (`meta`, `open`, `edit`, `copy`) and each output |
+| `crew/stopping.py` | The menus' Launch, Stop and Restart on `life` and `metacall`, with the Yes/No questions (the brain always asked); Stop all is `life.stop_all` |
 | `crew/hook.py` | `crew status`, the Claude hook: event to state, standard library only |
 | `crew/guard.py` | `crew guard`: bspwm's events, the settle deadline, the drag hold-off, the re-dock |
 | `crew/store.py`, `crew/conf.py`, `crew/log.py`, `crew/out.py` | crew's files and locks, settings, messages and stdout |
@@ -81,7 +84,8 @@ changed (busy, say), crew writes `$XDG_RUNTIME_DIR/crew/state/<name>` and starts
 hook returns at once. That looks at bspwm and tmux once each, builds a segment per coordinator and pushes them to
 barctl's `crew` module in-process (`barctl.ops.push`, with a time to live); barctl pokes the module and polybar runs
 `barctl render crew`. A click on a glyph runs `barctl click crew left --segment <name>`, which runs
-`crew toggle --launch <name>` detached.
+`crew toggle --launch <name>` detached; a right click runs `crew quick <name>` and a middle click `crew menu` the same
+way. The quick menu asks `meta <name> menu --json` for its items each time it opens (meta caches it for 30 seconds).
 
 ## Design decisions
 
@@ -90,5 +94,5 @@ Why things are the way they are is recorded in [docs/design/](https://github.com
 This repo has no design records of its own yet: barctl's design is the dotfiles' [record 0003](https://github.com/andronics/dotfiles/blob/main/docs/design/0003-desktop-tools-in-python.md) (Python,
 one package, Typer with a standard-library fast path, barctl as polybar's only owner, the state model, the verbs),
 which amends [record 0001](https://github.com/andronics/dotfiles/blob/main/docs/design/0001-polybar-ipc-module-taxonomy.md) (custom/ipc modules, one render hook, the colour tiers, the player rule, barmenu menus).
-crew's is the brain's record 0019 (§4 the registry, §7 coord becoming crew), with the brain coordinator's decision of
+crew's is the brain's record 0019 (§4 the registry, §7 coord becoming crew, §7a the quick menu), with the brain coordinator's decision of
 2026-11-04 that showing never starts a stopped coordinator; its strip follows record 0003 Part C.
