@@ -1034,7 +1034,8 @@ def test_stop_all_no_stops_nothing(menu_desk: Desk) -> None:
     answers(menu_desk, "2", "No")
     assert menus.full(reg) == 1  # life.stop_all: declined is 1, nothing stopped
     asked = rofi_calls(menu_desk)[1]
-    assert asked[asked.index("-mesg") + 1] == "notes not clean for desktop, homelab: stop all anyway?"
+    q = "notes not clean for desktop, homelab: stop all anyway?"
+    assert asked[asked.index("-mesg") + 1] == q
     assert all("--check" in m for m in meta_calls(menu_desk))
 
 
