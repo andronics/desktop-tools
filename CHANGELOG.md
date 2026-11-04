@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/andronics/desktop-tools/compare/v0.1.7...v0.1.8) (2026-11-04)
+
+
+### 🐛 Bug Fixes
+
+* **crew:** the Yes/No shows the question in full over two rows ([#25](https://github.com/andronics/desktop-tools/issues/25)) ([a816bc2](https://github.com/andronics/desktop-tools/commit/a816bc22250920c21e0b1a2b692ddfc112cd5158))
+
 ## [0.1.7](https://github.com/andronics/desktop-tools/compare/v0.1.6...v0.1.7) (2026-11-04)
 
 
