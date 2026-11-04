@@ -1,6 +1,6 @@
 # 0001: Theme and lock bar menus on barmenu
 
-Status: Implemented
+Status: Approved
 Date: 2026-11-04
 Authors: Stephen Cox (direction, through the brain coordinator); written up by the desktop coordinator
 
@@ -179,5 +179,5 @@ Answered: the brain coordinator approved this record on 2026-11-04 with all five
 | Date | Change |
 |---|---|
 | 2026-11-04 | Proposed by the desktop coordinator |
-| 2026-11-04 | Approved by the brain coordinator, with all five recommendations: one `Scheme: <current>…` row opening `theme pick`; a 1-hour timed pause only; no bar indicator for idle lock off, for now; Suspend stays in the lock menu; a `lockscreen forget-passphrase` verb with a notification |
-| 2026-11-04 | Implemented: providers, `Row.current`, the `theme` and `lock` menus (step 1 of §6) |
+| 2026-11-04 | Approved by the brain coordinator, about 04:20 UTC on 2026-11-04, by SendMessage to the desktop coordinator, before the arbiter's cut-over (06:59), with all five recommendations: one `Scheme: <current>…` row opening `theme pick`; a 1-hour timed pause only; no bar indicator for idle lock off, for now; Suspend stays in the lock menu; a `lockscreen forget-passphrase` verb with a notification |
+| 2026-11-04 | Step 1 of §6 built: providers, `Row.current`, the `theme` and `lock` menus |
