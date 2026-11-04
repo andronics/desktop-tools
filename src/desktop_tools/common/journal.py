@@ -1,7 +1,7 @@
 """The journal helper (brain record 0017, with its 2026-11-04 amendment).
 
-Copied from andronics/brain `tools/journal.py` at commit 1aa3be646a9d43867364b864d2cca85063c931a9
-(PR 170, 2026-11-04; first copied at 9544ce8, PR 128), as dotfiles record 0003 §A8 decided (its
+Copied from andronics/brain `tools/journal.py` at commit 2834ee45f80cce79700a9410d2a72d882e49ea1e
+(PR 193, 2026-11-04; first copied at 9544ce8, PR 128), as dotfiles record 0003 §A8 decided (its
 open question 6: a copy, not a shared package). Changes from the brain's copy, and only these:
 
 - typed for `mypy --strict`, and `except Exception: pass` written as `contextlib.suppress`;
@@ -11,7 +11,10 @@ open question 6: a copy, not a shared package). Changes from the brain's copy, a
   `journal.sh` command line are left out: they serve the brain's `tool-errors`, `tool-stats`
   and shell tools, which live in the brain;
 - `allow_commands`, `owner`, `current_owner` and `SLUG_COMMAND` are left out: they serve the
-  brain's `meta`, which names its commands and owners at run time.
+  brain's `meta`, which names its commands and owners at run time;
+- record 0025's trace (brain PR 186: TRACEPARENT, TOOL_TRACE and the other trace fields, the
+  16-hex TOOL_RUN, redact() keeping the run's own trace ID) is left out until that record's
+  phase 3 brings it here.
 
 A tool wraps its main in run() and gets, without changing its output or its exit code:
 
@@ -99,7 +102,10 @@ _PATTERNS = [
     # password=…, token: …, secret …: the keyword stays, the word after it goes. With `=` or `:` the
     # keyword may end a longer name (gh-token:, my.password=); with only a space it must stand alone
     # (`password hunter2`, `--password x`), so a name that merely ends in one, such as a pass path
-    # (accounts/last.fm/api-key 312) or gh-cli-token, keeps the word after it.
+    # (accounts/last.fm/api-key 312) or gh-cli-token, keeps the word after it. Two hyphenated names
+    # are not mere names, and lose the word after a space too: an option that starts with a dash
+    # and ends in the keyword (--github-token x, --db-password x), and a header name in
+    # Capitalised-Words (X-Auth-Token x, X-API-Key x); a pass path is neither.
     (
         re.compile(
             r"(?i)\b(password|passwd|secret|token|api[_-]?key)(\s*[=:]\s*)(['\"]?)[^\s'\",;]+"
@@ -112,11 +118,26 @@ _PATTERNS = [
         ),
         r"\1\2\3" + REDACTED,
     ),
+    (
+        re.compile(
+            r"(?i)(?<![\w/.@-])(--?[\w.-]*?(?:password|passwd|secret|token|api[_-]?key))(\s+)(?![=:])(['\"]?)"
+            r"[^\s'\",;]+"
+        ),
+        r"\1\2\3" + REDACTED,
+    ),
+    (
+        re.compile(
+            r"(?<![\w/.@-])((?:[A-Z][A-Za-z0-9]*-)+(?:Password|Passwd|Secret|Token|Key|PASSWORD|PASSWD|SECRET"
+            r"|TOKEN|KEY))(\s+)(?![=:])(['\"]?)[^\s'\",;]+"
+        ),
+        r"\1\2\3" + REDACTED,
+    ),
     # GitHub tokens.
     (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9_]{10,}|github_pat_[A-Za-z0-9_]{10,})"), REDACTED),
-    # Long hex runs (keys, unspaced fingerprints).
-    (re.compile(r"\b[0-9A-Fa-f]{32,}\b"), REDACTED),
+    # Long hex runs (keys, unspaced fingerprints): _HEX below. The brain's also keeps the run's own
+    # trace ID (record 0025), which this copy doesn't carry yet.
 ]
+_HEX = re.compile(r"\b[0-9A-Fa-f]{32,}\b")
 # Long base64 runs: 32 or more base64 characters with a digit, an upper- and a lower-case
 # letter in them, so a long path or a word made of letters alone is left alone.
 _B64 = re.compile(r"[A-Za-z0-9+/_-]{32,}={0,2}")
@@ -135,6 +156,7 @@ def redact(text: str) -> str:
         return text
     for pattern, repl in _PATTERNS:
         text = pattern.sub(repl, text)
+    text = _HEX.sub(REDACTED, text)
     return _B64.sub(_b64, text)
 
 
