@@ -185,7 +185,8 @@ def test_bar_tiers(desk: Desk, theme: dict[str, str], bar: FakeBar) -> None:
         ("media", "alert", True),
         ("desktop", "unavailable", False),
     ]
-    assert data["source"] == "crew" and data["expires"] > data["updated"]
+    # A day: a coordinator waiting hours for an answer still shows it (record 0003's ttl).
+    assert data["source"] == "crew" and data["expires"] - data["updated"] >= 86400 - 5
     assert not store.activity_path("desktop").exists()
     line = strip.line()
     assert "%{A1:barctl click crew left --segment brain:}" in line

@@ -10,7 +10,8 @@
                                      the guard re-docks
     CREW_REGISTRY_MAX_AGE  300       seconds the registry's kept copy is used before meta is
                                      asked again (0: every start)
-    CREW_BAR_TTL           3600      seconds a pushed strip holds before barctl shows it stale
+    CREW_BAR_TTL           86400     seconds a pushed strip holds before barctl shows it stale: a
+                                     day, since a coordinator can wait hours for an answer
 
 Folders: `$XDG_RUNTIME_DIR/crew/` (each coordinator's activity, the locks) and
 `$XDG_STATE_HOME/crew/` (width, side, last shown, the registry's last good copy).
@@ -75,7 +76,7 @@ def registry_max_age() -> float:
 
 
 def bar_ttl() -> float:
-    return _number("CREW_BAR_TTL", 3600.0)
+    return _number("CREW_BAR_TTL", 86400.0)
 
 
 def runtime() -> Path:

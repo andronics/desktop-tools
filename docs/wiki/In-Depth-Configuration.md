@@ -70,7 +70,7 @@ list of arguments) and `dynamic` (a barctl module whose source's rows are append
 | `CREW_LAUNCH_TIMEOUT` | Seconds crew waits for a window or a lock (10) |
 | `CREW_GUARD_SETTLE` | Seconds of quiet after a crew window's last event before the guard re-docks (0.2) |
 | `CREW_REGISTRY_MAX_AGE` | Seconds the registry's kept copy is used before `meta` is asked again (300; 0 asks every time) |
-| `CREW_BAR_TTL` | Seconds a pushed strip holds before barctl shows it stale (3600) |
+| `CREW_BAR_TTL` | Seconds a pushed strip holds before barctl shows it stale (86400: a coordinator may wait hours for an answer, and must still show it) |
 | `CREW_DEBUG` | `1`: crew's debug lines on stderr |
 | `TOOL_STATS=skip`, `TOOL_JOURNAL=off` | No run record; nothing to the journal (brain record 0017) |
 

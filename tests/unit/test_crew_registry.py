@@ -209,3 +209,13 @@ def test_names_verb_lists_with_keys(desk: Desk) -> None:
     out = CliRunner().invoke(app, ["names", "--keys"])
     assert out.exit_code == 0
     assert out.stdout.splitlines() == ["b brain", "pl platform", "pe personal"]
+
+
+def test_a_copy_that_cant_be_kept_warns(desk: Desk, capsys: pytest.CaptureFixture[str]) -> None:
+    from desktop_tools.crew import conf
+
+    desk.coordinators("brain")
+    conf.state_dir().parent.mkdir(parents=True, exist_ok=True)
+    conf.state_dir().write_text("not a folder")
+    assert rg.load().names == ["brain"]
+    assert "registry: cannot keep a copy in" in capsys.readouterr().err

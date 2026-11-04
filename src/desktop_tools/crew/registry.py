@@ -263,14 +263,14 @@ def _read_kept() -> tuple[list[Coordinator], float] | None:
 
 def _keep(raw: Any) -> None:
     folder = conf.state_dir()
+    tmp = folder / f".{KEPT}.{os.getpid()}.tmp"
     try:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
-        tmp = folder / f".{KEPT}.{os.getpid()}.tmp"
         tmp.write_text(json.dumps(raw, ensure_ascii=False, sort_keys=True), encoding="utf-8")
         os.replace(tmp, kept_path())
     except OSError as e:
         log.warning(f"registry: cannot keep a copy in {folder}: {e.strerror}")
-        with contextlib.suppress(OSError, UnboundLocalError):
+        with contextlib.suppress(OSError):
             tmp.unlink()
 
 
