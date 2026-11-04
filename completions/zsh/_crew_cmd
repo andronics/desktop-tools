@@ -30,12 +30,15 @@ _crew_cmd() {
         'cycle:Show the next or previous running coordinator in menu order, wrapping'
         'guard:Keep the shown coordinator docked (started detached by every show; exits when none is)'
         'hide:Hide the shown coordinator, focused or not, and give its strip back'
+        'launch:Start a coordinator through `meta <name> launch`, hidden unless --show'
         'list:List crew'\''s windows and whether each is hidden or visible'
         'names:List the coordinators crew knows, in menu order, from the registry'
         'notify:The waiting notification, run detached by `status`; its click shows the coordinator'
+        'restart:Restart a coordinator through `meta <name> restart`, shown again if it was shown'
         'show:Show a coordinator docked, never hiding it and never starting it (exit 1 if stopped)'
         'side:Print the dock side, or set it, re-docking a shown coordinator'
         'status:Claude Code hook'
+        'stop:Stop a coordinator through `meta <name> stop`, or all of them with --all'
         'stopped:The desktop half of a stop, run by the brain'\''s stop script after it ends a session'
         'toggle:Hide a coordinator if it is shown and focused, else show it docked'
         'width:Print the dock panel'\''s visible width, or set it (640 to 2560), resizing a shown panel'
@@ -72,6 +75,12 @@ _crew_cmd() {
                         '(- *)'{-h,--help}'[Show help and exit]' \
                         '--toggle[With none shown, show the last one shown (or the first), if running]'
                     ;;
+                launch)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]' \
+                        '--show[Then show it docked (also if it was running)]' \
+                        ':name:_crew_cmd_names'
+                    ;;
                 list)
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]'
@@ -87,6 +96,11 @@ _crew_cmd() {
                         ':name:_crew_cmd_names' \
                         '::body: '
                     ;;
+                restart)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]' \
+                        ':name:_crew_cmd_names'
+                    ;;
                 show)
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]' \
@@ -101,6 +115,14 @@ _crew_cmd() {
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]' \
                         '::event: '
+                    ;;
+                stop)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]' \
+                        '--force[End it even if its resume notes are not clean]' \
+                        '--all[Every running coordinator but the brain coordinator]' \
+                        '(--yes -y)'{--yes,-y}'[With --all]' \
+                        '::name:_crew_cmd_names'
                     ;;
                 stopped)
                     _arguments -s -S \

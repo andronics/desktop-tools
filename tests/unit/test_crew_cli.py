@@ -158,3 +158,46 @@ def test_status_and_bar_fast_dispatch(desk: Desk, monkeypatch: pytest.MonkeyPatc
             cli.main()
         assert e.value.code == 0
     assert seen == [["status", "Stop"], ["bar", "--quiet"]]
+
+
+def test_lifecycle_verbs_through_the_app(desk: Desk) -> None:
+    desk.coordinators("brain", "homelab", "desktop")
+    assert invoke("launch", "desktop") == 0
+    assert invoke("launch", "homelab", "--show") == 0
+    assert desk.shown() == ["homelab"]
+    assert invoke("restart", "homelab") == 0
+    assert desk.shown() == ["homelab"]
+    assert invoke("stop", "desktop") == 0
+    desk.put("stop-rc-homelab", "1")
+    assert invoke("stop", "homelab") == 1  # not clean: meta's 1
+    assert invoke("stop", "homelab", "--force") == 0
+    desk.session("brain-coordinator", "desktop-coordinator")
+    assert invoke("stop", "--all", "--yes") == 0
+    assert desk.sessions() == ["brain-coordinator"]
+    assert [c[:2] for c in desk.lifecycle()] == [
+        ["desktop", "launch"],
+        ["homelab", "launch"],
+        ["homelab", "restart"],
+        ["desktop", "stop"],
+        ["homelab", "stop"],
+        ["homelab", "stop"],
+        ["desktop", "stop"],
+        ["desktop", "stop"],
+    ]
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["stop"],
+        ["stop", "desktop", "--all"],
+        ["stop", "--all", "--force"],
+        ["stop", "desktop", "--yes"],
+        ["launch"],
+        ["restart"],
+    ],
+)
+def test_lifecycle_usage_errors_call_no_meta(desk: Desk, args: list[str]) -> None:
+    desk.coordinators("desktop")
+    assert invoke(*args) == 2
+    assert desk.lifecycle() == []

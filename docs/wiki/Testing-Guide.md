@@ -18,7 +18,7 @@ CI runs the unit tests on every supported Python version, together with ruff, my
 | `tests/integration/` | Real dependencies, marked `@pytest.mark.integration`; skipped unless `RUN_INTEGRATION=1` |
 | `tests/conftest.py` | Shared fixtures: `clean_env`, `isolate` (every folder in `tmp_path`, for every test), `theme`, `bar`, `journal_sock`, `commands`, `launched`, `write_config` |
 | `tests/fakes.py` | A fake polybar answering on its IPC socket, the journal's datagram socket, the theme, and fake commands on PATH that log every call |
-| `tests/crew_fakes.py` | crew's fake desktop (the `desk` fixture): a bspwm keeping its windows in a file, a tmux, `meta`, alacritty and notify-send |
+| `tests/crew_fakes.py` | crew's fake desktop (the `desk` fixture): a bspwm keeping its windows in a file, a tmux, `meta`, alacritty, rofi and notify-send |
 
 Nothing a test runs reaches the live desktop: `isolate` points every XDG folder, barctl's state, the journal socket,
 the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_path`.
@@ -39,8 +39,10 @@ the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_
 - The zsh controller's tests (`tests/barctl.zsh` in the dotfiles) are ported case by case; their names appear in the
   docstrings ("Ported: ...").
 - **crew** (`desk` fixture): `desk.coordinators(...)` is `meta`'s answer, `desk.window(...)` and `desk.session(...)`
-  add windows and sessions, `desk.shown()`, `desk.padding()`, `desk.launched()` and `desk.notified()` say what
-  happened. The fake tmux refuses any call that doesn't name its own server (`-L` or `-S`) and the fixture fails
+  add windows and sessions, `desk.shown()`, `desk.padding()`, `desk.launched()`, `desk.lifecycle()` (every
+  `meta <name> launch|stop|restart` call), `desk.sessions()` and `desk.notified()` say what happened. The fake
+  `meta` stops and restarts too, and exits as files say (`stop-rc-<name>`, `check-rc`, with a `*-why`); the fake
+  rofi answers with `rofi-answer`. The fake tmux refuses any call that doesn't name its own server (`-L` or `-S`) and the fixture fails
   the test, so nothing can reach the live server. crew's own detached children (the guard, the strip's refresh,
   notifications) are recorded, not run; alacritty runs (it is the fake) so a window appears.
   `tests/coordinators.zsh`'s cases (in the dotfiles) appear in the docstrings by name.

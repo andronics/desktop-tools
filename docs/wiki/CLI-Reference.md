@@ -305,6 +305,21 @@ Hide the shown coordinator, focused or not, and give its strip back.
 |---|---|---|
 | `--toggle` |  | With none shown, show the last one shown (or the first), if running. |
 
+### `desktop-tools crew launch`
+
+Start a coordinator through `meta <name> launch`, hidden unless --show.
+
+meta's refusals are meta's (already running, not for this caller, no home): crew says why in
+a notification and exits with meta's code.
+
+| Argument | Description |
+|---|---|
+| `NAME` | A coordinator, as `crew names` lists them. |
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--show` |  | Then show it docked (also if it was running). |
+
 ### `desktop-tools crew list`
 
 List crew's windows and whether each is hidden or visible.
@@ -325,6 +340,17 @@ The waiting notification, run detached by `status`; its click shows the coordina
 |---|---|
 | `NAME` | A coordinator, as `crew names` lists them. |
 | `BODY` |  |
+
+### `desktop-tools crew restart`
+
+Restart a coordinator through `meta <name> restart`, shown again if it was shown.
+
+Hidden before, it stays hidden. meta's exit code and reason reach the notification and
+crew's exit status.
+
+| Argument | Description |
+|---|---|
+| `NAME` | A coordinator, as `crew names` lists them. |
 
 ### `desktop-tools crew show`
 
@@ -353,6 +379,25 @@ click shows the coordinator; every change refreshes the strip.
 | Argument | Description |
 |---|---|
 | `EVENT` | Overrides the hook's event name. |
+
+### `desktop-tools crew stop`
+
+Stop a coordinator through `meta <name> stop`, or all of them with --all.
+
+meta judges the resume notes and ends the session; not clean, it exits 1 and nothing ends,
+unless --force. --all checks each first (`meta <name> stop --check`) and, if any is not
+clean, asks once (rofi Yes/No) before stopping them all; declined, nothing stops. meta's
+exit code and reason reach the notification and crew's exit status.
+
+| Argument | Description |
+|---|---|
+| `NAME` | A coordinator, as `crew names` lists them. |
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--force` |  | End it even if its resume notes are not clean. |
+| `--all` |  | Every running coordinator but the brain coordinator. |
+| `--yes`, `-y` |  | With --all: don't ask, stop the unclean ones too. |
 
 ### `desktop-tools crew stopped`
 
