@@ -1,8 +1,13 @@
 [project]
 name = "desktop-tools"
 # Owned by release-please: never edit by hand (see the wiki's Release-Process page).
+<<<<<<< before updating
 version = "0.1.8"
 description = "Stephen\u0027s desktop tools in Python: barctl (the Polybar controller), barmenu and the rest of the dotfiles\u0027 tools"
+=======
+version = "0.0.0"
+description = "Stephen's desktop tools in Python: barctl (the Polybar controller), barmenu and the rest of the dotfiles' tools"
+>>>>>>> after updating
 readme = "README.md"
 requires-python = ">=3.13"
 license = "Unlicense"
