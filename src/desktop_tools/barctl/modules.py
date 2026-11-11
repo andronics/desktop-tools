@@ -6,6 +6,8 @@
     # pusher = "crew"            # the one outside program that may `barctl push` it
     display = "both"             # icon (glyph, then count), text (label) or both
     glyph = "\\U000F0581"         # shown before anything has written the module
+    glyph_override = "\\U000F099D" # wins over the pushed glyph: a string (every tier) or a table
+    # glyph_override = { idle = "\\U000F099D", alert = "\\U000F0ECC" }  # per tier; others unchanged
     separator = " "              # between segments, for a module made of several cells
 
     [modules.audio-level.clicks] # button -> command; {target} and {segment} are filled in
@@ -32,6 +34,8 @@ SOURCES = ("volume", "player", "printer", "scanner", "vpn", "bluetooth", "counte
 BUILT = ("volume", "player")  # the others are reserved names: their sources come in later PRs
 BUTTONS = {"left": 1, "middle": 2, "right": 3, "scroll-up": 4, "scroll-down": 5}
 DISPLAYS = ("icon", "text", "both")
+TIERS = ("unavailable", "idle", "active", "alert")  # state.TIERS, kept here (no import cycle)
+OVERRIDE_ORDER = ("idle", "active", "alert", "unavailable")  # how doctor lists a table's tiers
 PACKAGED = Path(__file__).with_name("modules.toml")
 
 
@@ -68,6 +72,7 @@ class Module:
         "clicks",
         "display",
         "glyph",
+        "glyph_override",
         "menu",
         "name",
         "pusher",
@@ -84,6 +89,7 @@ class Module:
         pusher: str | None = None,
         display: str = "icon",
         glyph: str = "",
+        glyph_override: str | dict[str, str] | None = None,
         separator: str = " ",
         clicks: dict[str, list[str]] | None = None,
         segment_clicks: dict[str, list[str]] | None = None,
@@ -91,6 +97,7 @@ class Module:
     ) -> None:
         self.name, self.source, self.pusher = name, source, pusher
         self.display, self.glyph, self.separator = display, glyph, separator
+        self.glyph_override = glyph_override
         self.clicks = clicks or {}
         self.segment_clicks = segment_clicks or {}
         self.menu = menu or []
@@ -99,11 +106,32 @@ class Module:
     def writer(self) -> str:
         return self.source or self.pusher or ""
 
+    def override_tiers(self) -> list[str]:
+        """The tiers a glyph override covers, in doctor's order (empty without one)."""
+        if self.glyph_override is None:
+            return []
+        if isinstance(self.glyph_override, str):
+            return list(OVERRIDE_ORDER)
+        return [t for t in OVERRIDE_ORDER if t in self.glyph_override]
+
+    def glyph_for(self, tier: str, state: dict[str, object] | None) -> tuple[str, str]:
+        """The glyph the bar shows for the tier barctl shows, and which rule gave it (record
+        0002 §7): the override's entry for the tier ("override-tier"), a string override
+        ("override"), the state's own glyph ("pushed"), else the module's `glyph` ("default")."""
+        override = self.glyph_override
+        if isinstance(override, dict) and tier in override:
+            return override[tier], "override-tier"
+        if isinstance(override, str):
+            return override, "override"
+        if state is not None and "glyph" in state:
+            return str(state["glyph"] or ""), "pushed"
+        return self.glyph, "default"
+
     def has_menu(self) -> bool:
         return bool(self.menu) or self.source in BUILT
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        out: dict[str, object] = {
             "name": self.name,
             "source": self.source,
             "pusher": self.pusher,
@@ -113,6 +141,9 @@ class Module:
             "segment_clicks": self.segment_clicks,
             "menu": [r.as_dict() for r in self.menu],
         }
+        if self.glyph_override is not None:
+            out["glyph_override"] = self.glyph_override
+        return out
 
 
 def config_path() -> Path:
@@ -146,6 +177,32 @@ def _clicks(value: object, where: str) -> dict[str, list[str]]:
         if button not in BUTTONS:
             raise ConfigError(f"{where}: unknown button {button!r} (one of {', '.join(BUTTONS)})")
         out[button] = _strings(cmd, f"{where}.{button}")
+    return out
+
+
+def shown_tier(state: dict[str, object] | None, now: float) -> str:
+    """The tier barctl shows: the state's, `unavailable` when there is none or its ttl ran out."""
+    if state is None:
+        return "unavailable"
+    if state.get("expires") and float(str(state["expires"])) <= now:
+        return "unavailable"
+    return str(state.get("tier") or "unavailable")
+
+
+def _override(value: object, where: str) -> str | dict[str, str] | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, dict):
+        raise ConfigError(f"{where}: glyph_override must be a string or a table of tier = glyph")
+    out = {}
+    for tier, glyph in value.items():
+        if tier not in TIERS:
+            raise ConfigError(f"{where}.{tier}: unknown tier (one of {', '.join(TIERS)})")
+        if not isinstance(glyph, str):
+            raise ConfigError(f"{where}.{tier}: a glyph is text")
+        out[tier] = glyph
     return out
 
 
@@ -193,6 +250,7 @@ def parse(data: dict[str, object]) -> dict[str, Module]:
             pusher=pusher if isinstance(pusher, str) else None,
             display=display,
             glyph=_text(raw, "glyph", where),
+            glyph_override=_override(raw.get("glyph_override"), f"{where}.glyph_override"),
             separator=_text(raw, "separator", where, " "),
             clicks=_clicks(raw.get("clicks"), f"{where}.clicks"),
             segment_clicks=_clicks(raw.get("segment_clicks"), f"{where}.segment_clicks"),

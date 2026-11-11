@@ -116,6 +116,11 @@ def checks(now: float | None = None) -> list[Check]:
         modules = {}
         out.append(_check("modules.toml", False, str(e), f"fix {mods.config_path()}"))
 
+    for name, found in modules.items():
+        tiers = found.override_tiers()
+        if tiers:
+            out.append(_check(f"glyph {name}", True, "override for " + ", ".join(tiers)))
+
     folder = polybar_config_dir()
     hooks = ini_hooks(folder)
     ours = {}

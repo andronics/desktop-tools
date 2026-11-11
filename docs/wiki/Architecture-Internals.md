@@ -44,7 +44,8 @@ flowchart LR
 | `barctl/doctor.py` | `barctl doctor`'s checks |
 | `barctl/sources/` | The controller's sources: `volume`, `player` |
 | `barmenu/menus.py`, `menus.toml` | Menus as data, rofi placement, current rows as rofi's active rows, the detached launch |
-| `barmenu/providers/` | Menus whose rows come from Python when they open (`theme`, `lock`), from read-only queries with a 2 s limit; state-free rows when a query fails (record 0001) |
+| `barmenu/providers/` | Menus whose rows come from Python when they open (`theme`, `lock`, `tessera`), from read-only queries with a 2 s limit; state-free rows when a query fails (records 0001 and 0002). `tessera` reads only `tessera status --json`, never an entry name, and passes COORDINATOR, CLAUDECODE and TESSERA_ACTOR to tessera untouched |
+| `barctl/modules.py` `Module.glyph_for` | The one place that decides a module's glyph (override, pushed, default), used by `render`, `store.shown`, `ops.module_info` and the menu prompt (record 0002 §7) |
 | `barmenu/cli.py` | `barmenu`: a subcommand per menu, `run`, `list` |
 | `crew/cli.py`, `crew/fast.py` | `crew`: the fast path for `status` and `bar`, then the Typer app (`crew/app.py`) with run records |
 | `crew/registry.py` | The coordinators from `meta brain coordinators --json`, its kept copy, or the homes; former names; menu keys |

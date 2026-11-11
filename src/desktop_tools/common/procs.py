@@ -65,8 +65,10 @@ class Stream:
                 self.proc.stdout.close()
 
 
-def query(argv: Sequence[str], timeout: float = 3.0) -> str | None:
-    """A short command's stdout, or None when it is missing, fails or times out."""
+def query(argv: Sequence[str], timeout: float = 3.0, *, any_exit: bool = False) -> str | None:
+    """A short command's stdout, or None when it is missing, fails or times out. With
+    `any_exit`, a nonzero exit still gives its stdout (for a command whose exit code reports
+    the state it prints, as `tessera status --json` does)."""
     try:
         # S603: argv is a fixed list from the caller, never a shell string.
         result = subprocess.run(  # noqa: S603
@@ -80,7 +82,7 @@ def query(argv: Sequence[str], timeout: float = 3.0) -> str | None:
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    return result.stdout if result.returncode == 0 else None
+    return result.stdout if result.returncode == 0 or any_exit else None
 
 
 _launched: list[subprocess.Popen[bytes]] = []

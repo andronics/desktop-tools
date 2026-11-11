@@ -469,3 +469,127 @@ def test_config_override_and_packaged(isolate: Path) -> None:
     with pytest.raises(mods.ConfigError, match="No such file"):
         mods.load(isolate / "missing.toml")
     assert mods.load(mods.PACKAGED)["audio-level"].as_dict()["source"] == "volume"
+
+
+# ---------------------------------------------------------------- glyph overrides (record 0002 §7)
+
+TESSERA = """
+[modules.tessera]
+pusher = "tessera"
+glyph = "D"
+glyph_override = { idle = "I", active = "A" }
+
+[modules.all]
+pusher = "all"
+glyph_override = "S"
+
+[modules.plain]
+pusher = "plain"
+glyph = "D"
+"""
+
+
+@pytest.fixture
+def overridden(isolate: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    path = isolate / "modules.toml"
+    path.write_text(TESSERA)
+    monkeypatch.setenv("BARCTL_CONFIG", str(path))
+    return path
+
+
+@pytest.mark.parametrize(
+    ("toml", "message"),
+    [
+        ('[modules.x]\npusher = "y"\nglyph_override = { sleepy = "z" }', "x.glyph_override.sleepy"),
+        ('[modules.x]\npusher = "y"\nglyph_override = { idle = 3 }', "x.glyph_override.idle"),
+        ('[modules.x]\npusher = "y"\nglyph_override = 3', "glyph_override must be a string"),
+        ('[modules.x]\npusher = "y"\nglyph_override = ["a"]', "glyph_override must be a string"),
+    ],
+)
+def test_glyph_override_errors_name_the_key(isolate: Path, toml: str, message: str) -> None:
+    path = isolate / "m.toml"
+    path.write_text(toml)
+    with pytest.raises(mods.ConfigError, match=re.escape(message)):
+        mods.load(path)
+
+
+def test_glyph_override_parses(overridden: Path) -> None:
+    found = mods.load(overridden)
+    assert found["tessera"].glyph_override == {"idle": "I", "active": "A"}
+    assert found["all"].glyph_override == "S"
+    assert found["plain"].glyph_override is None
+    assert found["tessera"].as_dict()["glyph_override"] == {"idle": "I", "active": "A"}
+
+
+def test_packaged_modules_set_no_override() -> None:
+    assert all(m.glyph_override is None for m in mods.load(mods.PACKAGED).values())
+
+
+def test_shown_ignores_a_glyph_an_override_hides(overridden: Path) -> None:
+    from desktop_tools.barctl import store
+
+    found = mods.load(overridden)
+    one, two = {"tier": "idle", "glyph": "P1"}, {"tier": "idle", "glyph": "P2"}
+    # tessera overrides idle: a push that changes only the glyph is not a change
+    assert store.shown(found["tessera"], one, 0) == store.shown(found["tessera"], two, 0)
+    # ... but its alert tier has no override, so the pushed glyph still shows
+    a1, a2 = {**one, "tier": "alert"}, {**two, "tier": "alert"}
+    assert store.shown(found["tessera"], a1, 0) != store.shown(found["tessera"], a2, 0)
+    assert store.shown(found["plain"], one, 0) != store.shown(found["plain"], two, 0)
+
+
+def test_store_does_not_poke_for_a_hidden_glyph(overridden: Path) -> None:
+    from desktop_tools.barctl import store
+
+    found = mods.load(overridden)
+    pokes: list[str] = []
+    assert store.store(found["tessera"], {"tier": "idle", "glyph": "P1"}, pokes.append, now=1.0)
+    assert pokes == ["tessera"]
+    assert store.store(found["tessera"], {"tier": "idle", "glyph": "P2"}, pokes.append, now=2.0)
+    assert pokes == ["tessera"]  # written, not poked
+    assert store.store(found["plain"], {"tier": "idle", "glyph": "P1"}, pokes.append, now=1.0)
+    assert store.store(found["plain"], {"tier": "idle", "glyph": "P2"}, pokes.append, now=2.0)
+    assert pokes == ["tessera", "plain", "plain"]
+
+
+def test_status_gives_the_glyph_source_and_the_pushed_glyph(overridden: Path, bar: FakeBar) -> None:
+    now = time.time()
+    st.write("tessera", {"tier": "idle", "glyph": "P", "updated": now})
+    st.write("plain", {"tier": "idle", "glyph": "P", "updated": now})
+    found = {m["name"]: m for m in ops.status(now)["modules"]}
+    assert (found["tessera"]["glyph"], found["tessera"]["glyph_source"]) == ("I", "override-tier")
+    assert found["tessera"]["glyph_pushed"] == "P"
+    assert (found["plain"]["glyph"], found["plain"]["glyph_source"]) == ("P", "pushed")
+    assert found["plain"]["glyph_pushed"] == "P"
+    # no state: the override for unavailable, else the default; nothing pushed
+    assert (found["all"]["glyph"], found["all"]["glyph_source"]) == ("S", "override")
+    st.clear("plain")
+    again = {m["name"]: m for m in ops.status(now)["modules"]}
+    assert (again["plain"]["glyph"], again["plain"]["glyph_source"]) == ("D", "default")
+    assert again["plain"]["glyph_pushed"] is None
+
+
+def test_menu_prompt_uses_the_glyph_the_bar_shows(
+    overridden: Path, launched: list[list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from desktop_tools.barmenu import menus as bm
+
+    path = overridden
+    path.write_text(path.read_text() + '\n[[modules.tessera.menu]]\nlabel = "L"\ncommand = ["x"]\n')
+    shown: list[bm.Menu] = []
+    monkeypatch.setattr(bm, "choose", lambda menu, extra=None: shown.append(menu))
+    st.write("tessera", {"tier": "idle", "glyph": "P"})
+    ops.menu("tessera")
+    assert shown[0].glyph == "I"
+
+
+def test_doctor_lists_each_override(overridden: Path, bar: FakeBar) -> None:
+    found = {c["name"]: c for c in doctor.checks()}
+    assert found["glyph tessera"] == {
+        "name": "glyph tessera",
+        "state": "ok",
+        "detail": "override for idle, active",
+        "fix": "",
+    }
+    assert found["glyph all"]["detail"] == "override for idle, active, alert, unavailable"
+    assert "glyph plain" not in found

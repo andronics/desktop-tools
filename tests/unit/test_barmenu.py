@@ -30,7 +30,16 @@ def rofi(pick: str, code: int = 0) -> str:
 
 def test_the_zsh_menus_carried_over() -> None:
     menus = bm.load()
-    assert list(menus) == ["layout", "lock", "screenshot", "session", "settings", "theme", "vpn"]
+    assert list(menus) == [
+        "layout",
+        "lock",
+        "screenshot",
+        "session",
+        "settings",
+        "tessera",
+        "theme",
+        "vpn",
+    ]
     assert [r.label for r in menus["vpn"].rows] == ["CONNECT", "Disconnect", "Information"]
     assert menus["screenshot"].settle == 0.5 and menus["session"].side == "right"
     assert len(menus["layout"].rows) == 8

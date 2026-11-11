@@ -248,6 +248,10 @@ Session menu: QUIT, COMPOSITOR
 
 Settings menu: BSPWM, POLYBAR, DOTFILES, SXHKD
 
+### `desktop-tools barmenu tessera`
+
+Passwords menu: rows from the tessera provider
+
 ### `desktop-tools barmenu theme`
 
 Theme menu: rows from the theme provider

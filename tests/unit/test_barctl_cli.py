@@ -245,6 +245,7 @@ def test_verbs_in_process(
     assert r.exit_code == 1 and "controller: not running" in r.stdout
     assert "bar 4242: answering" in r.stdout
     assert json.loads(invoke(["status", "--json"]).stdout)["state"] == "fail"
+    assert "(override)" not in invoke(["status"]).stdout  # no packaged module sets one
     assert theme["active"] in invoke(["render", "audio-level"]).stdout
     assert invoke(["disable", "audio-level"]).exit_code == 0
     assert "[disabled]" in invoke(["status"]).stdout
@@ -337,6 +338,7 @@ def test_desktop_tools_mounts_the_tools(isolate: Path, monkeypatch: pytest.Monke
         "screenshot",
         "session",
         "settings",
+        "tessera",
         "theme",
         "vpn",
     ]
@@ -358,3 +360,21 @@ def test_main_entry_points(monkeypatch: pytest.MonkeyPatch, isolate: Path) -> No
         cli.main()
     assert e.value.code == 0
     assert cli.run_app([]) == 2  # no command: help, and Typer's usage exit
+
+
+def test_status_marks_an_overridden_glyph(
+    isolate: Path, bar: FakeBar, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TOOL_JOURNAL", "off")
+    path = isolate / "m.toml"
+    path.write_text(
+        '[modules.t]\npusher = "t"\nglyph_override = "O"\n[modules.u]\npusher = "u"\nglyph = "U"\n'
+    )
+    monkeypatch.setenv("BARCTL_CONFIG", str(path))
+    st.write("t", {"tier": "idle", "glyph": "P", "updated": 1.0})
+    st.write("u", {"tier": "idle", "glyph": "P", "updated": 1.0})
+    lines = {ln.split()[0]: ln for ln in invoke(["status"]).stdout.splitlines() if "idle" in ln}
+    assert "O (override)" in lines["t"] and "P" not in lines["t"].split("O (override)")[1]
+    assert "(override)" not in lines["u"] and lines["u"].rstrip().endswith("P")
+    data = {m["name"]: m for m in json.loads(invoke(["status", "--json"]).stdout)["modules"]}
+    assert data["t"]["glyph_source"] == "override" and data["t"]["glyph_pushed"] == "P"

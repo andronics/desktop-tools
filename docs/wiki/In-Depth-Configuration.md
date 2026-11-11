@@ -39,6 +39,7 @@ The package ships a default for the live modules (`src/desktop_tools/barctl/modu
 | `pusher` | Or: the one outside program allowed to `barctl push` the module (`crew`). Exactly one of the two |
 | `display` | `icon` (the glyph, then the count), `text` (the label) or `both` |
 | `glyph` | Shown before anything has written the module |
+| `glyph_override` | A glyph that wins over the pusher's or source's: a string (every tier) or a table of tiers (`unavailable`, `idle`, `active`, `alert`; a tier left out shows the pusher's glyph). Precedence for the tier shown (a stale module is `unavailable`): the table's entry, the string, the state's glyph, `glyph`. An empty string hides the glyph. `barctl status --json` gives `glyph_source` (`override-tier`, `override`, `pushed`, `default`) and `glyph_pushed`; `barctl doctor` lists each override (design record 0002 §7) |
 | `separator` | Between segments, for a module of several cells |
 | `[modules.<m>.clicks]` | `left`, `middle`, `right`, `scroll-up`, `scroll-down` = a command as a list; `{target}` is filled from the state, as a whole argument |
 | `[modules.<m>.segment_clicks]` | The same per segment, with `{segment}` |
@@ -56,7 +57,7 @@ list of arguments; `current = true` marks a row), and one of `dynamic` or `provi
 | Key | What |
 |---|---|
 | `dynamic` | A barctl module whose source's rows are appended |
-| `provider` | `theme` or `lock`: a function in `barmenu/providers/` that gives the menu's rows when it opens, the static `rows` following them. It reads state only through read-only queries with a 2 s limit (`theme current --json`, `lockscreen status --json`); when one fails, the rows still come, unmarked and with labels that name no state |
+| `provider` | `theme`, `lock` or `tessera`: a function in `barmenu/providers/` that gives the menu's rows when it opens, the static `rows` following them. It reads state only through read-only queries with a 2 s limit (`theme current --json`, `lockscreen status --json`, `tessera status --json`); when one fails, the rows still come, unmarked and with labels that name no state |
 | `current` (a row's) | Shown as one of rofi's active rows, which the dotfiles' `bar-menu.rasi` colours in the theme's accent; the cursor still starts on the first row. Providers set it from the state they read |
 
 An override can add rows to a provider's menu, for example a 30-minute pause:

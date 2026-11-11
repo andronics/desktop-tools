@@ -84,3 +84,11 @@ glyph = "\uF023" # fa-lock
 title = "Lock"
 side = "right"
 provider = "lock"
+
+# Record 0002 §1-2: rows from barmenu/providers/tessera.py (the key's lock state marked, the
+# password store's sync state). Opened by the bar module's right-click.
+[menus.tessera]
+glyph = "\U000F033E" # md-lock
+title = "Passwords"
+side = "right"
+provider = "tessera"
