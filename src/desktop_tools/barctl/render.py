@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 
 from desktop_tools.barctl import state as st
-from desktop_tools.barctl.modules import BUTTONS, Module
+from desktop_tools.barctl.modules import BUTTONS, Module, shown_tier
 from desktop_tools.common import theme
 
 METADATA_MAX = 40
@@ -68,14 +68,14 @@ def _underline(text: str, colour: str | None) -> str:
 
 def text_of(module: Module, state: st.State | None, now: float) -> tuple[str, str]:
     """(tier, plain text) of a module without segments, staleness applied."""
+    tier = shown_tier(state, now)
+    glyph, _ = module.glyph_for(tier, state)
     if state is None:
-        return "unavailable", module.glyph
-    tier = str(state.get("tier") or "unavailable")
-    glyph = str(state.get("glyph", module.glyph) or "")
+        return "unavailable", glyph
+    if tier == "unavailable" and state.get("expires") and float(state["expires"]) <= now:
+        return "unavailable", glyph
     label = str(state.get("label") or "")
     count = state.get("count") or 0
-    if state.get("expires") and float(state["expires"]) <= now:
-        return "unavailable", glyph
     return tier, compose(module.display, glyph, label, int(count))
 
 

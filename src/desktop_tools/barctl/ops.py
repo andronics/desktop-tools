@@ -230,7 +230,7 @@ def menu(name: str) -> mods.Row | None:
     if not rows:
         return None
     data = st.read(name)
-    glyph = str((data or {}).get("glyph", found.glyph) or "")
+    glyph = found.glyph_for(mods.shown_tier(data, time.time()), data)[0]
     picked = bm.choose(
         bm.Menu(
             name, glyph=glyph, title=name, rows=[bm.Row(r.glyph, r.label, r.command) for r in rows]
@@ -303,13 +303,16 @@ def enable(name: str, on: bool) -> bool:
 def module_info(found: mods.Module, now: float, off: set[str]) -> dict[str, Any]:
     data = st.read(found.name)
     tier, _ = render.text_of(found, data, now)
+    glyph, glyph_source = found.glyph_for(mods.shown_tier(data, now), data)
     info: dict[str, Any] = {
         "name": found.name,
         "writer": found.writer,
         "kind": "source" if found.source else "pusher",
         "enabled": found.name not in off,
         "tier": tier if data else None,
-        "glyph": (data or {}).get("glyph", found.glyph),
+        "glyph": glyph,
+        "glyph_source": glyph_source,
+        "glyph_pushed": (data or {}).get("glyph"),
         "label": (data or {}).get("label", ""),
         "count": (data or {}).get("count", 0),
         "detail": (data or {}).get("detail", ""),

@@ -288,3 +288,254 @@ def test_the_theme_menu_opens_with_its_rows(
     assert launched == [["theme", "pick"]]
     shown = (Path(commands()).parent / "rofi.in").read_text().splitlines()
     assert len(shown) == 7 and shown[0].endswith(" Scheme: Dracula…")
+
+
+# ---------------------------------------------------------------- tessera (record 0002 §2-6)
+
+from datetime import UTC, datetime, timedelta  # noqa: E402
+
+from desktop_tools.barmenu.providers import tessera  # noqa: E402
+
+PLANTED_NAME = "planted/entry-name"  # an entry name that must never reach a row
+
+
+def fetched(hours: int) -> str:
+    return (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
+
+
+def tessera_status(
+    lock: str = "locked",
+    waiting: int = 0,
+    sync: dict[str, object] | None = None,
+    version: str = "0.1.3",
+    sync_check: str = "ok",
+) -> dict[str, object]:
+    return {
+        "summary": "v0.1.3",
+        "state": "ok",
+        "version": version,
+        "lock": lock,
+        "waiting": waiting,
+        "sync": {
+            "state": "level",
+            "ahead": 0,
+            "behind": 0,
+            "dirty": 0,
+            "first_sync": "done",
+            "last_fetch": fetched(20),
+            "failing_since": None,
+            **(sync or {}),
+        },
+        "checks": [
+            {"name": "sync", "state": sync_check, "detail": "level; ahead 0, behind 0"},
+            {"name": "lock", "state": "ok", "detail": "the key is locked"},
+        ],
+        "names": [PLANTED_NAME],  # not a field tessera gives; if it ever did, no row may show it
+    }
+
+
+def fake_tessera(commands: Callable[..., Path], data: object, code: int = 0) -> Path:
+    """A fake tessera that answers `status --json` and fails the test (exit 99) on anything else."""
+    return commands(
+        tessera=(
+            "if args == ['status', '--json']:\n"
+            f"    {printing(data)}\n    sys.exit({code})\n"
+            "sys.exit(99)"
+        )
+    )
+
+
+@pytest.fixture(autouse=True)
+def clean_agent_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in tessera.AGENT_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
+
+
+UNLOCK_ARGV = [
+    "alacritty",
+    "--class",
+    "tessera-prompt",
+    "-e",
+    "zsh",
+    "-fc",
+    'tessera unlock || read -sk1 "?Press any key to close"',
+]
+LOCK_ARGV = [*UNLOCK_ARGV[:-1], 'tessera lock || read -sk1 "?Press any key to close"']
+STATUS_ARGV = [*UNLOCK_ARGV[:-1], 'tessera status || read -sk1 "?Press any key to close"']
+
+
+def labels(rows: list[bm.Row]) -> list[str]:
+    return [r.label for r in rows]
+
+
+def test_tessera_one_query_and_nothing_else(commands: Callable[..., Path]) -> None:
+    log = fake_tessera(commands, tessera_status())
+    rows = tessera.rows()
+    assert calls(log) == [["tessera", "status", "--json"]]
+    for row in rows:
+        words = " ".join(row.argv())
+        for forbidden in ("sync", "show", "otp", "names", "log", "health", "pass "):
+            assert f"tessera {forbidden}" not in words
+        assert PLANTED_NAME not in words and PLANTED_NAME not in row.label
+
+
+def test_tessera_uses_the_two_second_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[tuple[list[str], float]] = []
+
+    def query(argv: list[str], timeout: float = 3.0, *, any_exit: bool = False) -> str | None:
+        seen.append((list(argv), timeout))
+        return None
+
+    monkeypatch.setattr(procs, "query", query)
+    tessera.rows()
+    assert seen == [(["tessera", "status", "--json"], 2.0)]
+
+
+def test_tessera_locked(commands: Callable[..., Path]) -> None:
+    fake_tessera(commands, tessera_status("locked"))
+    rows = tessera.rows()
+    assert table(rows[:3]) == [
+        ("\U000f033e", "Locked", LOCK_ARGV, True),
+        ("\U000f033f", "Unlock…", UNLOCK_ARGV, False),
+        ("\U000f07f5", "Pick…", ["tessera", "pick"], False),
+    ]
+
+
+def test_tessera_unlocked(commands: Callable[..., Path]) -> None:
+    fake_tessera(commands, tessera_status("unlocked"))
+    rows = tessera.rows()
+    assert (rows[0].label, rows[0].current) == ("Locked", False)
+    assert (rows[1].label, rows[1].current) == ("Unlocked", True)
+
+
+def test_tessera_locked_with_reads_waiting(commands: Callable[..., Path]) -> None:
+    fake_tessera(commands, tessera_status("locked", waiting=2))
+    rows = tessera.rows()
+    assert rows[1].label == "Unlock: 2 waiting…"
+    assert rows[1].command == UNLOCK_ARGV
+
+
+def test_tessera_a_failing_status_still_reads(commands: Callable[..., Path]) -> None:
+    """`tessera status` exits 1 when a check fails but prints its JSON: the rows keep the state."""
+    fake_tessera(commands, tessera_status("unlocked"), code=1)
+    assert tessera.rows()[1].current
+
+
+SYNC_CASES = [
+    ({}, "Sync: level, 20h ago", "\U000f04e6", "ok"),
+    ({"state": "ahead", "ahead": 2}, "Sync: ahead 2", "\U000f04e7", "warn"),
+    ({"state": "behind", "behind": 3}, "Sync: behind 3", "\U000f04e7", "warn"),
+    ({"state": "diverged", "ahead": 1, "behind": 1}, "Sync: diverged", "\U000f04e7", "fail"),
+    ({"first_sync": "pending"}, "Sync: first sync pending", "\U000f04e7", "warn"),
+    ({"failing_since": "2026-11-10T00:00:00Z"}, "Sync: failing", "\U000f04e7", "fail"),
+]
+
+
+@pytest.mark.parametrize(("sync", "label", "glyph", "check"), SYNC_CASES)
+def test_tessera_sync_row(
+    commands: Callable[..., Path], sync: dict[str, object], label: str, glyph: str, check: str
+) -> None:
+    fake_tessera(commands, tessera_status(sync=sync, sync_check=check))
+    row = tessera.rows()[-1]
+    assert (row.glyph, row.label) == (glyph, label)
+    assert row.command[:4] == ["dunstify", "-a", "tessera", "Password store"]
+    lines = str(row.command[4]).splitlines()
+    assert lines[1] == "ok   lock  the key is locked"
+    if check == "ok":
+        assert lines[0] == "ok   sync  level; ahead 0, behind 0"
+    else:
+        assert lines[0].startswith(f"{check:<4} sync  ") and lines[0].endswith(tessera.FIX + ")")
+    assert PLANTED_NAME not in " ".join(row.command)
+
+
+@pytest.mark.parametrize("version", ["0.1.3", "0.2.0", "garbage"])
+def test_tessera_pick_flags_follow_the_version(
+    commands: Callable[..., Path], monkeypatch: pytest.MonkeyPatch, version: str
+) -> None:
+    fake_tessera(commands, tessera_status(version=version))
+    assert tessera.PICK_FLAGS_FROM is None  # hidden until the release exists
+    assert labels(tessera.rows()) == ["Locked", "Unlock…", "Pick…", "Sync: level, 20h ago"]
+    monkeypatch.setattr(tessera, "PICK_FLAGS_FROM", (0, 2, 0))
+    rows = tessera.rows()
+    if version != "0.2.0":
+        assert "Copy password…" not in labels(rows)
+        return
+    assert table(rows[2:4]) == [
+        ("\U000f0306", "Copy password…", ["tessera", "pick", "--password"], False),
+        ("\U000f09af", "Copy two-factor code…", ["tessera", "pick", "--otp"], False),
+    ]
+
+
+@pytest.mark.parametrize(
+    "body", ["sys.exit(4)", "print('not json')", printing(["a list"]), "time.sleep(5)"]
+)
+def test_tessera_unreadable_status(
+    commands: Callable[..., Path], monkeypatch: pytest.MonkeyPatch, body: str
+) -> None:
+    monkeypatch.setattr(providers, "TIMEOUT", 0.2)
+    monkeypatch.setattr(tessera, "PICK_FLAGS_FROM", (0, 0, 1))  # even a gated row stays hidden
+    commands(tessera=body)
+    assert table(tessera.rows()) == [
+        ("\U000f033e", "Lock", LOCK_ARGV, False),
+        ("\U000f033f", "Unlock…", UNLOCK_ARGV, False),
+        ("\U000f07f5", "Pick…", ["tessera", "pick"], False),
+        ("\U000f04e6", "Sync status…", STATUS_ARGV, False),
+    ]
+
+
+def test_tessera_missing(isolate: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PATH", str(isolate / "empty"))
+    assert labels(tessera.rows()) == ["Lock", "Unlock…", "Pick…", "Sync status…"]
+
+
+@pytest.mark.parametrize("variable", tessera.AGENT_VARIABLES)
+def test_tessera_tainted_environment(
+    commands: Callable[..., Path], monkeypatch: pytest.MonkeyPatch, variable: str
+) -> None:
+    fake_tessera(commands, tessera_status())
+    monkeypatch.setenv(variable, "x")
+    rows = tessera.rows()
+    assert labels(rows) == [
+        "Not available: the bar runs in an agent's environment",
+        "Sync: level, 20h ago",
+    ]
+    assert rows[0].command[:4] == ["dunstify", "-a", "tessera", "Password menu"]
+    assert not any(r.current for r in rows)
+
+
+@pytest.mark.parametrize("tainted", [False, True])
+def test_tessera_never_touches_the_caller_variables(
+    commands: Callable[..., Path], monkeypatch: pytest.MonkeyPatch, tainted: bool
+) -> None:
+    if tainted:
+        monkeypatch.setenv("TESSERA_ACTOR", "x")
+    fake_tessera(commands, tessera_status())
+    for row in tessera.rows():
+        words = " ".join(row.argv())
+        assert not any(v in words for v in tessera.AGENT_VARIABLES)
+        assert row.argv()[0] not in ("env", "unset") and "unset" not in words
+
+
+def test_tessera_rows_are_argument_lists_but_the_windows(commands: Callable[..., Path]) -> None:
+    fake_tessera(commands, tessera_status())
+    rows = tessera.rows()
+    assert all(isinstance(r.command, list) for r in rows)
+    assert rows[0].command == LOCK_ARGV and rows[1].command == UNLOCK_ARGV
+    # the shell strings are the two windows' inner commands and nothing else
+    inner = [r.command[-1] for r in rows if r.command[:1] == ["alacritty"]]
+    assert inner == [LOCK_ARGV[-1], UNLOCK_ARGV[-1]]
+
+
+def test_tessera_menu_loads_and_help_runs_nothing(commands: Callable[..., Path]) -> None:
+    log = commands(tessera="sys.exit(99)")
+    menu = bm.load()["tessera"]
+    assert (menu.glyph, menu.title, menu.side, menu.provider) == (
+        "\U000f033e",
+        "Passwords",
+        "right",
+        "tessera",
+    )
+    assert "tessera" in providers.NAMES
+    result = runner.invoke(cli.app, ["--help"])
+    assert "tessera" in result.stdout
+    assert calls(log) == []

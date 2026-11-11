@@ -254,3 +254,93 @@ def test_a_moved_underline_is_a_change_to_show(modules: dict[str, mods.Module]) 
         "segments": [{"id": "a", "tier": "idle"}, {"id": "b", "tier": "idle", "underline": True}]
     }
     assert store.shown(modules["crew"], before, 0.0) != store.shown(modules["crew"], after, 0.0)
+
+
+# ---------------------------------------------------------------- glyph overrides (record 0002 §7)
+
+OVERRIDES = {
+    "none": None,
+    "string": "S",
+    "table-with-tier": {t: f"T-{t}" for t in st.TIERS},
+    "table-without-tier": {"alert": "T-alert"},
+}
+
+
+def override_module(override: object) -> mods.Module:
+    return mods.parse(
+        {
+            "modules": {
+                "x": {
+                    "pusher": "p",
+                    "display": "icon",
+                    "glyph": "D",
+                    **({} if override is None else {"glyph_override": override}),
+                }
+            }
+        }
+    )["x"]
+
+
+@pytest.mark.parametrize("pushed", ["P", None])
+@pytest.mark.parametrize("kind", list(OVERRIDES))
+@pytest.mark.parametrize("tier", st.TIERS)
+def test_glyph_precedence_matrix(tier: str, kind: str, pushed: str | None) -> None:
+    module = override_module(OVERRIDES[kind])
+    state: dict[str, object] = {"tier": tier}
+    if pushed is not None:
+        state["glyph"] = pushed
+    table = OVERRIDES[kind]
+    if isinstance(table, dict) and tier in table:
+        want = (f"T-{tier}", "override-tier")
+    elif isinstance(table, str):
+        want = ("S", "override")
+    elif pushed is not None:
+        want = (pushed, "pushed")
+    else:
+        want = ("D", "default")
+    assert module.glyph_for(tier, state) == want
+    # what the bar draws is the same glyph
+    assert rd.text_of(module, state, 0.0) == (tier, want[0])
+
+
+@pytest.mark.parametrize("kind", list(OVERRIDES))
+def test_glyph_with_no_state_uses_unavailable_and_the_default(kind: str) -> None:
+    module = override_module(OVERRIDES[kind])
+    table = OVERRIDES[kind]
+    want = (
+        ("T-unavailable", "override-tier")
+        if isinstance(table, dict) and "unavailable" in table
+        else ("S", "override")
+        if isinstance(table, str)
+        else ("D", "default")
+    )
+    assert module.glyph_for("unavailable", None) == want
+    assert rd.text_of(module, None, 0.0) == ("unavailable", want[0])
+
+
+def test_a_stale_state_uses_the_unavailable_entry() -> None:
+    module = override_module({"unavailable": "U", "idle": "I"})
+    state = {"tier": "idle", "glyph": "P", "expires": 5.0}
+    assert rd.text_of(module, state, 10.0) == ("unavailable", "U")
+    assert rd.text_of(module, state, 1.0) == ("idle", "I")
+
+
+def test_an_empty_override_hides_the_glyph() -> None:
+    module = override_module("")
+    assert rd.text_of(module, {"tier": "idle", "glyph": "P"}, 0.0) == ("idle", "")
+    assert rd.render(module, {"tier": "idle", "glyph": "P"}, colours={}, controller=False) == ""
+
+
+def test_the_glyph_key_is_unchanged_without_an_override() -> None:
+    module = override_module(None)
+    assert module.glyph_for("idle", {"tier": "idle", "glyph": ""}) == ("", "pushed")
+    assert module.glyph_for("idle", {"tier": "idle"}) == ("D", "default")
+    assert "glyph_override" not in module.as_dict()
+
+
+def test_render_draws_the_override(theme: dict[str, str]) -> None:
+    module = override_module({"idle": "I"})
+    out = strip_actions(rd.render(module, {"tier": "idle", "glyph": "P"}, controller=False))
+    assert out == f"%{{F{theme['idle']}}}I%{{F-}}"
+    out = strip_actions(rd.render(module, {"tier": "active", "glyph": "P"}, controller=False))
+    assert out == f"%{{F{theme['active']}}}P%{{F-}}"

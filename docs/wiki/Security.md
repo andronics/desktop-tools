@@ -26,6 +26,15 @@ A tool's arguments never reach the journal: the helper drops them from what it l
 rewrites its own process's command line to the program alone, since journald copies that into `_CMDLINE`. Where it
 can't, it writes no journal entry (brain PR 170). From then on `ps` shows the tool without its arguments.
 
+### The tessera menu
+
+`barmenu tessera` (design record 0002) reads only `tessera status --json`, which never decrypts and holds counts and
+states, never an entry name. Entry names are chosen inside `tessera pick`'s own rofi, so no name reaches barmenu's
+arguments, its journal line or `ps`. The clipboard is pass's own `-c` through tessera: cleared after 45 seconds.
+barmenu never sets or clears `COORDINATOR`, `CLAUDECODE` or `TESSERA_ACTOR`: tessera reads them to tell who is
+calling. When one is set in barmenu's own environment, the menu shows one `Not available` row instead of the
+actions, since tessera would refuse them.
+
 ## Hardening
 
 - **Supply chain:** dependencies are pinned in the lock file and updated weekly by Dependabot. GitHub Actions are pinned to commit SHAs.

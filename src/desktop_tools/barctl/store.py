@@ -10,7 +10,7 @@ import time
 from collections.abc import Callable
 
 from desktop_tools.barctl import state as st
-from desktop_tools.barctl.modules import Module
+from desktop_tools.barctl.modules import Module, shown_tier
 
 
 def shown(module: Module, state: st.State | None, now: float | None = None) -> tuple[object, ...]:
@@ -20,7 +20,7 @@ def shown(module: Module, state: st.State | None, now: float | None = None) -> t
     now = time.time() if now is None else now
     stale = bool(state.get("expires")) and float(state["expires"]) <= now
     alerting = bool(state.get("alert_until")) and float(state["alert_until"]) > now
-    glyph = state.get("glyph", module.glyph)
+    glyph = module.glyph_for(shown_tier(state, now), state)[0]
     parts: tuple[object, ...]
     if module.display == "icon":
         parts = (glyph, state.get("count"))

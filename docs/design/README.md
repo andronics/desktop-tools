@@ -9,4 +9,4 @@ Approved (by a human) → Implemented; supersede an implemented record with a ne
 | # | Title | Status | Decision in one line |
 |---|---|---|---|
 | 0001 | [Theme and lock bar menus on barmenu](0001-theme-and-lock-bar-menus.md) | Implemented | The last two `custom/menu` buttons become `barmenu theme` and `barmenu lock`, with menu providers and a current-row mark new in barmenu |
-| 0002 | [A right-click menu on the tessera bar module, and glyph overrides in barctl](0002-tessera-bar-menu.md) | Proposed | Right-click on the tessera module opens `barmenu tessera` (lock and unlock, copy through `tessera pick`, a read-only sync row, never `tessera sync`); a new `glyph_override` in modules.toml wins over a pusher's glyph |
+| 0002 | [A right-click menu on the tessera bar module, and glyph overrides in barctl](0002-tessera-bar-menu.md) | Approved | Right-click on the tessera module opens `barmenu tessera` (lock and unlock, copy through `tessera pick`, a read-only sync row, never `tessera sync`); a new `glyph_override` in modules.toml wins over a pusher's glyph |

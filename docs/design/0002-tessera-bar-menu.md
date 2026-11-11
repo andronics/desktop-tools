@@ -2,7 +2,7 @@
 
 <!-- Add a line for this record to the index in docs/design/README.md (CI checks). -->
 
-Status: Proposed
+Status: Approved
 Date: 2026-11-11
 Authors: Stephen Cox (direction, 2026-11-11: the menu; and that tessera's glyph "is set for its own use but
 should allow others to overwrite"); written up by the desktop coordinator
@@ -371,3 +371,4 @@ and locking and unlocking switch md-shield_lock and md-shield_lock_open on the b
 | Date | Change |
 |---|---|
 | 2026-11-11 | Proposed by the desktop coordinator |
+| 2026-11-11 | Approved: Stephen via the arbiter, 2026-11-11, ❓ 2026-11-11 Approve Desktop Tools Record 0002 Tessera Bar Menu (option a, the recommendations on the open questions) |

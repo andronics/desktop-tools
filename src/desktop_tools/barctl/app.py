@@ -85,8 +85,11 @@ def status(as_json: Json = False) -> None:
         if not data["bars"]:
             typer.echo("bars: none running")
         for m in data["modules"]:
+            shown = m["glyph"] + " (override)" if m["glyph_source"].startswith("override") else ""
             text = " ".join(
-                p for p in (m["glyph"], str(m["count"]) if m["count"] else "", m["label"]) if p
+                p
+                for p in (shown or m["glyph"], str(m["count"]) if m["count"] else "", m["label"])
+                if p
             )
             age = f"{m['age_s']:g}s" if m["age_s"] is not None else "-"
             flags = "".join(f" [{f}]" for f in ("alerting", "stale") if m[f]) + (
