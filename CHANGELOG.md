@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.9](https://github.com/andronics/desktop-tools/compare/v0.1.8...v0.1.9) (2026-11-11)
+
+
+### ✨ Features
+
+* **barmenu,barctl:** the tessera bar menu and glyph overrides (record 0002) ([#35](https://github.com/andronics/desktop-tools/issues/35)) ([0a34e84](https://github.com/andronics/desktop-tools/commit/0a34e8429c44d4e90b972af502d005d391af041e))
+
+
+### 📚 Documentation
+
+* **design:** propose 0002, the tessera bar menu and glyph overrides in barctl ([#33](https://github.com/andronics/desktop-tools/issues/33)) ([878db02](https://github.com/andronics/desktop-tools/commit/878db02002e6bf8ecd18f9f465e032d02a4e1d6a))
+
 ## [0.1.8](https://github.com/andronics/desktop-tools/compare/v0.1.7...v0.1.8) (2026-11-04)
 
 
