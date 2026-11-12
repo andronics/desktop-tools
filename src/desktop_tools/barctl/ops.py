@@ -248,6 +248,33 @@ def menu(name: str) -> mods.Row | None:
     return row
 
 
+# ---------------------------------------------------------------- the player's pin
+
+
+def pin(name: str, instance: str | None) -> str | None:
+    """Show one player on a player module (and every module of its source) while it is
+    listed; None goes back to the rank. The controller holds it (record 0003 §5). Returns the
+    pin."""
+    found = module(name)
+    if found.source != "player":
+        raise Failure(f"{name} is not drawn by the player source: nothing to pin", USAGE)
+    answer = control.request("pin", module=name, instance=instance)
+    if answer is None:
+        raise Failure("the controller is not running (systemctl --user start barctl)", FAILED)
+    if not answer.get("ok"):
+        error = str(answer.get("error") or "refused")
+        raise Failure(error, NOT_FOUND if error.startswith("no player") else FAILED)
+    pinned = answer.get("pinned")
+    return pinned if isinstance(pinned, str) else None
+
+
+def pins() -> dict[str, Any]:
+    """source -> its pinned instance, from the running controller ({} without one)."""
+    answer = control.request("ping")
+    found = (answer or {}).get("pinned")
+    return found if isinstance(found, dict) else {}
+
+
 # ---------------------------------------------------------------- the bars
 
 
@@ -370,6 +397,10 @@ def status(now: float | None = None) -> dict[str, Any]:
         checks.append({"name": "modules.toml", "state": "fail", "detail": str(e)})
     off = st.disabled()
     infos = [module_info(m, now, off) for m in modules.values()]
+    pinned = pins() if running and any(m.source == "player" for m in modules.values()) else {}
+    for info, found in zip(infos, modules.values(), strict=True):
+        if found.source == "player":
+            info["pinned"] = pinned.get("player")
     for source in sorted({m.source for m in modules.values() if m.source}):
         health = st.source_health(source)
         if running and health.get("state") == "failing":

@@ -13,6 +13,11 @@ wrote it:
                  underline}; underline (true) marks one, as crew marks the coordinator shown
     alert_until  epoch seconds: until then the module (or a segment) blinks to urgent
     expires      epoch seconds: past it the state is stale (push --ttl) and shows unavailable
+    progress     a track's place (record 0003 §5): {position, length, rate, at, playing}, in
+                 seconds (at in epoch seconds; length null when unknown), for the capsule's line
+    accent       `#rrggbb`: the art's colour for the capsule's line and icon (accent = "art")
+    label_since  epoch seconds: when the label last changed, for the capsule's scroll (a source
+                 keeps it; a pusher's capsule scrolls from `updated`)
     source       who wrote it
     updated      epoch seconds
 
@@ -35,7 +40,20 @@ from desktop_tools.common import paths
 
 TIERS = ("unavailable", "idle", "active", "alert")
 ROLES = {"unavailable": "dim", "idle": "fg_dim", "active": "accent", "alert": "urgent"}
-FIELDS = ("tier", "glyph", "label", "count", "detail", "target", "segments", "alert_until")
+FIELDS = (
+    "tier",
+    "glyph",
+    "label",
+    "count",
+    "detail",
+    "target",
+    "segments",
+    "alert_until",
+    "progress",
+    "accent",
+)
+PROGRESS_FIELDS = ("position", "length", "rate", "at", "playing")
+RATE_MAX = 16.0  # MPRIS lets a player say any rate; past this it is a mistake, not a speed
 SEGMENT_FIELDS = ("id", "tier", "glyph", "label", "alert_until", "underline")
 BLINK = 0.5  # seconds per half of a blink
 
@@ -123,6 +141,46 @@ def _time(value: object, key: str) -> float:
     return float(value)
 
 
+def _number(value: object, where: str, low: float, high: float | None = None) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise StateError(f"{where} must be a number")
+    if value != value or value < low or (high is not None and value > high):  # NaN fails too
+        span = f"{low:g} to {high:g}" if high is not None else f"{low:g} or more"
+        raise StateError(f"{where} must be {span}")
+    return float(value)
+
+
+def progress(value: object) -> State:
+    """A `progress` field, checked (record 0003 §5): any other shape is a StateError."""
+    if not isinstance(value, dict):
+        raise StateError("progress must be an object")
+    length = value.get("length")
+    out: State = {
+        "position": _number(value.get("position", 0), "progress.position", 0),
+        "length": None if length is None else _number(length, "progress.length", 0),
+        "rate": _number(value.get("rate", 1.0), "progress.rate", 0, RATE_MAX),
+        "at": _number(value.get("at"), "progress.at", 0),
+    }
+    playing = value.get("playing", False)
+    if not isinstance(playing, bool):
+        raise StateError("progress.playing must be true or false")
+    out["playing"] = playing
+    return out
+
+
+def accent(value: object) -> str:
+    """`#` and six hex digits, so no colour can carry a polybar tag."""
+    hexdigits = "0123456789abcdefABCDEF"
+    if (
+        not isinstance(value, str)
+        or len(value) != 7
+        or value[0] != "#"
+        or not all(c in hexdigits for c in value[1:])
+    ):
+        raise StateError("accent must be # and six hex digits")
+    return value.lower()
+
+
 def validate(data: object) -> State:
     """A whole state from `push --json -`: the known fields, checked; anything else is dropped."""
     from desktop_tools.barctl.modules import valid_segment
@@ -143,6 +201,10 @@ def validate(data: object) -> State:
         out["count"] = count
     if data.get("alert_until") is not None:
         out["alert_until"] = _time(data["alert_until"], "alert_until")
+    if data.get("progress") is not None:
+        out["progress"] = progress(data["progress"])
+    if data.get("accent") is not None:
+        out["accent"] = accent(data["accent"])
     if "segments" in data and data["segments"] is not None:
         segs = data["segments"]
         if not isinstance(segs, list):

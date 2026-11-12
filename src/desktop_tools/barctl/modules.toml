@@ -28,10 +28,32 @@ glyph = "" # fa-stop: no player
 [modules.player-play-pause.clicks]
 left = ["player", "play-pause", "{target}"]
 
-# The chosen player's "artist: title", cut to 40 characters.
+# The chosen player's "Artist – Title", cut to 40 characters when drawn.
 [modules.player-metadata]
 source = "player"
 display = "text"
+
+# The player capsule (record 0003 §1-2): one "now playing" module, the play-state icon, then
+# "Artist – Title" in a fixed width, scrolling while it plays, and the track's progress as an
+# underline. Right-click opens `barmenu player`. Not on by default: the dotfiles turn it on
+# (with a [module/player-capsule] whose hook-0 = barctl render player-capsule).
+#
+# [modules.player-capsule]
+# source = "player"
+# display = "capsule"
+# glyph = "\U000F038A"   # md-music_note_off: before the source has written it
+# glyph_override = { active = "\U000F040A", idle = "\U000F03E4", unavailable = "\U000F038A" }
+# width = 32             # cells of text after the icon (8-80)
+# scroll = 2.0           # steps per second (0-4); 0 cuts with "…" instead
+# scroll_rest = 10       # seconds the start of the title rests between passes (0-120)
+# accent = "role"        # or "art": the cover's colour on the line and icon (curl, magick)
+#
+# [modules.player-capsule.clicks]
+# left = ["playerctl", "-p", "{target}", "play-pause"]
+# middle = ["playerctl", "-p", "{target}", "next"]
+# scroll-up = ["playerctl", "-p", "{target}", "volume", "0.05+"]
+# scroll-down = ["playerctl", "-p", "{target}", "volume", "0.05-"]
+# right = ["barmenu", "player"]
 
 # The coordinator strip: one cell per coordinator, pushed by crew (brain record 0019 §7, dotfiles
 # record 0003 Part C) with each cell's tier (unavailable stopped, idle running, active busy,

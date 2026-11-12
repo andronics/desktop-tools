@@ -9,6 +9,7 @@
     glyph_override = "\\U000F099D" # wins over the pushed glyph: a string (every tier) or a table
     # glyph_override = { idle = "\\U000F099D", alert = "\\U000F0ECC" }  # per tier; others unchanged
     separator = " "              # between segments, for a module made of several cells
+    # width, scroll, scroll_rest, accent: for display = "capsule" only (record 0003 §2)
 
     [modules.audio-level.clicks] # button -> command; {target} and {segment} are filled in
     left = ["audio", "mute-toggle"]
@@ -33,7 +34,14 @@ from desktop_tools.common import paths
 SOURCES = ("volume", "player", "printer", "scanner", "vpn", "bluetooth", "counter")
 BUILT = ("volume", "player")  # the others are reserved names: their sources come in later PRs
 BUTTONS = {"left": 1, "middle": 2, "right": 3, "scroll-up": 4, "scroll-down": 5}
-DISPLAYS = ("icon", "text", "both")
+DISPLAYS = ("icon", "text", "both", "capsule")
+ACCENTS = ("role", "art")
+# The capsule's keys (record 0003 §2): (default, lowest, highest); read only for `capsule`.
+CAPSULE_KEYS: dict[str, tuple[float, float, float]] = {
+    "width": (32, 8, 80),
+    "scroll": (2.0, 0, 4),
+    "scroll_rest": (10.0, 0, 120),
+}
 TIERS = ("unavailable", "idle", "active", "alert")  # state.TIERS, kept here (no import cycle)
 OVERRIDE_ORDER = ("idle", "active", "alert", "unavailable")  # how doctor lists a table's tiers
 PACKAGED = Path(__file__).with_name("modules.toml")
@@ -69,6 +77,7 @@ class Row:
 
 class Module:
     __slots__ = (
+        "accent",
         "clicks",
         "display",
         "glyph",
@@ -76,9 +85,12 @@ class Module:
         "menu",
         "name",
         "pusher",
+        "scroll",
+        "scroll_rest",
         "segment_clicks",
         "separator",
         "source",
+        "width",
     )
 
     def __init__(
@@ -94,8 +106,13 @@ class Module:
         clicks: dict[str, list[str]] | None = None,
         segment_clicks: dict[str, list[str]] | None = None,
         menu: list[Row] | None = None,
+        width: int = 32,
+        scroll: float = 2.0,
+        scroll_rest: float = 10.0,
+        accent: str = "role",
     ) -> None:
         self.name, self.source, self.pusher = name, source, pusher
+        self.width, self.scroll, self.scroll_rest, self.accent = width, scroll, scroll_rest, accent
         self.display, self.glyph, self.separator = display, glyph, separator
         self.glyph_override = glyph_override
         self.clicks = clicks or {}
@@ -143,6 +160,13 @@ class Module:
         }
         if self.glyph_override is not None:
             out["glyph_override"] = self.glyph_override
+        if self.display == "capsule":
+            out.update(
+                width=self.width,
+                scroll=self.scroll,
+                scroll_rest=self.scroll_rest,
+                accent=self.accent,
+            )
         return out
 
 
@@ -206,6 +230,31 @@ def _override(value: object, where: str) -> str | dict[str, str] | None:
     return out
 
 
+def _number(table: dict[str, object], key: str, where: str) -> float:
+    default, low, high = CAPSULE_KEYS[key]
+    value = table.get(key, default)
+    whole = key == "width"
+    if isinstance(value, bool) or not isinstance(value, int if whole else (int, float)):
+        raise ConfigError(f"{where}: {key} must be {'a whole number' if whole else 'a number'}")
+    if not low <= value <= high:
+        raise ConfigError(f"{where}: {key} must be {low:g} to {high:g}")
+    return float(value)
+
+
+def _capsule(module: Module, raw: dict[str, object], where: str) -> Module:
+    """The capsule's keys, checked, with their defaults; read only for `display = "capsule"`."""
+    if module.display != "capsule":
+        return module
+    accent = _text(raw, "accent", where, "role")
+    if accent not in ACCENTS:
+        raise ConfigError(f"{where}: accent is one of {', '.join(ACCENTS)}")
+    module.width = int(_number(raw, "width", where))
+    module.scroll = _number(raw, "scroll", where)
+    module.scroll_rest = _number(raw, "scroll_rest", where)
+    module.accent = accent
+    return module
+
+
 def parse(data: dict[str, object]) -> dict[str, Module]:
     table = data.get("modules", {})
     if not isinstance(table, dict):
@@ -244,17 +293,21 @@ def parse(data: dict[str, object]) -> dict[str, Module]:
                     _strings(row.get("command"), f"{where}.menu[{i}].command"),
                 )
             )
-        out[name] = Module(
-            name,
-            source=source if isinstance(source, str) else None,
-            pusher=pusher if isinstance(pusher, str) else None,
-            display=display,
-            glyph=_text(raw, "glyph", where),
-            glyph_override=_override(raw.get("glyph_override"), f"{where}.glyph_override"),
-            separator=_text(raw, "separator", where, " "),
-            clicks=_clicks(raw.get("clicks"), f"{where}.clicks"),
-            segment_clicks=_clicks(raw.get("segment_clicks"), f"{where}.segment_clicks"),
-            menu=menu,
+        out[name] = _capsule(
+            Module(
+                name,
+                source=source if isinstance(source, str) else None,
+                pusher=pusher if isinstance(pusher, str) else None,
+                display=display,
+                glyph=_text(raw, "glyph", where),
+                glyph_override=_override(raw.get("glyph_override"), f"{where}.glyph_override"),
+                separator=_text(raw, "separator", where, " "),
+                clicks=_clicks(raw.get("clicks"), f"{where}.clicks"),
+                segment_clicks=_clicks(raw.get("segment_clicks"), f"{where}.segment_clicks"),
+                menu=menu,
+            ),
+            raw,
+            where,
         )
     return dict(sorted(out.items()))
 

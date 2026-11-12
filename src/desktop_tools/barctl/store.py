@@ -11,6 +11,7 @@ from collections.abc import Callable
 
 from desktop_tools.barctl import state as st
 from desktop_tools.barctl.modules import Module, shown_tier
+from desktop_tools.barctl.render import METADATA_MAX, cut
 
 
 def shown(module: Module, state: st.State | None, now: float | None = None) -> tuple[object, ...]:
@@ -22,12 +23,24 @@ def shown(module: Module, state: st.State | None, now: float | None = None) -> t
     alerting = bool(state.get("alert_until")) and float(state["alert_until"]) > now
     glyph = module.glyph_for(shown_tier(state, now), state)[0]
     parts: tuple[object, ...]
+    label = cut(str(state.get("label") or ""), METADATA_MAX)
     if module.display == "icon":
         parts = (glyph, state.get("count"))
     elif module.display == "text":
-        parts = (state.get("label"),)
+        parts = (label,)
+    elif module.display == "capsule":
+        # The position moves by itself (render works it out from the time): only the length
+        # and whether it plays are what is shown, so a re-read position pokes nothing.
+        progress = state.get("progress") or {}
+        parts = (
+            glyph,
+            state.get("label"),
+            progress.get("length"),
+            bool(progress.get("playing")),
+            state.get("accent"),
+        )
     else:
-        parts = (glyph, state.get("count"), state.get("label"))
+        parts = (glyph, state.get("count"), label)
     segments = tuple(
         (
             s.get("id"),
@@ -62,8 +75,9 @@ def store(
 
 
 class Writer:
-    """How a source sets its modules: tier, glyph, label and target, nothing else. An alert
-    someone set on the module is kept."""
+    """How a source sets its modules: tier, glyph, label, target, and the player's progress and
+    accent, nothing else. An alert someone set on the module is kept, and so is when the label
+    last changed (`label_since`, the capsule's scroll clock) while the label is the same."""
 
     def __init__(self, modules: dict[str, Module], poke: Callable[[str], object]) -> None:
         self.modules, self.poke = modules, poke
@@ -78,10 +92,14 @@ class Writer:
         label: str = "",
         target: str | None = None,
         detail: str | None = None,
+        progress: st.State | None = None,
+        accent: str | None = None,
+        now: float | None = None,
     ) -> bool:
         module = self.modules.get(name)
         if module is None:
             return False
+        now = time.time() if now is None else now
         new: st.State = {"tier": tier, "source": source}
         if glyph is not None:
             new["glyph"] = glyph
@@ -91,7 +109,14 @@ class Writer:
             new["target"] = target
         if detail:
             new["detail"] = detail
+        if progress is not None:
+            new["progress"] = progress
+        if accent:
+            new["accent"] = accent
         old = st.read(name)
         if old and old.get("alert_until"):
             new["alert_until"] = old["alert_until"]
-        return store(module, new, self.poke)
+        if label:
+            same = old is not None and old.get("label") == label and old.get("label_since")
+            new["label_since"] = old["label_since"] if same and old else now
+        return store(module, new, self.poke, now)

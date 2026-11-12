@@ -34,6 +34,7 @@ _barctl_cmd() {
         'hide:Hide the bars (bsp-hide calls it)'
         'list:List every module, one per line, sorted'
         'menu:Open a module'\''s right-click menu'
+        'pin:Show one player on a player module until it goes'
         'push:Set a module'\''s state'
         'reload:Redraw every module, or one, without restarting polybar'
         'render:Print a module'\''s text for polybar'
@@ -100,6 +101,13 @@ _barctl_cmd() {
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]' \
                         ':module:_barctl_cmd_modules'
+                    ;;
+                pin)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]' \
+                        '--auto[Unpin]' \
+                        ':module:_barctl_cmd_modules' \
+                        '::instance: '
                     ;;
                 push)
                     _arguments -s -S \

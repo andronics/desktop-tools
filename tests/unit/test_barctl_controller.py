@@ -200,6 +200,8 @@ elif args[0] == 'get-sink-mute':
         playerctl=f"""
 if args == ['-l']:
     print(open({str(players)!r}).read(), end='')
+elif args[0] == '-p' and args[2:] == ['position']:
+    print('12.5')  # record 0003 §5: the source reads the shown player's position
 else:
     os.execvp('cat', ['cat', here + '/pl.fifo'])
 """,

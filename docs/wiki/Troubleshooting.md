@@ -36,6 +36,25 @@ click started may hold a polybar pipe: start it through `barctl click` or `barme
 opened with the rows that name no state. Run the query by hand: `theme current --json` or `lockscreen status --json`
 (a dotfiles older than the lock menu has no `--json`).
 
+### The capsule shows no progress line
+
+The player gives no length (a stream, a radio station, some browsers), or its position can't be read: `playerctl -p
+<instance> metadata mpris:length` and `playerctl -p <instance> position` say which. With no length there is nothing to
+measure, so no line. The line moves on by itself while playing and is re-read every 30 seconds, so a seek made in the
+player shows within 30 seconds.
+
+### `modules.toml` fails, and every barctl module is blank, after a downgrade
+
+An older barctl rejects `display = "capsule"` as an unknown display, which fails the whole file. Take
+`[modules.player-capsule]` out of the dotfiles' `modules.toml` (or revert the dotfiles change that added it) before
+downgrading desktop-tools; `barctl doctor` names the key it can't read.
+
+### `barctl doctor` says "the bar runs in an agent's environment"
+
+The controller or a bar was started from a shell with `COORDINATOR`, `CLAUDECODE` or `TESSERA_ACTOR` set (an agent's
+or coordinator's session). Menus such as tessera's then refuse to act. Restart it from a terminal outside any agent
+session: `barctl restart`, and `systemctl --user restart barctl.service` for the controller.
+
 ### `error: cannot read DESKTOP_TOOLS_..._FILE`
 
 The file named by a `_FILE` variable doesn't exist, or the process can't read it. Check the path inside the container or unit, and the file's owner and mode: the process runs as uid 1000 / the `desktop-tools` user.

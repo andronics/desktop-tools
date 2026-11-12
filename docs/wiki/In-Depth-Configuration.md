@@ -37,13 +37,44 @@ The package ships a default for the live modules (`src/desktop_tools/barctl/modu
 |---|---|
 | `source` | One of barctl's own sources (`volume`, `player`; `printer`, `scanner`, `vpn`, `bluetooth`, `counter` are reserved) |
 | `pusher` | Or: the one outside program allowed to `barctl push` the module (`crew`). Exactly one of the two |
-| `display` | `icon` (the glyph, then the count), `text` (the label) or `both` |
+| `display` | `icon` (the glyph, then the count), `text` (the label, cut to 40 characters), `both`, or `capsule` (the player's "now playing" module, below) |
 | `glyph` | Shown before anything has written the module |
 | `glyph_override` | A glyph that wins over the pusher's or source's: a string (every tier) or a table of tiers (`unavailable`, `idle`, `active`, `alert`; a tier left out shows the pusher's glyph). Precedence for the tier shown (a stale module is `unavailable`): the table's entry, the string, the state's glyph, `glyph`. An empty string hides the glyph. `barctl status --json` gives `glyph_source` (`override-tier`, `override`, `pushed`, `default`) and `glyph_pushed`; `barctl doctor` lists each override (design record 0002 §7) |
 | `separator` | Between segments, for a module of several cells |
 | `[modules.<m>.clicks]` | `left`, `middle`, `right`, `scroll-up`, `scroll-down` = a command as a list; `{target}` is filled from the state, as a whole argument |
 | `[modules.<m>.segment_clicks]` | The same per segment, with `{segment}` |
 | `[[modules.<m>.menu]]` | Right-click rows: `glyph`, `label`, `command`. `right` with no command of its own opens the menu |
+
+`display = "capsule"` (design record 0003 §1-3) draws the `player` source as one module: the play-state glyph (set
+per tier with `glyph_override`), then `Artist – Title` padded to a fixed width, scrolling while it plays when it is
+longer (one pass round to the start, then a rest), and the track's progress as an underline under the first cells.
+Four keys, read only for a capsule; a value out of range or of the wrong type is a load error naming the key:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `width` | 32 | Cells of text after the icon, a whole number 8-80 |
+| `scroll` | 2 | Steps a second, 0-4; 0 never scrolls (the title is cut with "…") |
+| `scroll_rest` | 10 | Seconds the start of the title rests between passes, 0-120 |
+| `accent` | `"role"` | The line's and icon's colour: the theme's `accent`, or `"art"`, the cover's average colour (needs `curl` and ImageMagick's `magick`; one fetch per new cover; a colour under 3:1 against the theme's `bg` falls back to the role). The text keeps the tier's role colour either way |
+
+```toml
+[modules.player-capsule]
+source = "player"
+display = "capsule"
+glyph = "\U000F038A"
+glyph_override = { active = "\U000F040A", idle = "\U000F03E4", unavailable = "\U000F038A" }
+
+[modules.player-capsule.clicks]
+left = ["playerctl", "-p", "{target}", "play-pause"]
+middle = ["playerctl", "-p", "{target}", "next"]
+scroll-up = ["playerctl", "-p", "{target}", "volume", "0.05+"]
+scroll-down = ["playerctl", "-p", "{target}", "volume", "0.05-"]
+right = ["barmenu", "player"]
+```
+
+The packaged file keeps `player-play-pause` and `player-metadata` and has this capsule as a commented example; the
+source writes every player module the same state, so a capsule can run beside the old buttons. `barctl pin
+player-capsule <instance>` shows one player until it goes (`--auto` undoes it; a controller restart forgets it).
 
 ### barmenu: `menus.toml`
 
@@ -57,7 +88,8 @@ list of arguments; `current = true` marks a row), and one of `dynamic` or `provi
 | Key | What |
 |---|---|
 | `dynamic` | A barctl module whose source's rows are appended |
-| `provider` | `theme`, `lock` or `tessera`: a function in `barmenu/providers/` that gives the menu's rows when it opens, the static `rows` following them. It reads state only through read-only queries with a 2 s limit (`theme current --json`, `lockscreen status --json`, `tessera status --json`); when one fails, the rows still come, unmarked and with labels that name no state |
+| `provider` | `theme`, `lock`, `tessera`, `player` or `players`: a function in `barmenu/providers/` that gives the menu's rows when it opens, the static `rows` following them. It reads state only through read-only queries with a 2 s limit (`theme current --json`, `lockscreen status --json`, `tessera status --json`, `playerctl -p <shown> metadata --format …`, `playerctl -l`); when one fails, the rows still come, unmarked and with labels that name no state |
+| `player`, `players` (menus) | Design record 0003 §4: next, previous, loop and shuffle (marked; hidden when the player gives none), `Player: <name> ›` (opens `players`), back and forward 10 s (when a length is known), all `playerctl -p <shown>` argument lists for the player `player-capsule` shows; with no player, `No player` (runs nothing) and `Player… ›`. `players` lists every player, the shown one marked, then `Automatic` (marked when nothing is pinned); a pick runs `barctl pin player-capsule …` |
 | `current` (a row's) | Shown as one of rofi's active rows, which the dotfiles' `bar-menu.rasi` colours in the theme's accent; the cursor still starts on the first row. Providers set it from the state they read |
 
 An override can add rows to a provider's menu, for example a 30-minute pause:

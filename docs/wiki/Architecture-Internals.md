@@ -38,11 +38,12 @@ flowchart LR
 | `barctl/modules.py`, `modules.toml` | The modules' config, and the packaged default |
 | `barctl/state.py` | The state model and where states and settings live |
 | `barctl/store.py` | Writing a state; poking only when what shows changed |
-| `barctl/render.py` | A state as polybar text: colour, escaping, action tags, blink, segments |
+| `barctl/render.py` | A state as polybar text: colour, escaping, action tags, blink, segments, and the capsule (its scroll offset and progress cells worked out from the state and the time; `next_change` for the controller's tick) |
+| `barctl/art.py` | The capsule's art accent: the cover fetched once (curl, HTTPS only, 2 s, 1 MiB) into a 20-file cache in the runtime folder, its average colour (magick), dropped under 3:1 against the theme's `bg` |
 | `barctl/control.py` | The control socket's client |
-| `barctl/controller.py` | `barctl run`: sources, control socket, alert and ttl timers |
+| `barctl/controller.py` | `barctl run`: sources, control socket (with `pin`), alert and ttl timers, and the capsule timer: it pokes a capsule when its frame changes and sleeps until the next scroll step or progress cell |
 | `barctl/doctor.py` | `barctl doctor`'s checks |
-| `barctl/sources/` | The controller's sources: `volume`, `player` |
+| `barctl/sources/` | The controller's sources: `volume`, `player` (the label `Artist – Title` whole; `progress` from `mpris:length` and `playerctl -p <shown> position`, read on the shown player's events and every 30 s while it plays; the in-memory pin; the art URL) |
 | `barmenu/menus.py`, `menus.toml` | Menus as data, rofi placement, current rows as rofi's active rows, the detached launch |
 | `barmenu/providers/` | Menus whose rows come from Python when they open (`theme`, `lock`, `tessera`), from read-only queries with a 2 s limit; state-free rows when a query fails (records 0001 and 0002). `tessera` reads only `tessera status --json`, never an entry name, and passes COORDINATOR, CLAUDECODE and TESSERA_ACTOR to tessera untouched |
 | `barctl/modules.py` `Module.glyph_for` | The one place that decides a module's glyph (override, pushed, default), used by `render`, `store.shown`, `ops.module_info` and the menu prompt (record 0002 §7) |
@@ -78,6 +79,15 @@ place). If what it shows changed, barctl sends `#audio-level.hook.0` to every ba
   `BARCTL_RETRY` seconds. A source that keeps raising an unexpected exception stops the controller with exit 1, for
   systemd to restart it.
 - **A polybar restart**: `initial = 1` runs each hook, which renders from the files; the controller is not involved.
+- **The capsule** (design record 0003 §3): the player source writes `progress` (`position`, `length`, `rate`, `at`,
+  `playing`) and the label once per real change; render works out the position and the scroll offset from the time,
+  as it does the blink. `store.shown` leaves out `position` and `at`, so a re-read position pokes nothing; the
+  controller's tick reads each capsule's state, pokes it when its frame (text cells, underlined cells) changed, and
+  sleeps until the next change: at most `scroll` times a second while scrolling, at most once a second for progress
+  alone, not at all while paused.
+- **A pin** (`barctl pin <module> <instance>`) is a `pin` request on the control socket; the player source shows that
+  player while `playerctl -l` lists it. `barctl status --json` gives the player modules `pinned`, from the
+  controller's `ping` answer.
 - **A click** runs `barctl click`, which starts the configured command in its own session with no inherited
   descriptors: polybar 3.7 leaks its module pipes into children, and a long-lived holder can freeze its next restart.
 
