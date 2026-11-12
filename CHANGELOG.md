@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.10](https://github.com/andronics/desktop-tools/compare/v0.1.9...v0.1.10) (2026-11-12)
+
+
+### ✨ Features
+
+* **barctl,barmenu:** the player capsule (record 0003 phase 1) ([#39](https://github.com/andronics/desktop-tools/issues/39)) ([3cc39bd](https://github.com/andronics/desktop-tools/commit/3cc39bd670b126c28db7554e4437f1acfe658b78))
+
+
+### 📚 Documentation
+
+* **design:** propose 0003, the player capsule on the bar ([#36](https://github.com/andronics/desktop-tools/issues/36)) ([77b8ac2](https://github.com/andronics/desktop-tools/commit/77b8ac2e8fb4200b35b37c5255f4c5f29fd3f6cf))
+* **design:** propose 0004, printer and scanner modules on the bar ([#38](https://github.com/andronics/desktop-tools/issues/38)) ([c5a1b7f](https://github.com/andronics/desktop-tools/commit/c5a1b7fdfc0337088f430b70f3e75eb423842917))
+
 ## [0.1.9](https://github.com/andronics/desktop-tools/compare/v0.1.8...v0.1.9) (2026-11-11)
 
 
