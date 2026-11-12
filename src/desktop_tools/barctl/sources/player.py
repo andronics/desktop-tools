@@ -20,8 +20,9 @@ changed, or another player became the shown one, from which render works out its
 matches: the track id or URL names an episode; the genre says podcast, audiobook or spoken; the
 URL is a local `.m4b` or `.aax` file or under a `Podcasts` or `Audiobooks` folder; the player's
 name is in `spoken_players`. The track id, URL and genre are read for that and kept nowhere.
-For spoken word the shown player's MPRIS `Rate` is read once per track (`busctl --user
-get-property`, read only) into `progress.rate`, so the line moves at the player's speed.
+For spoken word the shown player's MPRIS `Rate` is read once per track and with each 30-second
+position re-read (`busctl --user get-property`, read only) into `progress.rate`, so the line
+moves at the player's speed.
 
 The position is not in the followed format (playerctl may re-print one with `{{position}}`
 every second): it is read with `playerctl -p <shown> position` on each event of the shown player
@@ -290,6 +291,9 @@ class PlayerSource(Source):
             if last is not None and now - last[1] < POSITION_EVERY:
                 return False
             self.read_position(shown)
+            # The Rate too, for spoken word (record 0005 phase B): a speed set mid-track (the
+            # menu's speed row, the player's own) or a failed read is caught here.
+            self.rates.pop(shown, None)
             self.update()
             return True
 
@@ -360,8 +364,8 @@ class PlayerSource(Source):
         return SPOKEN if p.spoken or p.name.lower() in names else ""
 
     def rate(self, instance: str, p: Player, spoken: bool) -> float:
-        """The shown player's Rate for spoken word, read once per track; RATE otherwise or when
-        it can't be read."""
+        """The shown player's Rate for spoken word, read once per track (`refresh` drops it, so
+        the 30-second re-read reads it again); RATE otherwise or when it can't be read."""
         if not spoken:
             return RATE
         known = self.rates.get(instance)

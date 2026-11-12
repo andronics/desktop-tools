@@ -99,6 +99,8 @@ else:
             SET_GUARD
             + f"""
 rates = {rates!r}
+if os.path.exists(here + '/rates'):
+    rates = open(here + '/rates').read()
 if rates is None:
     sys.exit(1)
 print(rates)
@@ -323,7 +325,7 @@ def test_the_rate_is_read_once_per_track_for_spoken_word_only(
     source: tuple[PlayerSource, list[float]],
     fakes: Callable[..., Path],
 ) -> None:
-    found, _ = source
+    found, clock = source
     log = fakes("spotify\n", rates="d 1.5")
     episode = ("spotify:episode:abc", "", "")
     found.event(line("spotify", "Playing", "one", *episode))
@@ -343,8 +345,15 @@ def test_the_rate_is_read_once_per_track_for_spoken_word_only(
     assert (st.read("player-capsule") or {})["progress"]["rate"] == 1.5
     found.event(line("spotify", "Playing", "two", *episode))
     assert len([c for c in calls(log) if c[0] == "busctl"]) == 2
+    (Path(str(log)).parent / "rates").write_text("d 2.0")  # the speed set mid-track
+    found.event(line("spotify", "Playing", "two", *episode))
+    assert len([c for c in calls(log) if c[0] == "busctl"]) == 2  # same track: no read
+    clock[0] = 1000.0 + 31
+    assert found.refresh()  # the 30-second re-read reads the Rate again
+    assert len([c for c in calls(log) if c[0] == "busctl"]) == 3
+    assert (st.read("player-capsule") or {})["progress"]["rate"] == 2.0
     found.event(line("spotify", "Playing", "a song"))  # music: no read, the rate 1.0
-    assert len([c for c in calls(log) if c[0] == "busctl"]) == 2
+    assert len([c for c in calls(log) if c[0] == "busctl"]) == 3
     assert (st.read("player-capsule") or {})["progress"]["rate"] == 1.0
 
 

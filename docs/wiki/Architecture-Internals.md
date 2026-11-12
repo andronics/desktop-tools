@@ -102,7 +102,8 @@ place). If what it shows changed, barctl sends `#audio-level.hook.0` to every ba
 - **Spoken word** (design record 0005 phase B): the stream adds `{{mpris:trackid}}`, `{{xesam:url}}` and
   `{{xesam:genre}}`; `parse` keeps only whether they matched rules 1-3 (`Player.spoken`) and drops the text. A capsule
   with `spoken = true` gets `kind = "spoken"` when that matched or the player's name is in `spoken_players`. For
-  spoken word the source reads the shown player's MPRIS `Rate` once per track (`busctl --user get-property`, 2 s) into
+  spoken word the source reads the shown player's MPRIS `Rate` once per track and on each 30-second re-read
+  (`busctl --user get-property`, 2 s) into
   `progress.rate`; `barmenu player` reads `kind` from the capsule's state, and `Rate`, `MinimumRate` and
   `MaximumRate` in one `busctl` call when it opens.
 - **The output segment** (design record 0003 §10): the volume source writes the kind glyph, short name, `output`
