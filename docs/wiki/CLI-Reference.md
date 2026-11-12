@@ -103,7 +103,8 @@ barmenu (rofi) above the module.
 Show one player on a player module until it goes.
 
 The module's source (and every module it draws) shows that player while `playerctl -l`
-lists it; --auto goes back to Playing over Paused over Stopped. The controller holds the
+lists it; --auto goes back to Playing over Paused over Stopped; --toggle unpins the player
+when it is already the pinned one (a chip's second click). The controller holds the
 pin in memory: a restart forgets it. Exit 2 for a module the player source doesn't draw, 5
 for a player that isn't listed.
 
@@ -115,6 +116,7 @@ for a player that isn't listed.
 | Option | Environment variable | Description |
 |---|---|---|
 | `--auto` |  | Unpin: the bar picks the player again. |
+| `--toggle` |  | Unpin it instead when it is already pinned. |
 
 ### `desktop-tools barctl push`
 

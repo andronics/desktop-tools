@@ -55,6 +55,30 @@ display = "text"
 # scroll-down = ["playerctl", "-p", "{target}", "volume", "0.05-"]
 # right = ["barmenu", "player"]
 
+# The player chips (record 0005 phase A), just before the capsule: one chip per MPRIS player, in
+# the order each was first seen, its app icon (instances.json; else `glyph`) in the active colour
+# while it plays and idle otherwise; the shown player's chip underlined, the pinned one's with
+# md-pin. Drawn only with chips_min players or more; past chips_max the last cell is "+N" (id
+# `more`). Left pins that player (again: unpins), middle plays or pauses it, right opens
+# `barmenu players`. Not on by default: the dotfiles turn it on (with a [module/player-chips]
+# whose hook-0 = barctl render player-chips; the cells carry their own action tags).
+#
+# [modules.player-chips]
+# source = "player"
+# display = "chips"
+# glyph = "\U000F075A"   # md-music: a player with no icon of its own
+# separator = " "
+# chips_min = 2          # fewer players than this: nothing is drawn (1-8)
+# chips_max = 4          # more: the last cell is "+N", which opens barmenu players (1-8)
+#
+# [modules.player-chips.segment_clicks]
+# left = ["barctl", "pin", "player-capsule", "{segment}", "--toggle"]
+# middle = ["playerctl", "-p", "{segment}", "play-pause"]
+# right = ["barmenu", "players"]
+#
+# [modules.player-chips.segment_clicks.more]   # the "+N" cell's own clicks
+# left = ["barmenu", "players"]
+
 # The output segment (record 0003 §10), beside the player capsule on the same background: the
 # default sink's kind glyph and short name (the dotfiles' audio/devices.json names, else the
 # sink's own), a Bluetooth sink's battery, the volume glyph and percentage; muted, md-volume_off

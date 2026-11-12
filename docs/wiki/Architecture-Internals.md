@@ -100,7 +100,14 @@ place). If what it shows changed, barctl sends `#audio-level.hook.0` to every ba
   `barmenu outputs` reads the same sinks and BlueZ's managed objects when it opens.
 - **A pin** (`barctl pin <module> <instance>`) is a `pin` request on the control socket; the player source shows that
   player while `playerctl -l` lists it. `barctl status --json` gives the player modules `pinned`, from the
-  controller's `ping` answer.
+  controller's `ping` answer. With `--toggle` (the request's `toggle: true`), the source unpins instead when that
+  player is already the pin, under its lock, so a chip's second click undoes the first.
+- **The chips** (design record 0005 phase A): the player source keeps each player's `first` (the order it was first
+  seen) and writes a `display = "chips"` module `segments` (one per player by `first`, the shown one `underline`, the
+  pinned one labelled md-pin, at most `chips_max`, the last `+N` past that, none under `chips_min`) and no label;
+  every other module gets what it got before. `store.shown` compares segments, so a chip change pokes the chips and a
+  new title only the capsule. No new process, query or timer. A click on a cell looks up
+  `Module.clicks_for(<id>)`: the cell's own table (`segment_clicks.<id>`) over the module's `segment_clicks`.
 - **A click** runs `barctl click`, which starts the configured command in its own session with no inherited
   descriptors: polybar 3.7 leaks its module pipes into children, and a long-lived holder can freeze its next restart.
 

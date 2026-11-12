@@ -80,8 +80,10 @@ is. Restart the bar from a clean session.
 
 ### `modules.toml` fails, and every barctl module is blank, after a downgrade
 
-An older barctl rejects `display = "capsule"` or `"output"` as an unknown display, which fails the whole file. Take
-`[modules.player-capsule]` and `[modules.output-capsule]` out of the dotfiles' `modules.toml` (or revert the dotfiles change that added it) before
+An older barctl rejects `display = "capsule"`, `"output"` or `"chips"` as an unknown display, and a per-segment click
+table (`segment_clicks.<id>`) as an unknown button, which fails the whole file. Take `[modules.player-capsule]`,
+`[modules.output-capsule]` and `[modules.player-chips]` out of the dotfiles' `modules.toml` (or revert the dotfiles
+change that added them) before
 downgrading desktop-tools; `barctl doctor` names the key it can't read.
 
 ### `barctl doctor` says "the bar runs in an agent's environment"

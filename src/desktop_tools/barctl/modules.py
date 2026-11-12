@@ -11,9 +11,15 @@
     # glyph_override = { idle = "\\U000F099D", alert = "\\U000F0ECC" }  # per tier; others unchanged
     separator = " "              # between segments, for a module made of several cells
     # width, scroll, scroll_rest, accent: for display = "capsule" only (record 0003 §2)
+    # chips_min, chips_max: for display = "chips" only (record 0005 phase A)
 
     [modules.audio-level.clicks] # button -> command; {target} and {segment} are filled in
     left = ["audio", "mute-toggle"]
+
+    [modules.player-chips.segment_clicks]      # a module of cells: one command per button
+    left = ["barctl", "pin", "player-capsule", "{segment}", "--toggle"]
+    [modules.player-chips.segment_clicks.more] # and one cell's own, which wins (record 0005 A)
+    left = ["barmenu", "players"]
 
     [[modules.audio-level.menu]] # right-click rows, before the source's own
     glyph = "\\U000F057E"
@@ -40,13 +46,18 @@ BUILT = (
     "scanner",
 )  # the others are reserved names: their sources come in later PRs
 BUTTONS = {"left": 1, "middle": 2, "right": 3, "scroll-up": 4, "scroll-down": 5}
-DISPLAYS = ("icon", "text", "both", "capsule", "output")
+DISPLAYS = ("icon", "text", "both", "capsule", "output", "chips")
 ACCENTS = ("role", "art")
 # The capsule's keys (record 0003 §2): (default, lowest, highest); read only for `capsule`.
 CAPSULE_KEYS: dict[str, tuple[float, float, float]] = {
     "width": (32, 8, 80),
     "scroll": (2.0, 0, 4),
     "scroll_rest": (10.0, 0, 120),
+}
+# The chips' keys (record 0005 phase A): (default, lowest, highest); read only for `chips`.
+CHIPS_KEYS: dict[str, tuple[float, float, float]] = {
+    "chips_min": (2, 1, 8),
+    "chips_max": (4, 1, 8),
 }
 TIERS = ("unavailable", "idle", "active", "alert")  # state.TIERS, kept here (no import cycle)
 OVERRIDE_ORDER = ("idle", "active", "alert", "unavailable")  # how doctor lists a table's tiers
@@ -84,6 +95,9 @@ class Row:
 class Module:
     __slots__ = (
         "accent",
+        "cell_clicks",
+        "chips_max",
+        "chips_min",
         "clicks",
         "display",
         "glyph",
@@ -111,11 +125,14 @@ class Module:
         separator: str = " ",
         clicks: dict[str, list[str]] | None = None,
         segment_clicks: dict[str, list[str]] | None = None,
+        cell_clicks: dict[str, dict[str, list[str]]] | None = None,
         menu: list[Row] | None = None,
         width: int = 32,
         scroll: float = 2.0,
         scroll_rest: float = 10.0,
         accent: str = "role",
+        chips_min: int = 2,
+        chips_max: int = 4,
     ) -> None:
         self.name, self.source, self.pusher = name, source, pusher
         self.width, self.scroll, self.scroll_rest, self.accent = width, scroll, scroll_rest, accent
@@ -123,6 +140,8 @@ class Module:
         self.glyph_override = glyph_override
         self.clicks = clicks or {}
         self.segment_clicks = segment_clicks or {}
+        self.cell_clicks = cell_clicks or {}
+        self.chips_min, self.chips_max = chips_min, chips_max
         self.menu = menu or []
 
     @property
@@ -150,6 +169,14 @@ class Module:
             return str(state["glyph"] or ""), "pushed"
         return self.glyph, "default"
 
+    def clicks_for(self, segment: str | None) -> dict[str, list[str]]:
+        """button -> command for a click on the module (None) or on one of its cells: the
+        cell's own table (`segment_clicks.<id>`) wins, button by button, over the module's
+        `segment_clicks` (record 0005 phase A)."""
+        if segment is None:
+            return self.clicks
+        return {**self.segment_clicks, **self.cell_clicks.get(segment, {})}
+
     def has_menu(self) -> bool:
         return bool(self.menu) or self.source in BUILT
 
@@ -161,7 +188,7 @@ class Module:
             "display": self.display,
             "glyph": self.glyph,
             "clicks": self.clicks,
-            "segment_clicks": self.segment_clicks,
+            "segment_clicks": {**self.segment_clicks, **self.cell_clicks},
             "menu": [r.as_dict() for r in self.menu],
         }
         if self.glyph_override is not None:
@@ -173,6 +200,8 @@ class Module:
                 scroll_rest=self.scroll_rest,
                 accent=self.accent,
             )
+        if self.display == "chips":
+            out.update(chips_min=self.chips_min, chips_max=self.chips_max)
         return out
 
 
@@ -210,6 +239,26 @@ def _clicks(value: object, where: str) -> dict[str, list[str]]:
     return out
 
 
+def _segment_clicks(
+    value: object, where: str
+) -> tuple[dict[str, list[str]], dict[str, dict[str, list[str]]]]:
+    """`segment_clicks`: button = command for every cell, and, optionally, `<id>` = a table of
+    one cell's own (record 0005 phase A). A list is a command, a table a cell's clicks."""
+    if value is None:
+        return {}, {}
+    if not isinstance(value, dict):
+        raise ConfigError(f"{where}: must be a table of button = command")
+    buttons = {k: v for k, v in value.items() if not isinstance(v, dict)}
+    cells: dict[str, dict[str, list[str]]] = {}
+    for segment, table in value.items():
+        if not isinstance(table, dict):
+            continue
+        if not valid_segment(segment):
+            raise ConfigError(f"{where}.{segment}: not a segment id ([A-Za-z0-9_.-], 64 at most)")
+        cells[segment] = _clicks(table, f"{where}.{segment}")
+    return _clicks(buttons, where), cells
+
+
 def shown_tier(state: dict[str, object] | None, now: float) -> str:
     """The tier barctl shows: the state's, `unavailable` when there is none or its ttl ran out."""
     if state is None:
@@ -237,9 +286,9 @@ def _override(value: object, where: str) -> str | dict[str, str] | None:
 
 
 def _number(table: dict[str, object], key: str, where: str) -> float:
-    default, low, high = CAPSULE_KEYS[key]
+    default, low, high = CAPSULE_KEYS.get(key) or CHIPS_KEYS[key]
     value = table.get(key, default)
-    whole = key == "width"
+    whole = key in ("width", *CHIPS_KEYS)
     if isinstance(value, bool) or not isinstance(value, int if whole else (int, float)):
         raise ConfigError(f"{where}: {key} must be {'a whole number' if whole else 'a number'}")
     if not low <= value <= high:
@@ -258,6 +307,14 @@ def _capsule(module: Module, raw: dict[str, object], where: str) -> Module:
     module.scroll = _number(raw, "scroll", where)
     module.scroll_rest = _number(raw, "scroll_rest", where)
     module.accent = accent
+    return module
+
+
+def _chips(module: Module, raw: dict[str, object], where: str) -> Module:
+    """The chips' keys, checked, with their defaults; read only for `display = "chips"`."""
+    if module.display == "chips":
+        module.chips_min = int(_number(raw, "chips_min", where))
+        module.chips_max = int(_number(raw, "chips_max", where))
     return module
 
 
@@ -299,7 +356,10 @@ def parse(data: dict[str, object]) -> dict[str, Module]:
                     _strings(row.get("command"), f"{where}.menu[{i}].command"),
                 )
             )
-        out[name] = _capsule(
+        segment_clicks, cell_clicks = _segment_clicks(
+            raw.get("segment_clicks"), f"{where}.segment_clicks"
+        )
+        found = _capsule(
             Module(
                 name,
                 source=source if isinstance(source, str) else None,
@@ -309,12 +369,14 @@ def parse(data: dict[str, object]) -> dict[str, Module]:
                 glyph_override=_override(raw.get("glyph_override"), f"{where}.glyph_override"),
                 separator=_text(raw, "separator", where, " "),
                 clicks=_clicks(raw.get("clicks"), f"{where}.clicks"),
-                segment_clicks=_clicks(raw.get("segment_clicks"), f"{where}.segment_clicks"),
+                segment_clicks=segment_clicks,
+                cell_clicks=cell_clicks,
                 menu=menu,
             ),
             raw,
             where,
         )
+        out[name] = _chips(found, raw, where)
     return dict(sorted(out.items()))
 
 

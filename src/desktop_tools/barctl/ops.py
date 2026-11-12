@@ -190,7 +190,7 @@ def click(name: str, button: str, segment: str | None = None) -> list[str] | Non
     if button not in mods.BUTTONS:
         raise Failure(f"unknown button {button!r} (one of {', '.join(mods.BUTTONS)})", USAGE)
     found = module(name)
-    clicks = found.segment_clicks if segment is not None else found.clicks
+    clicks = found.clicks_for(segment)
     data = st.read(name)
     if button not in clicks:
         if button == "right" and found.has_menu():
@@ -251,14 +251,18 @@ def menu(name: str) -> mods.Row | None:
 # ---------------------------------------------------------------- the player's pin
 
 
-def pin(name: str, instance: str | None) -> str | None:
+def pin(name: str, instance: str | None, toggle: bool = False) -> str | None:
     """Show one player on a player module (and every module of its source) while it is
-    listed; None goes back to the rank. The controller holds it (record 0003 §5). Returns the
-    pin."""
+    listed; None goes back to the rank. The controller holds it (record 0003 §5). With
+    `toggle`, a player that is already the pin is unpinned instead (record 0005 phase A: a
+    second click on a chip undoes the first). Returns the pin."""
     found = module(name)
     if found.source != "player":
         raise Failure(f"{name} is not drawn by the player source: nothing to pin", USAGE)
-    answer = control.request("pin", module=name, instance=instance)
+    fields: dict[str, Any] = {"module": name, "instance": instance}
+    if toggle:
+        fields["toggle"] = True
+    answer = control.request("pin", **fields)
     if answer is None:
         raise Failure("the controller is not running (systemctl --user start barctl)", FAILED)
     if not answer.get("ok"):
@@ -443,7 +447,7 @@ def show(name: str, now: float | None = None) -> dict[str, Any]:
             "pusher": found.pusher,
             "display": found.display,
             "clicks": found.clicks,
-            "segment_clicks": found.segment_clicks,
+            "segment_clicks": {**found.segment_clicks, **found.cell_clicks},
             "menu": [r.as_dict() for r in found.menu],
             "dynamic_menu": found.source in mods.BUILT,
             "alert_until": iso(float(data["alert_until"])) if data.get("alert_until") else None,

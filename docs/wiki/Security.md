@@ -42,7 +42,10 @@ The capsule and its menus (design record 0003) never control a player on their o
 `playerctl -p <instance>` argument list, the instance from barctl's state and `playerctl -l`, never a shell string.
 The track (artist, title) lives only in the module's state file in `$XDG_RUNTIME_DIR/barctl` (700, emptied at
 logout); barctl's journal lines name the module and button, never the label, and the menus' providers log nothing of
-the player's state. `barctl status` shows the label to the user's own processes, as before.
+the player's state. `barctl status` shows the label to the user's own processes, as before. The player chips
+(design record 0005 phase A) hold only player instance names and icons, already in `barctl status`; a chip's click
+fills `{segment}` with that name as one whole argument, and the name must pass the segment-id check (no space, colon
+or `%`) before it goes into an action tag.
 
 - **The art fetch** (`accent = "art"`, off by default) goes only to the cover URL the player itself gives, once per
   new URL: `curl -q` (no `.curlrc`, so no cookie jar), HTTPS only (redirects too), 2 seconds, 1 MiB at most, into a

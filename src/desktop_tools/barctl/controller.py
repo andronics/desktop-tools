@@ -223,7 +223,7 @@ class Controller:
                 "pinned": self.pins(),
             }
         if op == "pin":
-            return self.pin(module, request.get("instance"))
+            return self.pin(module, request.get("instance"), request.get("toggle") is True)
         if op in ("pushed", "alert") and isinstance(module, str) and module in self.modules:
             self.follow_state(module)
             self.poke(module)
@@ -255,9 +255,10 @@ class Controller:
         source = self._player()
         return {"player": source.pinned} if source is not None else {}
 
-    def pin(self, module: object, instance: object) -> dict[str, Any]:
-        """Show one player on a player module's source until it goes (None: back to the rank).
-        Held here, in memory: a restart forgets it (record 0003 §5, open question 8)."""
+    def pin(self, module: object, instance: object, toggle: bool = False) -> dict[str, Any]:
+        """Show one player on a player module's source until it goes (None: back to the rank;
+        `toggle`: unpin it when it is already the pin, record 0005 phase A). Held here, in
+        memory: a restart forgets it (record 0003 §5, open question 8)."""
         found = self.modules.get(module) if isinstance(module, str) else None
         if found is None:
             return {"ok": False, "error": f"unknown module {module!r}"}
@@ -269,7 +270,7 @@ class Controller:
         if source is None:
             return {"ok": False, "error": "the player source is not running"}
         try:
-            pinned = source.pin(instance)
+            pinned = source.pin(instance, toggle=toggle)
         except LookupError as e:
             return {"ok": False, "error": str(e)}
         return {"ok": True, "pinned": pinned}

@@ -39,6 +39,8 @@ def shown(module: Module, state: st.State | None, now: float | None = None) -> t
             bool(progress.get("playing")),
             state.get("accent"),
         )
+    elif module.display == "chips":
+        parts = ()  # its segments are all it shows
     elif module.display == "output":
         # The kind glyph, the name, the volume and battery, and the notice while it shows; the
         # controller's tick pokes when a notice ends (no write marks it).
@@ -87,7 +89,8 @@ def store(
 
 class Writer:
     """How a source sets its modules: tier, glyph, label, count, detail, target, the player's
-    progress and accent, and the output segment's numbers and notice, nothing else. An alert
+    progress and accent, the output segment's numbers and notice, and the cells of a module made
+    of several (the player chips'), nothing else. An alert
     someone set on the module is kept, and so is when the label last changed (`label_since`, the
     capsule's scroll clock) while the label is the same. A source may start an alert of its own
     (`alert_for` seconds, record 0004 §1: an alert that appears blinks once); `follow` (the
@@ -115,6 +118,7 @@ class Writer:
         progress: st.State | None = None,
         accent: str | None = None,
         output: st.State | None = None,
+        segments: list[st.State] | None = None,
         notice: str | None = None,
         notice_until: float | None = None,
         alert_for: float | None = None,
@@ -141,6 +145,8 @@ class Writer:
             new["accent"] = accent
         if output is not None:
             new["output"] = output
+        if segments:
+            new["segments"] = segments
         if notice and notice_until is not None:
             new["notice"], new["notice_until"] = notice, notice_until
         old = st.read(name)

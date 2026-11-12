@@ -11,6 +11,9 @@ track's progress as an underline under the first cells. Both are worked out here
 and the time, as the blink is, so the source writes once per real change; the controller's tick
 pokes the capsule when its frame changes (`next_change`).
 
+`display = "chips"` (record 0005 phase A) is drawn only from its segments, one per player, which
+the player source writes; with none it draws nothing.
+
 `display = "output"` (record 0003 §10) is the output segment beside it: the default sink's kind
 glyph, its short name (or, for 5 seconds, a notice such as `<name> connected` in the active
 accent), a Bluetooth sink's battery, then the volume glyph by level and the percentage; muted,
@@ -69,7 +72,7 @@ def colour(tier: str, alert_until: float | None, now: float, controller: bool) -
 
 
 def _actions(module: Module, text: str, segment: str | None = None) -> str:
-    clicks = module.segment_clicks if segment is not None else module.clicks
+    clicks = module.clicks_for(segment)
     buttons = [b for b in BUTTONS if b in clicks]
     if "right" not in buttons and module.has_menu():
         buttons.append("right")
@@ -320,6 +323,8 @@ def render(
                 cell = _underline(cell, colours.get("underline"))
             cells.append(_actions(module, cell, seg["id"]))
         return module.separator.join(cells)
+    if module.display == "chips":
+        return ""  # fewer players than chips_min, or none: the chips draw nothing
     if module.display == "capsule":
         return capsule(module, state, now, colours, controller)
     if module.display == "output":

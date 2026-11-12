@@ -63,6 +63,10 @@ CUPS's and SANE's commands are tripwires on PATH; `no_device_sockets` fails a te
   it was reached, so no source or provider code can control a player. Scroll and progress are pure functions of the
   state and a time the test passes (`now=`); the source's clock is `source.clock`, so the 30-second position re-read
   runs on a fake clock. The art accent runs on fake `curl` and `magick`.
+- **The player chips** (`tests/unit/test_player_chips.py`, design record 0005 phase A): the capsule's guarded fake
+  `playerctl` (imported from its tests), so no chip code can control a player; a chip's middle click is checked by
+  the argv the `launched` fixture records, never run. `barctl pin --toggle` is checked on the source, the controller's
+  request and the command line (with `control.request` replaced).
 - **The output segment** (`tests/unit/test_output_capsule.py`, design record 0003 §8 and §10): fake `pactl` (a wired,
   an HDMI and a Bluetooth headset sink in `-f json list sinks`, the default, volume and mute in files the test
   changes), `busctl` (the battery and BlueZ's managed objects) and `bluetoothctl`. Each starts with a guard that logs
