@@ -462,8 +462,7 @@ An opt-in integration test (`RUN_INTEGRATION=1`, marked) does only reads against
   a Bluetooth source later (its idea 6); this record touches nothing it owns. The overlap: both records add
   barctl sources and barmenu providers in the same release train and both change `bars/main`; the
   `device-*` group on the left ends as `device-bluetooth`, `printer`, `scanner`. A later Bluetooth source
-  could reuse this record's DNS-SD-free pieces (the `devices` command's confirm and notification
-  helpers). Whichever is built second rebases on the first's `modules.toml` and `bars/main` changes.
+  could reuse this record's shared confirm (`common/confirm.py`) and DNS-SD watcher. Whichever is built second rebases on the first's `modules.toml` and `bars/main` changes.
 
 ## Open questions
 
