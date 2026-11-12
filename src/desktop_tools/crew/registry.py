@@ -65,6 +65,8 @@ class Coordinator:
     dataclasses costs the hooks about 7 ms."""
 
     __slots__ = (
+        "favourite",
+        "favourite_told",
         "glyph",
         "home",
         "name",
@@ -87,10 +89,14 @@ class Coordinator:
         status: str = "",
         stopped_by_default: bool = False,
         stephen_only: bool | None = None,
+        favourite: bool = False,
+        favourite_told: bool = False,
     ) -> None:
         self.name, self.home, self.session, self.glyph = name, home, session, glyph
         self.old_names, self.order, self.status = old_names, order, status
         self.stopped_by_default = stopped_by_default
+        # `favourite` (brain registry): always on the strip; `favourite_told`: the registry says.
+        self.favourite, self.favourite_told = favourite, favourite_told
         # Only Stephen ends it (`ended_by: "stephen"`); None: the registry doesn't say.
         self.stephen_only = name == STEPHEN_ONLY if stephen_only is None else stephen_only
 
@@ -120,6 +126,11 @@ class Registry:
     @property
     def names(self) -> list[str]:
         return [c.name for c in self.coordinators]
+
+    @property
+    def favourites_told(self) -> bool:
+        """Does any entry carry `favourite`? Not (an older copy): every coordinator is shown."""
+        return any(c.favourite_told for c in self.coordinators)
 
     def get(self, name: str) -> Coordinator | None:
         name = self.resolve(name)
@@ -198,6 +209,7 @@ def parse(data: Any, today: dt.date | None = None) -> list[Coordinator] | None:
     today = today or datetime.date.today()
     # `ended_by` anywhere: the registry says who only Stephen ends; nowhere: STEPHEN_ONLY.
     told = any(isinstance(raw, dict) and "ended_by" in raw for raw in entries)
+    fav_told = any(isinstance(raw, dict) and "favourite" in raw for raw in entries)
     out: list[tuple[int, int, Coordinator]] = []
     seen: set[str] = set()
     for i, raw in enumerate(entries):
@@ -236,6 +248,8 @@ def parse(data: Any, today: dt.date | None = None) -> list[Coordinator] | None:
                     status=status if isinstance(status, str) else "",
                     stopped_by_default=raw.get("stopped_by_default") is True,
                     stephen_only=raw.get("ended_by") == "stephen" if told else None,
+                    favourite=raw.get("favourite") is True,
+                    favourite_told=fav_told,
                 ),
             )
         )

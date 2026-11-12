@@ -954,6 +954,16 @@ def test_full_menu_lists_every_coordinator_and_stop_all(
     assert argv[argv.index("-matching") + 1] == "prefix"
 
 
+def test_full_menu_lists_hidden_non_favourites_too(menu_desk: Desk) -> None:
+    """Record 0006: favourites hide a stopped non-favourite from the strip, not from this menu."""
+    menu_desk.coordinators("brain", "media", brain={"favourite": True}, media={"favourite": False})
+    reg = registry.load()
+    answers(menu_desk, "")
+    assert menus.full(reg) == 0
+    rows = rofi_rows(menu_desk, 0)
+    assert len(rows) == 3 and "<u>m</u>edia" in rows[1] and "off" in rows[1]
+
+
 def test_full_menu_shows_a_running_one(menu_desk: Desk) -> None:
     reg = reg_of(menu_desk, "brain", "desktop")
     menu_desk.window("desktop")

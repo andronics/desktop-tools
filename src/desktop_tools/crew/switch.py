@@ -274,7 +274,7 @@ def cycle(reg: Registry, direction: str) -> int:
         with store.lock("switch"):
             tree = wm.look()
             found = strip.scan(reg, tree)
-            names = reg.names
+            names = [c.name for c in strip.visible(reg, found)]
             if not any(n in found.running for n in names):
                 return flash(reg, None)
             current = next(
@@ -289,7 +289,7 @@ def cycle(reg: Registry, direction: str) -> int:
                 start = names.index(current) + step
             else:
                 last = last_shown(reg)
-                start = names.index(last) if last else 0
+                start = names.index(last) if last in names else 0
             for k in range(len(names)):
                 name = names[(start + step * k) % len(names)]
                 if name in found.running:
