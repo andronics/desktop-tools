@@ -350,8 +350,29 @@ def disabled() -> set[str]:
     return {v for v in value if isinstance(v, str)} if isinstance(value, list) else set()
 
 
+class _SettingsLock:
+    """An exclusive lock round a read and rewrite of settings.json: the CLI and the controller
+    (the visualiser's guards) both rewrite it, and neither may lose the other's change."""
+
+    def __enter__(self) -> None:
+        import fcntl
+
+        folder = settings_dir()
+        folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.fd = os.open(folder / ".settings.lock", os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
+        fcntl.flock(self.fd, fcntl.LOCK_EX)
+
+    def __exit__(self, *exc: object) -> None:
+        os.close(self.fd)  # closing it releases the lock
+
+
 def set_enabled(module: str, enabled: bool) -> bool:
     """Remember a module enabled or disabled. Returns whether that changed anything."""
+    with _SettingsLock():
+        return _set_enabled(module, enabled)
+
+
+def _set_enabled(module: str, enabled: bool) -> bool:
     data = settings()
     off = disabled()
     before = set(off)
@@ -405,6 +426,11 @@ def visualiser_off() -> bool:
 def set_visualiser(on: bool, reason: str = "switch", now: float | None = None) -> bool:
     """Turn the visualiser switch on or off (kept with the disabled modules, so it survives
     restarts). Returns whether that changed anything."""
+    with _SettingsLock():
+        return _set_visualiser(on, reason, now)
+
+
+def _set_visualiser(on: bool, reason: str, now: float | None) -> bool:
     import time
 
     before = visualiser_switch()

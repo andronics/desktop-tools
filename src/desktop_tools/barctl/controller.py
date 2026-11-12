@@ -75,7 +75,9 @@ class Controller:
         self.log: Callable[[str], None] = journal.warning
         # The visualiser strip (record 0005 phase D): its frames go out over `send`, so a
         # write or tick poke for the capsule it draws becomes its next frame instead.
-        self.visualiser = Visualiser(self.modules, poke=self.poke, log=lambda m: self.log(m))
+        self.visualiser = Visualiser(
+            self.modules, poke=self.poke, log=lambda m: self.log(m), modules_lock=self.lock
+        )
 
     def _poke(self, module: str) -> object:
         if self.visualiser.handles(module):

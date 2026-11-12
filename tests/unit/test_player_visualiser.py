@@ -703,3 +703,82 @@ def test_cpu_reads_cava_from_proc(isolate: Path, config: dict[str, mods.Module])
     found.cava_cpu[777] = 4.0  # a cava that has ended still counts
     own = os.times()
     assert found.cpu() >= own.user + own.system + 4.0
+
+
+def test_a_config_write_failure_is_not_cava_missing(
+    made: tuple[vis.Visualiser, list[str], list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    found, _, logs = made
+
+    def broken(self: vis.Strip) -> Path:
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(vis.Strip, "write_conf", broken)
+    st.write(NAME, playing(time.time()))
+    found.sync()
+    found.sync()
+    assert not found.drawing(NAME) and not st.visualiser_off()
+    assert logs == [f"visualiser: can't write {vis.conf_path()}: Permission denied"]
+
+
+def test_a_guard_holds_the_strip_off_when_settings_cant_be_written(
+    made: tuple[vis.Visualiser, list[str], list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    found, _, logs = made
+    st.write(NAME, playing(time.time()))
+    found.sync()
+    assert found.drawing(NAME)
+
+    def broken(*args: object) -> bool:
+        raise OSError(28, "No space left on device")
+
+    real = st.set_visualiser
+    monkeypatch.setattr(st, "set_visualiser", broken)
+    found.turn_off("budget")
+    found.sync()
+    assert not found.drawing(NAME)
+    assert logs == [
+        "visualiser: can't write the settings: No space left on device",
+        "visualiser off: over its CPU budget",
+    ]
+    monkeypatch.setattr(st, "set_visualiser", real)
+    found.reset()  # `barctl visualiser on` lifts it
+    assert found.drawing(NAME)
+
+
+def test_candidates_hold_the_controllers_lock(config: dict[str, mods.Module]) -> None:
+    import threading
+
+    lock = threading.RLock()
+    found = vis.Visualiser(config, poke=lambda m: None, log=lambda m: None, modules_lock=lock)
+    taken: list[bool] = []
+    real = lock.__enter__
+
+    class Spy:
+        def __enter__(self) -> None:
+            taken.append(True)
+            real()
+
+        def __exit__(self, *exc: object) -> None:
+            lock.release()
+
+    found.modules_lock = Spy()  # type: ignore[assignment]  # records that the lock was taken
+    assert [m.name for m in found.candidates()] == [NAME]
+    assert taken == [True]
+
+
+def test_settings_writers_dont_lose_each_others_changes(isolate: Path) -> None:
+    import threading
+
+    def flip(i: int) -> None:
+        st.set_enabled(f"m{i}", False)
+        st.set_visualiser(i % 2 == 0, now=float(i))
+
+    threads = [threading.Thread(target=flip, args=(i,)) for i in range(20)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert st.disabled() == {f"m{i}" for i in range(20)}

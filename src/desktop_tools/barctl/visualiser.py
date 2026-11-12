@@ -131,11 +131,14 @@ class Strip:
         self.sockets_at = -SOCKETS_EVERY
         self.sent = 0
 
-    def start(self) -> None:
-        """Start cava (raises OSError when it can't) and the thread that draws its frames."""
+    def write_conf(self) -> Path:
         path = conf_path()
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         path.write_text(cava_conf(self.module), encoding="utf-8")
+        return path
+
+    def start(self, path: Path) -> None:
+        """Start cava (raises OSError when it can't) and the thread that draws its frames."""
         # S603: barctl's own fixed argument list. SIGPIPE is cava's default again (Popen's
         # restore_signals), so it ends when the controller does and the pipe closes.
         self.proc = subprocess.Popen(  # noqa: S603
@@ -289,8 +292,13 @@ class Visualiser:
         clock: Callable[[], float] = time.time,
         monotonic: Callable[[], float] = time.monotonic,
         sockets: Callable[[], dict[int, Path]] = polybar.sockets,
+        modules_lock: threading.RLock | None = None,
     ) -> None:
         self.modules, self.poke, self.log = modules, poke, log
+        # The controller's lock: a reload clears and refills `modules` under it.
+        self.modules_lock = modules_lock or threading.RLock()
+        self.failure = ""  # the last error writing cava's config, said once
+        self.held = False  # turned off by a guard in this run, even if settings can't be written
         self.cpu = cpu or self._cpu
         self.clock, self.monotonic, self.sockets = clock, monotonic, sockets
         self.lock = threading.RLock()
@@ -303,12 +311,14 @@ class Visualiser:
     # ------------------------------------------------------------ what shows
 
     def candidates(self) -> list[Module]:
-        return [m for m in self.modules.values() if m.display == "capsule" and m.visualiser]
+        with self.modules_lock:
+            found = list(self.modules.values())
+        return [m for m in found if m.display == "capsule" and m.visualiser]
 
     def wanted(self, now: float) -> Module | None:
         """The capsule that should show the strip now, or None."""
         found = self.candidates()
-        if not found or st.visualiser_off():
+        if not found or self.held or st.visualiser_off():
             return None
         off = st.disabled()
         for module in found:
@@ -364,7 +374,17 @@ class Visualiser:
         colours = theme.roles({**st.ROLES, "underline": render.UNDERLINE_ROLE})
         strip = Strip(module, command, colours, self.sockets, self.clock)
         try:
-            strip.start()
+            conf = strip.write_conf()
+        except OSError as e:
+            # The runtime folder, not cava: say it once, try again on a later tick.
+            error = f"visualiser: can't write {conf_path()}: {e.strerror or e}"
+            if error != self.failure:
+                self.failure = error
+                self.log(error)
+            return
+        self.failure = ""
+        try:
+            strip.start(conf)
         except OSError:
             strip.stop()
             self.turn_off("cava-missing")
@@ -394,7 +414,13 @@ class Visualiser:
     def turn_off(self, reason: str) -> None:
         """Off as `barctl visualiser off` would, with why: one journal line, nothing else."""
         with self.lock:
-            changed = st.set_visualiser(False, reason, self.clock())
+            changed = not self.held
+            self.held = True
+            try:
+                changed = st.set_visualiser(False, reason, self.clock()) or changed
+            except OSError as e:
+                # Still off for this run (held); only keeping it across restarts failed.
+                self.log(f"visualiser: can't write the settings: {e.strerror or e}")
             self._stop(redraw=True)
         if changed:
             self.log(f"visualiser off: {st.VISUALISER_REASONS.get(reason, reason)}")
@@ -402,6 +428,7 @@ class Visualiser:
     def reset(self) -> None:
         """The switch changed (`barctl visualiser on|off`): start the guards' counts again."""
         with self.lock:
+            self.held = False
             self.exits.clear()
             self.over = 0
             self.sample = None
