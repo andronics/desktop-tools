@@ -16,6 +16,10 @@ With `expand_for` (record 0005 phase C), a capsule whose `expanded_until` is sti
 its transport row (barctl/transport.py) in the same cells as the title, so nothing moves; its
 icon carries `icon_clicks` (the segment `icon`) and each cell of the row its own action tag.
 
+With `visualiser` (record 0005 phase D), the controller sends `strip` frames over polybar's
+`send` action while the capsule plays: the same icon, tags and underline, block glyphs in the
+title's cells; render itself never draws them.
+
 `display = "chips"` (record 0005 phase A) is drawn only from its segments, one per player, which
 the player source writes; with none it draws nothing.
 
@@ -290,12 +294,10 @@ def _safe(text: str) -> str:
     return text + BREAK if text.endswith("%") else text
 
 
-def capsule(
+def _capsule_icon(
     module: Module, state: st.State | None, now: float, colours: dict[str, str], controller: bool
-) -> str:
-    """The capsule's line: the icon in the accent, the text in the tier's role colour, and the
-    progress underline in the accent. The art's colour, with `accent = "art"`, is only ever the
-    line's and the icon's, never the text's, so the theme's contrast rules hold."""
+) -> tuple[str, str | None, str]:
+    """(the tier whose colour the text takes, the accent, the painted icon) of a capsule."""
     tier = shown_tier(state, now)
     glyph, _ = module.glyph_for(tier, state)
     until = (state or {}).get("alert_until")
@@ -310,6 +312,16 @@ def capsule(
     if shown == "idle" and faded(module, state, now):
         icon_hex = colours.get("idle")  # faded: the icon alone, dim (record 0005 phase B)
     icon = _hex_paint(_safe(glyph), icon_hex) if glyph else ""
+    return shown, accent, icon
+
+
+def capsule(
+    module: Module, state: st.State | None, now: float, colours: dict[str, str], controller: bool
+) -> str:
+    """The capsule's line: the icon in the accent, the text in the tier's role colour, and the
+    progress underline in the accent. The art's colour, with `accent = "art"`, is only ever the
+    line's and the icon's, never the text's, so the theme's contrast rules hold."""
+    shown, accent, icon = _capsule_icon(module, state, now, colours, controller)
     text, cells = capsule_frame(module, state, now)
     if not text:
         return _actions(module, icon) if icon else ""
@@ -352,6 +364,57 @@ def _expanded(
         parts.append(_actions(module, painted, cell.id, menu=False))
     body = "".join(parts)
     return _actions(module, f"{icon} {body}" if icon else body, without="left")
+
+
+# ---------------------------------------------------------------- the visualiser strip
+
+LEVELS = "▁▂▃▄▅▆▇█"  # U+2581-U+2588: one cell per bar, levels 0-7 (record 0005 phase D)
+LOW = 1  # levels up to this one are drawn in fg_dim, the rest in the accent
+
+
+def strip_shows(module: Module, state: st.State | None, now: float) -> bool:
+    """Whether a capsule may show the visualiser strip now (record 0005 phase D): its
+    `visualiser` key on, a player shown and playing, the capsule at rest (not expanded, not
+    faded), and no segments of its own. The runtime switch is the controller's to add."""
+    if module.display != "capsule" or not module.visualiser or state is None:
+        return False
+    if state.get("segments") or shown_tier(state, now) != "active":
+        return False
+    return not expanded(module, state, now) and not faded(module, state, now)
+
+
+def strip(
+    module: Module,
+    state: st.State | None,
+    now: float,
+    colours: dict[str, str],
+    levels: list[int],
+) -> str:
+    """A visualiser frame (record 0005 phase D): the capsule's icon, then one block glyph per
+    text cell from cava's levels (0-7), low ones in `fg_dim` and the rest in the accent (the
+    role's or the art's; never the alert colour), with the progress underline under the first
+    cells and the capsule's own action tags round it, so its clicks work during the strip.
+    Cells of one colour and underline are joined, so a frame is a few tags, not one a cell."""
+    _, accent, icon = _capsule_icon(module, state, now, colours, True)
+    if icon and module.icon_clicks:
+        icon = _actions(module, icon, ICON, menu=False)
+    width = module.width
+    shown = [min(7, max(0, n)) for n in levels[:width]]
+    shown += [0] * (width - len(shown))
+    lined = _cells(module, fraction(state, now))
+    low, high = colours.get("idle"), accent
+    runs: list[tuple[str, str | None, bool]] = []
+    for i, level in enumerate(shown):
+        hex_, under = (low if level <= LOW else high), i < lined
+        if runs and runs[-1][1] == hex_ and runs[-1][2] == under:
+            runs[-1] = (runs[-1][0] + LEVELS[level], hex_, under)
+        else:
+            runs.append((LEVELS[level], hex_, under))
+    body = ""
+    for text, hex_, under in runs:
+        painted = _hex_paint(text, hex_)
+        body += _underline(painted, accent) if under else painted
+    return _actions(module, f"{icon} {body}" if icon else body)
 
 
 # ---------------------------------------------------------------- the output segment

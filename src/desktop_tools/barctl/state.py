@@ -37,7 +37,8 @@ wrote it:
 States live in `$XDG_RUNTIME_DIR/barctl/modules/<module>.json` (`$BARCTL_RUNTIME_DIR` for tests),
 written whole and renamed into place, so a render never reads half of one; the runtime folder is
 emptied at logout, so yesterday's state can't show as today's. Settings (disabled modules) live
-in `$XDG_STATE_HOME/desktop-tools/barctl/settings.json` (`$BARCTL_SETTINGS_DIR`), which survives
+in `$XDG_STATE_HOME/desktop-tools/barctl/settings.json` (`$BARCTL_SETTINGS_DIR`), with the
+visualiser's switch (record 0005 phase D), which survives
 logouts and is not the zsh controller's `~/.local/state/barctl`, left as it was for a rollback.
 """
 
@@ -349,8 +350,29 @@ def disabled() -> set[str]:
     return {v for v in value if isinstance(v, str)} if isinstance(value, list) else set()
 
 
+class _SettingsLock:
+    """An exclusive lock round a read and rewrite of settings.json: the CLI and the controller
+    (the visualiser's guards) both rewrite it, and neither may lose the other's change."""
+
+    def __enter__(self) -> None:
+        import fcntl
+
+        folder = settings_dir()
+        folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.fd = os.open(folder / ".settings.lock", os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
+        fcntl.flock(self.fd, fcntl.LOCK_EX)
+
+    def __exit__(self, *exc: object) -> None:
+        os.close(self.fd)  # closing it releases the lock
+
+
 def set_enabled(module: str, enabled: bool) -> bool:
     """Remember a module enabled or disabled. Returns whether that changed anything."""
+    with _SettingsLock():
+        return _set_enabled(module, enabled)
+
+
+def _set_enabled(module: str, enabled: bool) -> bool:
     data = settings()
     off = disabled()
     before = set(off)
@@ -361,11 +383,65 @@ def set_enabled(module: str, enabled: bool) -> bool:
     if off == before:
         return False
     data["disabled"] = sorted(off)
+    _write_settings(data)
+    return True
+
+
+def _write_settings(data: dict[str, Any]) -> None:
     folder = settings_dir()
     folder.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = folder / f".settings.{os.getpid()}.tmp"
     tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(tmp, settings_path())
+
+
+# Why the visualiser strip is off (record 0005 phase D): the switch, or the controller's guards.
+VISUALISER_REASONS = {
+    "switch": "turned off with barctl visualiser off",
+    "budget": "over its CPU budget",
+    "cava-missing": "cava is not installed",
+    "cava-exits": "cava exited 3 times in 5 minutes",
+}
+
+
+def visualiser_switch() -> dict[str, Any]:
+    """The visualiser's runtime switch: `{}` when never set, else {on, reason, at}. Off wins
+    over a capsule's `visualiser = true`; on only lifts an off (the key still decides)."""
+    value = settings().get("visualiser")
+    if not isinstance(value, dict) or not isinstance(value.get("on"), bool):
+        return {}
+    reason = value.get("reason")
+    at = value.get("at")
+    return {
+        "on": value["on"],
+        "reason": reason if reason in VISUALISER_REASONS else "switch",
+        "at": float(at) if isinstance(at, (int, float)) and not isinstance(at, bool) else None,
+    }
+
+
+def visualiser_off() -> bool:
+    return visualiser_switch().get("on") is False
+
+
+def set_visualiser(on: bool, reason: str = "switch", now: float | None = None) -> bool:
+    """Turn the visualiser switch on or off (kept with the disabled modules, so it survives
+    restarts). Returns whether that changed anything."""
+    with _SettingsLock():
+        return _set_visualiser(on, reason, now)
+
+
+def _set_visualiser(on: bool, reason: str, now: float | None) -> bool:
+    import time
+
+    before = visualiser_switch()
+    if before.get("on") is on and (on or before.get("reason") == reason):
+        return False
+    data = settings()
+    entry: dict[str, Any] = {"on": on, "at": time.time() if now is None else now}
+    if not on:
+        entry["reason"] = reason if reason in VISUALISER_REASONS else "switch"
+    data["visualiser"] = entry
+    _write_settings(data)
     return True
 
 

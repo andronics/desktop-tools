@@ -11,7 +11,8 @@
     # glyph_override = { idle = "\\U000F099D", alert = "\\U000F0ECC" }  # per tier; others unchanged
     separator = " "              # between segments, for a module made of several cells
     # width, scroll, scroll_rest, accent: for display = "capsule" only (record 0003 §2), and
-    # fade_after, spoken, spoken_players (record 0005 phase B), expand_for (phase C)
+    # fade_after, spoken, spoken_players (record 0005 phase B), expand_for (phase C),
+    # visualiser, visualiser_fps, visualiser_title, visualiser_budget (phase D)
     # chips_min, chips_max: for display = "chips" only (record 0005 phase A)
 
     [modules.audio-level.clicks] # button -> command; {target} and {segment} are filled in
@@ -59,6 +60,11 @@ CAPSULE_KEYS: dict[str, tuple[float, float, float]] = {
     "scroll_rest": (10.0, 0, 120),
     "fade_after": (0, 0, 240),  # minutes paused before the capsule fades to its icon; 0 never
     "expand_for": (0, 0, 30),  # seconds the transport row stays open (record 0005 C); 0 never
+    # The visualiser strip (record 0005 phase D): frames a second (15, the rate its gate chose),
+    # seconds the title shows over it, and its CPU budget in percent of one core.
+    "visualiser_fps": (15, 5, 30),
+    "visualiser_title": (5, 0, 30),
+    "visualiser_budget": (6.0, 1, 25),
 }
 # The chips' keys (record 0005 phase A): (default, lowest, highest); read only for `chips`.
 CHIPS_KEYS: dict[str, tuple[float, float, float]] = {
@@ -122,6 +128,10 @@ class Module:
         "source",
         "spoken",
         "spoken_players",
+        "visualiser",
+        "visualiser_budget",
+        "visualiser_fps",
+        "visualiser_title",
         "width",
     )
 
@@ -150,6 +160,10 @@ class Module:
         spoken_players: tuple[str, ...] = (),
         expand_for: int = 0,
         icon_clicks: dict[str, list[str]] | None = None,
+        visualiser: bool = False,
+        visualiser_fps: int = 15,
+        visualiser_title: int = 5,
+        visualiser_budget: float = 6.0,
     ) -> None:
         self.name, self.source, self.pusher = name, source, pusher
         self.width, self.scroll, self.scroll_rest, self.accent = width, scroll, scroll_rest, accent
@@ -161,6 +175,8 @@ class Module:
         self.chips_min, self.chips_max = chips_min, chips_max
         self.fade_after, self.spoken, self.spoken_players = fade_after, spoken, spoken_players
         self.expand_for, self.icon_clicks = expand_for, icon_clicks or {}
+        self.visualiser, self.visualiser_fps = visualiser, visualiser_fps
+        self.visualiser_title, self.visualiser_budget = visualiser_title, visualiser_budget
         self.menu = menu or []
 
     @property
@@ -226,6 +242,10 @@ class Module:
                 spoken_players=list(self.spoken_players),
                 expand_for=self.expand_for,
                 icon_clicks=self.icon_clicks,
+                visualiser=self.visualiser,
+                visualiser_fps=self.visualiser_fps,
+                visualiser_title=self.visualiser_title,
+                visualiser_budget=self.visualiser_budget,
             )
         if self.display == "chips":
             out.update(chips_min=self.chips_min, chips_max=self.chips_max)
@@ -315,7 +335,14 @@ def _override(value: object, where: str) -> str | dict[str, str] | None:
 def _number(table: dict[str, object], key: str, where: str) -> float:
     default, low, high = CAPSULE_KEYS.get(key) or CHIPS_KEYS[key]
     value = table.get(key, default)
-    whole = key in ("width", "fade_after", "expand_for", *CHIPS_KEYS)
+    whole = key in (
+        "width",
+        "fade_after",
+        "expand_for",
+        "visualiser_fps",
+        "visualiser_title",
+        *CHIPS_KEYS,
+    )
     if isinstance(value, bool) or not isinstance(value, int if whole else (int, float)):
         raise ConfigError(f"{where}: {key} must be {'a whole number' if whole else 'a number'}")
     if not low <= value <= high:
@@ -345,6 +372,13 @@ def _capsule(module: Module, raw: dict[str, object], where: str) -> Module:
     module.spoken_players = tuple(str(n) for n in players)
     module.expand_for = int(_number(raw, "expand_for", where))
     module.icon_clicks = _clicks(raw.get("icon_clicks"), f"{where}.icon_clicks")
+    visualiser = raw.get("visualiser", False)
+    if not isinstance(visualiser, bool):
+        raise ConfigError(f"{where}: visualiser must be true or false")
+    module.visualiser = visualiser
+    module.visualiser_fps = int(_number(raw, "visualiser_fps", where))
+    module.visualiser_title = int(_number(raw, "visualiser_title", where))
+    module.visualiser_budget = _number(raw, "visualiser_budget", where)
     return module
 
 

@@ -76,6 +76,11 @@ CUPS's and SANE's commands are tripwires on PATH; `no_device_sockets` fails a te
   checked cell by cell (the loop cycle, the seek fractions, the 10 and 30 s skips, no target). The row's cells at
   widths 32 and 20, the fold and the seek bar's next cell run on `now=`; `barctl expand` is checked with
   `control.request` answering (a controller) and returning None (none: the poke and the detached reload recorded).
+- **The visualiser strip** (`tests/unit/test_player_visualiser.py`, design record 0005 phase D): `cava` is a tripwire
+  on PATH, so the real one never runs; the tests that need it write a fake `cava` that notes its pid and prints the
+  frames the test scripts (a burst of 61 lines, repeats, then waiting or exiting). Frames go to fake polybar sockets
+  (`FakeBar`, two pids) in the test's runtime folder; the budget guard runs on fake CPU readings and a fake clock.
+  Every fake cava is stopped by its PID, and the fixture fails the test if one is left running.
 - **The output segment** (`tests/unit/test_output_capsule.py`, design record 0003 §8 and §10): fake `pactl` (a wired,
   an HDMI and a Bluetooth headset sink in `-f json list sinks`, the default, volume and mute in files the test
   changes), `busctl` (the battery and BlueZ's managed objects) and `bluetoothctl`. Each starts with a guard that logs

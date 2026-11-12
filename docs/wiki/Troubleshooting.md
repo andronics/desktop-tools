@@ -107,11 +107,22 @@ press runs `playerctl -p <player> loop <next>` or `shuffle toggle`, and the butt
 change. If a player changes mode without telling playerctl, the button catches up on its next event (a new track, a
 pause). `barctl watch player-capsule --json` prints the state barctl holds, `loop` and `shuffle` with it.
 
+### The visualiser strip turned itself off
+
+`barctl visualiser status` (or `barctl doctor`) says why. **Over its CPU budget**: cava and the controller together
+used more than `visualiser_budget` percent of one core (default 6) for three 10-second samples in a row; lower
+`visualiser_fps` (or raise the budget), then `barctl visualiser on`. **cava is not installed**: install `cava`, then
+`barctl visualiser on`. **cava exited 3 times in 5 minutes**: run `cava` in a terminal to see why it ends (no PipeWire,
+no default sink), then `barctl visualiser on`. Turned off with `barctl visualiser off` stays off across restarts until
+`barctl visualiser on`. The strip also stands aside, by design, while the player is paused, the transport row is open
+or the capsule has faded; and it needs `visualiser = true` on the capsule.
+
 ### `modules.toml` fails, and every barctl module is blank, after a downgrade
 
 An older barctl rejects `display = "capsule"`, `"output"` or `"chips"` as an unknown display, and a per-segment click
 table (`segment_clicks.<id>`) as an unknown button, which fails the whole file (one from before the transport row
-ignores `expand_for` and `icon_clicks`: the icon just plays and pauses). Take `[modules.player-capsule]`,
+ignores `expand_for` and `icon_clicks`: the icon just plays and pauses; one from before the strip rejects nothing but
+ignores `visualiser`). Take `[modules.player-capsule]`,
 `[modules.output-capsule]` and `[modules.player-chips]` out of the dotfiles' `modules.toml` (or revert the dotfiles
 change that added them) before
 downgrading desktop-tools; `barctl doctor` names the key it can't read.

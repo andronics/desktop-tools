@@ -207,6 +207,8 @@ DESKTOP = [
     "udevadm",
     "zenity",
     "xdg-user-dir",
+    # record 0005 phase D: the visualiser strip's levels; never the real one against live audio
+    "cava",
 ]
 # Real tools the fakes and tests use themselves, linked in from the system.
 REAL = ("cat", "pgrep")

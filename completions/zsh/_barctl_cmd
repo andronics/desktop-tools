@@ -46,6 +46,7 @@ _barctl_cmd() {
         'theme:Follow a new theme'
         'transport:Press a cell of a capsule'\''s transport row'
         'unhide:Show the bars again (bsp-unhide calls it)'
+        'visualiser:Turn the capsule'\''s visualiser strip off or on, or say whether it shows'
         'watch:Follow state changes as they happen, until interrupted'
     )
 
@@ -176,6 +177,12 @@ _barctl_cmd() {
                 unhide)
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]'
+                    ;;
+                visualiser)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]' \
+                        '--json[JSON instead of text]' \
+                        '::action:(on off status)'
                     ;;
                 watch)
                     _arguments -s -S \

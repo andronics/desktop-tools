@@ -255,6 +255,8 @@ def checks(now: float | None = None) -> list[Check]:
             )
         )
 
+    out.append(visualiser_check(modules))
+
     found = theme.roles(st.ROLES)
     out.append(
         _check(
@@ -323,6 +325,40 @@ def devices_checks(modules: dict[str, mods.Module]) -> list[Check]:
                     )
                 )
     return out
+
+
+def visualiser_check(modules: dict[str, mods.Module]) -> Check:
+    """The visualiser strip (record 0005 phase D): on or off, and why it is off."""
+    asking = sorted(m.name for m in modules.values() if m.display == "capsule" and m.visualiser)
+    switch = st.visualiser_switch()
+    cava = shutil.which("cava") is not None
+    if switch.get("on") is False:
+        reason = str(switch.get("reason") or "switch")
+        why = st.VISUALISER_REASONS.get(reason, reason)
+        at = switch.get("at")
+        since = f" since {time.strftime('%Y-%m-%d %H:%M', time.localtime(at))}" if at else ""
+        fixes = {
+            "budget": "it used more CPU than visualiser_budget allows: lower visualiser_fps,"
+            " then barctl visualiser on",
+            "cava-missing": "install cava, then barctl visualiser on",
+            "cava-exits": "run cava by hand to see why it ends, then barctl visualiser on",
+        }
+        return _check(
+            "visualiser",
+            reason == "switch",
+            f"off: {why}{since}",
+            fixes.get(reason, "barctl visualiser on"),
+            warn=True,
+        )
+    if not asking:
+        return _check("visualiser", True, "off: no capsule has visualiser = true")
+    return _check(
+        "visualiser",
+        cava,
+        f"on for {', '.join(asking)}: needs cava",
+        "install cava (or visualiser = false)",
+        warn=True,
+    )
 
 
 def problems(found: list[Check]) -> bool:

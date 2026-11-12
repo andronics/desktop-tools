@@ -55,6 +55,12 @@ display = "text"
 # expand_for = 0         # seconds the transport row stays open (record 0005 phase C; 0-30, 0
 #                        # never): previous, play-pause, next, loop, shuffle and a seek bar in
 #                        # the title's place, opened by a left-click on the icon
+# visualiser = false     # the visualiser strip (record 0005 phase D): while it plays, a cava
+#                        # spectrum in the title's cells; needs cava. `barctl visualiser off`
+#                        # turns it off at once and wins over this key
+# visualiser_fps = 15    # frames a second (5-30)
+# visualiser_title = 5   # seconds the title shows over it on a new track or a seek (0-30)
+# visualiser_budget = 6  # percent of one core (1-25): over it for 30 s, the strip turns off
 #
 # [modules.player-capsule.icon_clicks]       # the icon alone: opens and folds the row
 # left = ["barctl", "expand", "player-capsule"]

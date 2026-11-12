@@ -25,6 +25,7 @@ VERBS = [
     "pin",
     "expand",
     "transport",
+    "visualiser",
     "reload",
     "restart",
     "theme",

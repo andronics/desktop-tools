@@ -2,10 +2,12 @@
 
 One at a time (a lock in the runtime folder). It runs every enabled source in a thread of its
 own, restarting a source whose stream ended after BARCTL_RETRY seconds; serves the control socket
-for `push`, `alert`, `reload`, `enable`, `disable`, `pin` and `expand`; blinks alerting modules;
-redraws a pushed module when its ttl runs out; pokes a capsule when its frame changes (the next
-scroll step or progress cell, record 0003 §3, and its transport row folding, record 0005 phase
-C); and pokes an output segment when its notice ends (§10).
+for `push`, `alert`, `reload`, `enable`, `disable`, `pin`, `expand` and `visualiser`; blinks
+alerting modules; redraws a pushed module when its ttl runs out; pokes a capsule when its frame
+changes (the next scroll step or progress cell, record 0003 §3, and its transport row folding,
+record 0005 phase C); pokes an output segment when its notice ends (§10); and runs the
+visualiser strip's cava and frames while the capsule plays (record 0005 phase D,
+barctl/visualiser.py).
 On start it clears its own sources' states (they are redrawn within a second from the live
 sources) and keeps pushed ones.
 
@@ -34,6 +36,7 @@ from desktop_tools.barctl import modules as mods
 from desktop_tools.barctl import state as st
 from desktop_tools.barctl.sources import SOURCES, PlayerSource, Source
 from desktop_tools.barctl.store import Writer
+from desktop_tools.barctl.visualiser import Visualiser
 from desktop_tools.common import journal, polybar
 
 LATE = 0.02  # seconds after a change the tick wakes, so the render lands past it
@@ -70,8 +73,15 @@ class Controller:
         self._lock_fd: int | None = None
         self._server: socket.socket | None = None
         self.log: Callable[[str], None] = journal.warning
+        # The visualiser strip (record 0005 phase D): its frames go out over `send`, so a
+        # write or tick poke for the capsule it draws becomes its next frame instead.
+        self.visualiser = Visualiser(
+            self.modules, poke=self.poke, log=lambda m: self.log(m), modules_lock=self.lock
+        )
 
     def _poke(self, module: str) -> object:
+        if self.visualiser.handles(module):
+            return None
         return self.poke(module)
 
     # ------------------------------------------------------------ lifecycle
@@ -222,12 +232,13 @@ class Controller:
                 "pid": os.getpid(),
                 "sources": sorted(self.running),
                 "pinned": self.pins(),
+                "visualiser": self.visualiser.status(),
             }
         if op == "pin":
             return self.pin(module, request.get("instance"), request.get("toggle") is True)
         if op in ("pushed", "alert") and isinstance(module, str) and module in self.modules:
             self.follow_state(module)
-            self.poke(module)
+            self._poke(module)
             return {"ok": True}
         if op == "expand" and isinstance(module, str) and module in self.modules:
             # The row opened or folded (record 0005 phase C): draw it now, and note the frame,
@@ -235,23 +246,29 @@ class Controller:
             found = self.modules[module]
             with self.lock:
                 self.frames[module] = render.capsule_frame(found, st.read(module), time.time())
-            self.poke(module)
+            self._poke(module)
             return {"ok": True}
         if op == "reload":
             try:
                 fresh = mods.load()
             except mods.ConfigError as e:
                 return {"ok": False, "error": str(e)}
+            self.visualiser.stop()  # started again from the new keys and theme
             with self.lock:
                 self.modules.clear()
                 self.modules.update(fresh)
             self.sync_sources()
+            self.visualiser.sync()
             return {"ok": True}
         if op == "settings":
             self.sync_sources()
             if isinstance(module, str) and module in self.modules:
-                self.poke(module)
+                self._poke(module)
             return {"ok": True}
+        if op == "visualiser":
+            # The switch changed (record 0005 phase D): off stops cava and draws the capsule.
+            self.visualiser.reset()
+            return {"ok": True, **self.visualiser.status()}
         return {"ok": False, "error": f"unknown request {op!r}"}
 
     def _player(self) -> PlayerSource | None:
@@ -322,8 +339,10 @@ class Controller:
             nearest = min(self.expiries.values(), default=now + 1.0)
         moving, frames = self.capsules(now)
         due.extend(frames)
+        self.visualiser.sync(now)
+        self.visualiser.guard()
         for module in sorted(set(due)):
-            self.poke(module)
+            self._poke(module)
         if moving is not None:
             nearest = min(nearest, moving + LATE)
         # Wake at the next half of a blink, a little after it, so a render lands in it.
@@ -392,6 +411,7 @@ class Controller:
 
     def shutdown(self) -> None:
         self.stop_event.set()
+        self.visualiser.stop()
         for name in list(self.running):
             self.stop_source(name)
         if self._server is not None:

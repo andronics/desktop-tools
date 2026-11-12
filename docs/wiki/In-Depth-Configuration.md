@@ -63,6 +63,10 @@ These keys are read only for a capsule; a value out of range or of the wrong typ
 | `spoken_players` | `[]` | Player names always taken as spoken word when `spoken = true`, any case, e.g. `["gpodder", "cozy", "kasts"]` |
 | `expand_for` | 0 | Seconds the transport row stays open after `barctl expand` or the last press in it, a whole number 0-30; 0 never opens it (design record 0005 phase C, below) |
 | `[modules.<m>.icon_clicks]` | none | Button = command for the icon alone, inside the capsule's own clicks (the inner tag wins): the transport row's opener |
+| `visualiser` | `false` | The visualiser strip (design record 0005 phase D, below): while the player plays, a cava spectrum in the title's cells. Needs `cava`; `barctl visualiser off` wins over it |
+| `visualiser_fps` | 15 | The strip's frames a second, a whole number 5-30 (15 is the rate its CPU gate measured) |
+| `visualiser_title` | 5 | Seconds the title shows over the strip after a new track or a seek, a whole number 0-30; 0 never |
+| `visualiser_budget` | 6 | The strip's CPU budget in percent of one core (cava and the controller together), 1-25: over it three 10-second samples in a row, it turns itself off |
 
 ```toml
 [modules.player-capsule]
@@ -114,6 +118,28 @@ The row's cells are segments `previous`, `play-pause`, `next`, `loop`, `shuffle`
 `seek-15`; on a capsule the segment `icon` is the icon, whose clicks are `icon_clicks`. While the row is open, a press
 between cells does nothing; middle, scroll and right keep the capsule's own commands. It is off in the packaged file
 and in a capsule without the keys, and it never opens on a faded capsule.
+
+**The visualiser strip** (design record 0005 phase D). With `visualiser = true`, while the shown player plays and the
+capsule is at rest (not expanded, not faded), its text cells show a spectrum, one block glyph (`▁` to `█`) a cell, low
+bars in `fg_dim` and the rest in the accent (the role's, or the art's with `accent = "art"`; never the alert colour).
+The progress underline stays under it, and the capsule's clicks still work. The title shows instead for
+`visualiser_title` seconds after each new track and after a seek, and whenever the player is paused. The controller
+runs `cava` for it (its own config, `$XDG_RUNTIME_DIR/barctl/cava.conf`: PipeWire, the default sink's monitor, one bar
+a cell) only while the strip shows; paused, expanded, faded, with no player or turned off, no cava runs. One capsule
+shows it: the first, by name, with the key. It is off in the packaged file and in a capsule without the key.
+
+```toml
+[modules.player-capsule]
+visualiser = true
+# visualiser_fps = 15
+# visualiser_title = 5
+# visualiser_budget = 6
+```
+
+`barctl visualiser off` turns it off at once and keeps it off across restarts, whatever the file says; `barctl
+visualiser on` lifts that (the key still decides); `barctl visualiser status` says which. It also turns itself off,
+with one journal line, when it goes over `visualiser_budget`, when `cava` is missing, or when cava exits three times in
+five minutes; `barctl doctor` says why, and `barctl visualiser on` tries again.
 
 **Spoken word.** With `spoken = true`, the shown player plays spoken word (the state's `kind` is `spoken`) when the
 first of these matches: the track id or URL names an episode (`spotify:episode:`, `/episode/`); the genre contains

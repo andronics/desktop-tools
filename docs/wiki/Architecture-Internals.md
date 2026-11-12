@@ -40,9 +40,10 @@ flowchart LR
 | `barctl/store.py` | Writing a state; poking only when what shows changed |
 | `barctl/render.py` | A state as polybar text: colour, escaping, action tags, blink, segments, and the capsule (its scroll offset and progress cells worked out from the state and the time; `next_change` for the controller's tick) |
 | `barctl/transport.py` | The capsule's transport row (record 0005 phase C): its cells laid out in the capsule's width, and the one `playerctl -p <target>` argv each press maps to |
+| `barctl/visualiser.py` | The capsule's visualiser strip (record 0005 phase D): cava as the controller's child, its newest frame sent to each bar over polybar's `send` action, the switch, the CPU budget guard and cava's restart limit |
 | `barctl/art.py` | The capsule's art accent: the cover fetched once (curl, HTTPS only, 2 s, 1 MiB) into a 20-file cache in the runtime folder, its average colour (magick), dropped under 3:1 against the theme's `bg` |
 | `barctl/control.py` | The control socket's client |
-| `barctl/controller.py` | `barctl run`: sources, control socket (with `pin` and `expand`), alert and ttl timers, and the capsule timer: it pokes a capsule when its frame changes and sleeps until the next scroll step or progress cell |
+| `barctl/controller.py` | `barctl run`: sources, control socket (with `pin`, `expand` and `visualiser`), alert and ttl timers, the capsule timer (it pokes a capsule when its frame changes and sleeps until the next scroll step or progress cell) and the visualiser strip's lifecycle and budget guard |
 | `barctl/doctor.py` | `barctl doctor`'s checks |
 | `barctl/outputs.py` | The audio outputs (record 0003 §10): sinks from `pactl -f json list sinks` with their kind glyph and short name, a Bluetooth sink's battery (`busctl get-property … Battery1 Percentage`), BlueZ's paired audio devices; read-only, each name, path and address checked before it goes into an argv |
 | `barctl/sources/` | The controller's sources: `volume` (for an output segment also the sinks' properties, on a new default or a sink added or removed; the connect and disconnect notices; the battery every 5 minutes while a Bluetooth sink is the default; events coalesced to one read per 100 ms), `player` (the label `Artist – Title` whole; `progress` from `mpris:length` and `playerctl -p <shown> position`, read on the shown player's events and every 30 s while it plays; the in-memory pin; the art URL) |
@@ -119,6 +120,21 @@ place). If what it shows changed, barctl sends `#audio-level.hook.0` to every ba
   left click. `barctl transport` maps a cell to one detached `playerctl -p <target>` argv and, while the row is open,
   calls `expand` again with `expand_for`. With no controller, `expand` pokes the bar and a detached `barctl reload`
   redraws it after the time.
+- **The visualiser strip** (design record 0005 phase D): `Visualiser.sync`, on the controller's tick, on a write that
+  pokes a capsule and on the `visualiser`, `expand` and `reload` requests, starts the strip where
+  `render.strip_shows` holds (the `visualiser` key, a player playing, not expanded, faded or disabled, no segments)
+  and the switch in settings isn't off, and stops it everywhere else. Starting writes `cava.conf` and runs `cava -p`
+  with its stdout a pipe; a thread blocks on that pipe (no polling), keeps only the newest whole line, re-reads the
+  capsule's state when its file's mtime changes (noting a seek: a position more than 2 s from where it should be on
+  the same track), builds the frame (`render.strip`, or the ordinary render while the title shows) and, unless it is
+  the frame last sent, sends `#<capsule>.send.<frame>` to each bar's own socket in turn, 0.2 s each, no retry. While
+  it draws, `Controller._poke` hands the capsule's pokes to it instead of polybar, so a hook render never draws over
+  a frame; stopping it is one ordinary poke. cava is stopped by its PID (SIGTERM, then SIGKILL after 2 s) and dies
+  with the controller (its next write to the closed pipe). The budget guard samples every 10 s while the strip runs:
+  the controller's own CPU (`os.times`) and cava's (`/proc/<pid>/stat`) over the wall time; over `visualiser_budget`
+  three samples in a row, or cava ending by itself three times in five minutes, or no `cava` on PATH, it writes the
+  switch off with its reason (`budget`, `cava-exits`, `cava-missing`) and one journal line. The switch lives in
+  `settings.json` as `visualiser: {on, reason, at}`.
 - **The output segment** (design record 0003 §10): the volume source writes the kind glyph, short name, `output`
   (`volume`, `battery`) and, for 5 seconds after a Bluetooth sink comes or goes, `notice` with `notice_until`. Render
   draws the notice in place of the name until it ends; the controller's tick pokes the segment once when it does.
