@@ -5,7 +5,8 @@
 Status: Proposed
 Date: 2026-11-12
 Authors: Stephen Cox (direction, 2026-11-12: replace the bar's player group with one large barctl-drawn
-module, idea 1 first and ideas 2-5 to follow); written up by the desktop coordinator
+module, idea 1 first and ideas 2-5 to follow; and that it takes in volume, the audio output and
+Bluetooth as one unit); written up by the desktop coordinator
 
 ## Context
 
@@ -57,7 +58,9 @@ detached on `/dev/null`, rofi placed just above the clicked button (the main bar
 `segments` with per-segment clicks and an underline mark, a controller tick that already pokes blinking
 modules twice a second, and `glyph_override` (record 0002 §7), which picks a module's glyph per tier.
 
-`playerctl` is v2.4.1 here. No player was started, stopped or queried for this record.
+`playerctl` is v2.4.1 and `pactl` 17.0 here. No player was started, stopped or queried for this record,
+and no audio or Bluetooth state changed: the one live read was `pactl -f json list sinks`, for its
+property names.
 
 ## Decision
 
@@ -144,12 +147,15 @@ the key, as every `modules.toml` mistake. None is secret.
 **What goes, once the capsule is on (§7 step 3):**
 
 - From `bars/main`'s `modules-right`: `player-previous`, `player-stop`, `player-play-pause`,
-  `player-next`, `player-loop`, `player-shuffle`. `audio-spectrum` stays where it is (open question 2).
+  `player-next`, `player-loop`, `player-shuffle`. `audio-spectrum` stays where it is (open question 2);
+  `bluetooth-status` and `device-bluetooth` stay too (§10).
 - From `modules/player.ini`: every module but `player-capsule` (`player-instance`, `player-loop`,
   `player-metadata`, `player-next`, `player-play-pause`, `player-previous`, `player-seek-backward`,
   `player-seek-forward`, `player-shuffle`, `player-stop`); the file then holds the capsule only.
 - From `barctl/modules.toml`: `[modules.player-play-pause]` with its `clicks`, and
   `[modules.player-metadata]`.
+- The audio pieces the output segment takes over (§10): `audio-level` and `audio-device` from
+  `modules-right`, and `[modules.audio-level]` from `modules.toml`.
 - The sxhkd keys that run `player next`, `player play-pause` and `player previous` stay: they act on
   playerctl's default player, which is a separate question (open question 10).
 
@@ -188,8 +194,9 @@ From a new provider, `barmenu/providers/player.py`. It reads the shown player fr
 | 5 | md-playlist_play U+F0411 | `Player: <name> ›` | `barmenu players` | Always |
 | 6 | md-rewind_10 U+F0D2A | `Back 10 s` | `playerctl -p <t> position 10-` | When the player can seek (a length is known) |
 | 7 | md-fast_forward_10 U+F0D71 | `Forward 10 s` | `playerctl -p <t> position 10+` | Same |
+| 8 | the output's kind glyph (§10) | `Output: <short name> ›` | `barmenu outputs` | Always; `Output… ›` when the sink can't be read |
 
-- Seven rows fit the 8-line window. Every row is an argument list; the instance comes from barctl's state
+- Eight rows fill the 8-line window. Every row is an argument list; the instance comes from barctl's state
   and playerctl's own list, never from a shell string.
 - **With no player** (no target, or the query fails or takes over 2 s): one row, `No player`, which does
   nothing, and row 5 (`Player… ›`) so another can be chosen.
@@ -252,24 +259,27 @@ A colour under 3:1 contrast with the theme's `bg` (the non-text contrast rule) o
 #### 7. Rollout and rollback
 
 1. **desktop-tools** (this repository): §3-6, tests (§8), the wiki; a release. Nothing on the bar changes:
-   no packaged module uses `capsule`.
+   no packaged module uses `capsule` or `output`.
 2. **dotfiles, PR A: alongside.** Pin that release; add `[modules.player-capsule]` and its clicks to
-   `barctl/modules.toml` and `[module/player-capsule]` to `player.ini`; put `player-capsule` in
-   `bars/main`'s `modules-right` just before `player-previous`, with the old six still there. Stephen
+   `barctl/modules.toml` and `[module/player-capsule]` to `player.ini`, and `[modules.output-capsule]`
+   and `[module/output-capsule]` (§10) to `modules.toml` and `audio.ini`; put `player-capsule
+   output-capsule` in `bars/main`'s `modules-right` just before `player-previous`, with the old six and
+   the audio group still there. Stephen
    restarts the bar (`barctl restart`) and uses both for as long as he likes.
-3. **dotfiles, PR B: replace.** On Stephen's word, remove the old six from `bars/main`, the unused
-   modules from `player.ini` and the two old entries from `modules.toml` (§2).
+3. **dotfiles, PR B: replace.** On Stephen's word, remove the old six, `audio-level` and
+   `audio-device` from `bars/main`, the unused modules from `player.ini` and the old entries from
+   `modules.toml` (§2).
 
 Rollback:
 
-- **During step 2**: remove `player-capsule` from `modules-right` (one word), `barctl restart`. The old
-  group never left.
+- **During step 2**: remove `player-capsule output-capsule` from `modules-right` (two words), `barctl
+  restart`. The old group never left.
 - **After step 3**: revert PR B: the old modules and entries come back unchanged and work with the new
   barctl (the source still writes `player-play-pause`, with its pushed glyph, and `player-metadata`, cut
   to 40 by `render`).
-- **Downgrading desktop-tools**: first remove `[modules.player-capsule]` from the dotfiles'
-  `modules.toml` (or revert PR A), then downgrade. An older barctl ignores the new keys but rejects
-  `display = "capsule"` as an unknown display, which fails the whole file and blanks every barctl module.
+- **Downgrading desktop-tools**: first remove `[modules.player-capsule]` and `[modules.output-capsule]`
+  from the dotfiles' `modules.toml` (or revert PR A), then downgrade. An older barctl ignores the new
+  keys but rejects `display = "capsule"` and `"output"` as unknown displays, which fails the whole file and blanks every barctl module.
   The release notes say so.
 - Nothing is stored but the runtime state, the in-memory pin and the art cache in `$XDG_RUNTIME_DIR`,
   all gone at logout.
@@ -303,6 +313,15 @@ Unit, no player, no bar (the existing fake-command and fake-poke fixtures):
 - **Environment**: no row or click argv sets or unsets the three variables (the provider's rows and the
   `ops` click path, with each set and unset); `doctor`'s warning with a fake `/proc` whose environ has one
   set, and that it prints the name only.
+- **Output and Bluetooth** (§10): a fake `pactl` whose `-f json list sinks` gives a wired, an HDMI and a
+  Bluetooth headset sink, and a fake `busctl` for BlueZ; the kind glyph and short name for each; the
+  battery glyph by level and none when BlueZ gives no `Battery1`; a `new` Bluetooth sink event giving
+  the 5-second notice and a `remove` one the "disconnected" notice; the 100 ms coalescing of `change`
+  events; the 5-minute battery re-read only while a Bluetooth sink is the default; the `outputs`
+  provider's rows, marks and exact argv. The fakes fail the test on `set-default-sink`,
+  `set-sink-volume`, `set-sink-mute`, `connect`, `disconnect`, `power`, `pair`, `remove`, `trust` or a
+  BlueZ `Connect`/`Disconnect` call outside a picked row's own test, which checks the argv and never
+  runs it. No test touches the live audio server or Bluetooth.
 - Every existing source, render, ops and status test passes unchanged.
 
 Live, after dotfiles PR A, by Stephen (no agent touches a player or the bar): the capsule shows the
@@ -310,7 +329,9 @@ track and its progress; each click and scroll does what §1 says; the menu's loo
 state and show it on the next open; `Back 10 s` moves the line back; choosing a second player in
 `Players ›` switches the capsule; `journalctl --user -t barmenu -t barctl --since -10m` names menus,
 modules and buttons and no track; `top` shows `barctl render` at about the expected rate (§9) while a
-long title scrolls.
+long title scrolls. For §10: connecting the headphones shows the 5-second notice and, if WirePlumber
+makes them the default, the headphones glyph, name and battery; disconnecting shows the notice and the
+previous output; `Output ›` switches the sink and the segment follows.
 
 #### 9. Data, rates and privacy
 
@@ -326,6 +347,112 @@ long title scrolls.
   the player's state, and barmenu's line names the menu. Art files sit in the same runtime folder. The
   art fetch, when on, goes only to the URL the player itself gives, which it has already fetched.
   `barctl status` shows the label to the user's own processes, as it does today.
+
+#### 10. Output and Bluetooth in the same unit
+
+Stephen (2026-11-12): the capsule takes in volume, the current audio output and Bluetooth, so that when
+headphones (or any Bluetooth audio device) connect, the bar shows it as part of the same unit.
+
+**Today's pieces** (`bars/main`, `modules/audio.ini`, `modules/bluetooth.ini`, `modules/device.ini`, the
+dotfiles' `modules.toml`):
+
+| Module | Today | In phase 1 |
+|---|---|---|
+| `audio-level` | barctl `volume` source, `pactl subscribe`: level glyph and `NN%`; left mute, right `pwvucontrol`, scroll the sink's volume | **Absorbed** into the output segment (PR B removes it) |
+| `audio-device` | zsh script every 5 s: `audio device-icon` and `device-name` from `audio/devices.json` (its icons are old Nerd Font codepoints from the range v3 dropped); scroll cycles the sink | **Absorbed**: kind glyph and short name; switching moves to `Output ›` (PR B removes it) |
+| `bluetooth-status` | zsh script every 5 s: `bt status-icon` and `status-name` (off, ready, the first connected device); left `bt menu`, right `bt power-toggle`, scroll-up `bt connect` (a menu), scroll-down `bt disconnect` (the first connected device) | **Stays** in phase 1 (power, scanning and non-audio devices are not the capsule's); absorbed by the Bluetooth source in idea 6. Its scroll-down disconnects headphones on a stray scroll: open question 14 |
+| `device-bluetooth` | static button on the left, `bt menu` | **Stays**: it is the device launcher, beside printer and scanner |
+| `audio-spectrum` | draws nothing | **Stays**, unchanged (open question 2) |
+
+**The unit.** One capsule is two barctl modules side by side, `player-capsule` then `output-capsule`,
+on the same inverse background between the same corner spacers, so they read as one. Each keeps its own
+source, state and clicks (a module has one source; merging sources into one module is idea 6's).
+
+```text
+ ▶  Massive Attack – Teardrop          [headphones] Headphones [battery] [volume] 45%
+ ━━━━━━━━━━━━━━━━━━━──────────────
+```
+
+**The output segment** (`[modules.output-capsule]`, `source = "volume"`, `display = "output"`):
+
+- **Kind glyph** of the default sink, from its properties in `pactl -f json list sinks` (`device.bus`,
+  `device.form_factor`, `device.icon_name`, `node.name`; all present on this machine's sinks, read
+  2026-11-12 without changing anything):
+
+  | Kind | Rule | Glyph |
+  |---|---|---|
+  | Bluetooth headphones or headset | `device.bus = bluetooth` and form factor `headphone` or `headset` | md-headphones_bluetooth U+F0970 |
+  | Other Bluetooth audio | `device.bus = bluetooth` | md-speaker_bluetooth U+F09A2 |
+  | Wired headphones or headset | form factor `headphone` / `headset`, or a headphones port active | md-headphones U+F02CB / md-headset U+F02CE |
+  | HDMI or DisplayPort | `hdmi` in `node.name` or the profile | md-television U+F0502 |
+  | USB | `device.bus = usb` | md-usb U+F0553 |
+  | Speakers, anything else | | md-speaker U+F04C3 |
+
+- **Short name**: the `name` from the dotfiles' `audio/devices.json` when a pattern matches (Stephen's
+  own names), else `device.nick`, else `device.description`, cut to 16 characters.
+- **Volume**: md-volume_low U+F057F / md-volume_medium U+F0580 / md-volume_high U+F057E by level, and the
+  percentage; muted, md-volume_off U+F0581 and the segment in `fg_dim` (the `idle` tier, as
+  `audio-level` today).
+- **Bluetooth link**, when the default sink is Bluetooth: the battery glyph (md-battery_10 U+F007A to
+  md-battery_90 U+F0082, md-battery U+F0079 full; nothing when BlueZ gives no level) after the name,
+  read from BlueZ's `org.bluez.Battery1.Percentage` on the sink's own `api.bluez5.path`. Connecting and
+  the device's own connect state come from the sink appearing and going (below); a Bluetooth device that
+  is connecting but has no sink yet is idea 6's.
+- **Clicks**: left `audio mute-toggle` (as `audio-level`), scroll the sink's volume (`audio
+  volume-increase` / `volume-decrease`, as today), right `barmenu outputs`, middle nothing. The
+  player segment's scroll is the player's volume (open question 3), so the two scrolls differ by what
+  is under the pointer.
+
+**Events, not polling.** The `volume` source already follows `pactl subscribe` (served by
+pipewire-pulse) and re-reads the default sink on every `sink` or `server` event. It adds:
+
+- the sink's properties (one `pactl -f json list sinks`) only when the default sink's name changes or a
+  sink is added or removed, never on a volume change, so a scroll costs what it does today;
+- `change` events coalesced to at most one re-read per 100 ms, so a fast scroll is not one `pactl` trio
+  per notch;
+- **headphones connecting**: a `new` event on a sink whose `device.bus` is `bluetooth` writes a notice
+  (`<glyph> <short name> connected`, the `active` accent) for 5 seconds, then the segment shows the
+  default sink again, which is the headphones if WirePlumber made them the default. A `remove` of a
+  Bluetooth sink writes `<short name> disconnected` for 5 seconds. The notice is a new optional state
+  field, `notice` (text) with `notice_until` (epoch seconds), validated like `label`, drawn by `output`
+  in place of the name; the controller's tick pokes when it ends, as for expiries;
+- the battery: read when a Bluetooth sink becomes the default and every 5 minutes while it stays the
+  default (`busctl --system get-property org.bluez <path> org.bluez.Battery1 Percentage`, 2 s limit).
+  The one timed read in phase 1; idea 6 replaces it with BlueZ's `PropertiesChanged` signal.
+- Rates: one poke per real change; the notice two pokes; the battery one `busctl` per 5 minutes. With
+  `audio-device` gone (PR B), the bar loses one 5-second zsh poll.
+
+**Switching to the headphones.** barctl never changes the default sink by itself in phase 1: what the
+bar shows is what is true, and WirePlumber's own default-node policy (the dotfiles carry no WirePlumber
+settings) decides as it does today. Options (open question 12): (a) never switch, show only; (b) a
+`modules.toml` setting on `output-capsule`, `follow_new = "bluetooth"` (default off), which runs
+`pactl set-default-sink <new sink>` once when a Bluetooth sink appears; (c) always switch to a new
+Bluetooth sink. Recommendation: **(a)** now, (b) if WirePlumber's own choice turns out wrong in the
+trial: an automatic switch the bar makes is one more thing deciding where sound goes.
+
+**`barmenu outputs`** (provider `outputs`, `[menus.outputs]`, glyph md-speaker U+F04C3, title `Output`,
+side `right`), from row 8 of `barmenu player` and the output segment's right-click. Two read-only
+queries when it opens (2 s limit each): `pactl -f json list sinks`, and BlueZ's managed objects
+(`busctl --system --json=short call org.bluez / org.freedesktop.DBus.ObjectManager
+GetManagedObjects`) for paired audio devices (`Icon` starting `audio-`, `Paired` true). Rows:
+
+1. One per sink: kind glyph, short name; the default marked. Runs `pactl set-default-sink <sink>`.
+2. One per paired Bluetooth audio device that is not connected: md-bluetooth_connect U+F00B1, `Connect
+   <alias>`. Runs `bluetoothctl connect <address>`.
+3. One per connected Bluetooth audio device: md-bluetooth_off U+F00B2, `Disconnect <alias>`. Runs
+   `bluetoothctl disconnect <address>`.
+4. md-volume_high U+F057E, `Mixer…`: `pwvucontrol` (today's right-click on `audio-level`).
+
+Nothing runs until a row is picked; every row is an argument list (the sink and address come from the
+queries' JSON, never a shell string); with BlueZ unreadable, rows 2 and 3 are left out and the sinks
+still show. More than eight rows scroll in rofi. No row pairs, removes, trusts or powers Bluetooth: that
+stays in `bt menu`.
+
+**Privacy.** Device names and aliases are shown on the bar and in the menu, and held in the module's
+runtime state file, as the track is (§9). Nothing barctl or barmenu writes to the journal names a sink,
+a device, an alias or an address: barctl logs no state, barmenu's line names the menu, and a source's
+error line says what failed (`pactl` timed out), not on which device. A connect row's address is in
+`bluetoothctl`'s argv, seen only by the user's own processes. This record quotes no address.
 
 ### Roadmap, not for approval now
 
@@ -369,6 +496,17 @@ appears (md-speedometer U+F04C5, MPRIS `Rate`). Needs: when the status last chan
 tell a podcast (the track id or URL in the stream, for example Spotify's `spotify:episode:`), which the
 source can add to its format without a state change.
 
+#### Idea 6: a Bluetooth source, and one module for the whole unit
+
+barctl's reserved `bluetooth` source, built: `gdbus monitor --system --dest org.bluez` (match rules, no
+privilege needed) for `PropertiesChanged` (`Connected`, `Powered`, `Battery1.Percentage`) and
+`InterfacesAdded`/`Removed`, with one `GetManagedObjects` at start. It gives a connecting state before
+a sink exists, battery changes as they happen (ending phase 1's 5-minute read), and non-audio devices,
+and absorbs `bluetooth-status` (its 5-second poll goes). Then, optionally, one module drawing several
+sources (`sources = ["player", "volume", "bluetooth"]`), so the unit is one module with one set of
+segment clicks. Needs from phase 1: the output segment's state shape (`notice`, the kind glyph rules)
+kept, so the Bluetooth source writes into the same fields.
+
 ## Alternatives considered
 
 - **Keep the buttons and add the title.** Least work, but the bar keeps six stateless buttons, and loop
@@ -391,6 +529,13 @@ source can add to its format without a state change.
   starts zsh. Lost to `playerctl` argument lists.
 - **A new bar variant (`bars/main-capsule`) for the trial.** Clean A/B, but switching needs the bar
   stopped and started under another name. Lost to both side by side on the main bar (open question 4).
+- **Volume, output and Bluetooth inside `player-capsule` itself** (one module, three sources). The
+  truest "one unit", but barctl modules have one source each; merging them is a store and render change
+  bigger than the rest of phase 1. Lost for now to two adjacent modules; idea 6 keeps it open.
+- **Polling the sinks and BlueZ** (as `audio-device` and `bluetooth-status` do every 5 s). Lost to
+  `pactl subscribe`, which barctl already follows; only the battery is read on a timer, until idea 6.
+- **The `bt` and `audio` tools in the output menu's rows.** They work, but start zsh and, for `bt`,
+  a FIFO to `bluetoothctl`. Lost to `pactl` and `bluetoothctl` argument lists.
 - **Art colour as the text colour.** Breaks the theme's contrast rules on dark art. Lost to the art
   colouring only the line and icon.
 
@@ -407,10 +552,15 @@ source can add to its format without a state change.
 - `accent = "art"` needs `curl` and ImageMagick's `magick` on `PATH`; `barctl doctor` says when either is
   missing while a module asks for art. The role accent needs neither.
 - A stopped player shows the pause icon: the tiers do not tell paused from stopped.
+- The audio group shrinks: `audio-level` and `audio-device` fold into the output segment, and one
+  5-second zsh poll goes. Switching outputs moves from `audio-device`'s scroll to `Output ›`.
+- The `volume` source gains properties, a notice, coalescing and the battery read; `display = "output"`
+  is a second new display; `barmenu outputs` a third new provider.
 - Rollback is a dotfiles change (§7); downgrading desktop-tools needs the capsule out of `modules.toml`
   first.
-- Wiki: CLI-Reference (regenerated: `barctl pin`, `barmenu player`, `barmenu players`),
-  In-Depth-Configuration (the `capsule` display and its keys; the two providers), Architecture-Internals
+- Wiki: CLI-Reference (regenerated: `barctl pin`, `barmenu player`, `barmenu players`, `barmenu
+  outputs`), In-Depth-Configuration (the `capsule` and `output` displays and their keys; the three
+  providers), Architecture-Internals
   (the source's new fields, the tick's capsule timer, the pin), Security (the art fetch's limits, the
   environment rule, nothing of the track logged), Troubleshooting ("my modules.toml fails after a
   downgrade"; "the capsule shows no line": no length; the doctor's environment warning), Testing-Guide
@@ -439,8 +589,8 @@ source can add to its format without a state change.
 6. **How titles scroll.** (a) One pass, then 10 s resting at the start, while playing; (b) scroll all the
    time while playing; (c) never: cut with "…". Recommendation: **(a)**: readable, and about half the
    redraws of (b).
-7. **Stop.** (a) No stop anywhere on the capsule or its menu; (b) a `Stop` row in the menu (eight rows).
-   Recommendation: **(a)**: pause covers it, and the menu stays at seven.
+7. **Stop.** (a) No stop anywhere on the capsule or its menu; (b) a `Stop` row in the menu (nine rows,
+   one past the window). Recommendation: **(a)**: pause covers it, and the menu stays inside eight.
 8. **The pin's life.** (a) In memory, ends with the player or a controller restart; (b) saved in
    barctl's settings across restarts. Recommendation: **(a)**: a saved pin to a player that comes back
    days later would surprise.
@@ -451,8 +601,25 @@ source can add to its format without a state change.
     capsule's player (`barctl click player-capsule left` and `middle`). Recommendation: **(b)**, in
     PR B: keys and bar then act on the same player. Its own small change, not needed for phase 1.
 
+11. **The unit's shape.** (a) Two adjacent modules, `player-capsule` and `output-capsule`, on one
+    background (§10); (b) one module with three sources now. Recommendation: **(a)**: it looks like one
+    unit, needs no change to how barctl stores modules, and (b) stays open as idea 6.
+12. **Switching to new headphones.** (a) Never: show only, WirePlumber decides; (b) an opt-in
+    `follow_new = "bluetooth"` setting; (c) always. Recommendation: **(a)**, (b) if the trial shows
+    WirePlumber choosing wrong (§10).
+13. **What shows at the moment headphones connect.** (a) A 5-second `<name> connected` notice, then the
+    default sink; (b) only the glyph and name changing, if they become the default; (c) a desktop
+    notification as well. Recommendation: **(a)**: it says the connection happened even when the default
+    stays on the speakers, and needs no notification daemon.
+14. **`bluetooth-status`'s scroll.** (a) Keep it as it is in phase 1; (b) drop its scroll-up and
+    scroll-down in PR B, since a stray scroll-down disconnects the first connected device and `Output ›`
+    now connects and disconnects on purpose. Recommendation: **(b)**.
+15. **Where mute lives.** (a) Left-click on the output segment, as `audio-level` today; (b) a `Mute` row
+    in `Output ›` only. Recommendation: **(a)**: the same place it is now, one click.
+
 ## Change log
 
 | Date | Change |
 |---|---|
 | 2026-11-12 | Proposed by the desktop coordinator |
+| 2026-11-12 | §10, idea 6 and open questions 11-15 added: volume, the audio output and Bluetooth in the same unit (Stephen, 2026-11-12) |
