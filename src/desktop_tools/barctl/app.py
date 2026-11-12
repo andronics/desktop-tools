@@ -261,19 +261,26 @@ def pin(
     auto: Annotated[
         bool, typer.Option("--auto", help="Unpin: the bar picks the player again.")
     ] = False,
+    toggle: Annotated[
+        bool, typer.Option("--toggle", help="Unpin it instead when it is already pinned.")
+    ] = False,
 ) -> None:
     """Show one player on a player module until it goes.
 
     The module's source (and every module it draws) shows that player while `playerctl -l`
-    lists it; --auto goes back to Playing over Paused over Stopped. The controller holds the
+    lists it; --auto goes back to Playing over Paused over Stopped; --toggle unpins the player
+    when it is already the pinned one (a chip's second click). The controller holds the
     pin in memory: a restart forgets it. Exit 2 for a module the player source doesn't draw, 5
     for a player that isn't listed.
     """
     if auto == (instance is not None):
         typer.echo("barctl pin: give a player or --auto", err=True)
         raise typer.Exit(2)
+    if toggle and instance is None:
+        typer.echo("barctl pin: --toggle needs a player", err=True)
+        raise typer.Exit(2)
     try:
-        pinned = ops.pin(module, instance)
+        pinned = ops.pin(module, instance, toggle)
     except ops.Failure as e:
         raise _fail(e) from None
     typer.echo(f"pinned {pinned}" if pinned else "automatic")

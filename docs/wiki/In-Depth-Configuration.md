@@ -39,12 +39,12 @@ The package ships a default for the live modules (`src/desktop_tools/barctl/modu
 |---|---|
 | `source` | One of barctl's own sources (`volume`, `player`; `printer`, `scanner`, `vpn`, `bluetooth`, `counter` are reserved) |
 | `pusher` | Or: the one outside program allowed to `barctl push` the module (`crew`). Exactly one of the two |
-| `display` | `icon` (the glyph, then the count), `text` (the label, cut to 40 characters), `both`, `capsule` (the player's "now playing" module, below) or `output` (the output segment beside it, below) |
+| `display` | `icon` (the glyph, then the count), `text` (the label, cut to 40 characters), `both`, `capsule` (the player's "now playing" module, below), `output` (the output segment beside it, below) or `chips` (one chip per player, below) |
 | `glyph` | Shown before anything has written the module |
 | `glyph_override` | A glyph that wins over the pusher's or source's: a string (every tier) or a table of tiers (`unavailable`, `idle`, `active`, `alert`; a tier left out shows the pusher's glyph). Precedence for the tier shown (a stale module is `unavailable`): the table's entry, the string, the state's glyph, `glyph`. An empty string hides the glyph. `barctl status --json` gives `glyph_source` (`override-tier`, `override`, `pushed`, `default`) and `glyph_pushed`; `barctl doctor` lists each override (design record 0002 §7) |
 | `separator` | Between segments, for a module of several cells |
 | `[modules.<m>.clicks]` | `left`, `middle`, `right`, `scroll-up`, `scroll-down` = a command as a list; `{target}` is filled from the state, as a whole argument |
-| `[modules.<m>.segment_clicks]` | The same per segment, with `{segment}` |
+| `[modules.<m>.segment_clicks]` | The same per segment, with `{segment}`; a table under it, `[modules.<m>.segment_clicks.<id>]`, is one segment's own clicks, which win button by button for that cell and fall back to the module's (a list is a command, a table a cell's clicks; the id must be a segment id, `[A-Za-z0-9_.-]`, 64 at most, or the file fails to load naming it) |
 | `[[modules.<m>.menu]]` | Right-click rows: `glyph`, `label`, `command`. `right` with no command of its own opens the menu |
 
 `display = "capsule"` (design record 0003 §1-3) draws the `player` source as one module: the play-state glyph (set
@@ -76,7 +76,42 @@ right = ["barmenu", "player"]
 
 The packaged file keeps `player-play-pause` and `player-metadata` and has this capsule as a commented example; the
 source writes every player module the same state, so a capsule can run beside the old buttons. `barctl pin
-player-capsule <instance>` shows one player until it goes (`--auto` undoes it; a controller restart forgets it).
+player-capsule <instance>` shows one player until it goes (`--auto` undoes it; `--toggle` unpins it when it is
+already the pinned one; a controller restart forgets it).
+
+`display = "chips"` (design record 0005 phase A) draws the `player` source as one small chip per MPRIS player, just
+before the capsule: each player's app icon (from the `player` tool's `instances.json`; `glyph` for a player with
+none), in the `active` colour while it plays and `idle` otherwise, in the order each player was first seen (so chips
+keep their places). The shown player's chip is underlined in the accent, and the pinned one also carries md-pin. Each
+chip is a segment whose id is the player's instance name, so `segment_clicks` act on that player. An instance name
+over 64 characters, or one named `more` (the `+N` cell's id), is left out of the chips (it is still in `barmenu players`). Two keys, read only for chips:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `chips_min` | 2 | Fewer players than this and the module draws nothing, a whole number 1-8 |
+| `chips_max` | 4 | At most this many cells; past it the last cell is `+N` (md-dots_horizontal and the count, segment id `more`), a whole number 1-8 |
+
+```toml
+[modules.player-chips]
+source = "player"
+display = "chips"
+glyph = "\U000F075A"
+chips_min = 2
+chips_max = 4
+
+[modules.player-chips.segment_clicks]
+left = ["barctl", "pin", "player-capsule", "{segment}", "--toggle"]
+middle = ["playerctl", "-p", "{segment}", "play-pause"]
+right = ["barmenu", "players"]
+
+[modules.player-chips.segment_clicks.more]
+left = ["barmenu", "players"]
+```
+
+Left pins that player (a second left-click unpins it), middle plays or pauses that player (not the shown one), right
+opens `Players ›`, scroll does nothing. The polybar module is a `custom/ipc` with `hook-0 = barctl render
+player-chips` and no `click-*` lines: each chip carries its own action tags. The packaged file has it as a commented
+example, so a release changes nothing on the bar until the dotfiles turn it on.
 
 `display = "output"` (design record 0003 §10) draws the `volume` source as the output segment, the second half of the
 capsule: the default sink's kind glyph (Bluetooth headphones, other Bluetooth, wired headphones or headset, HDMI, USB,

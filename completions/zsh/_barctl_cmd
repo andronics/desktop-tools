@@ -106,6 +106,7 @@ _barctl_cmd() {
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]' \
                         '--auto[Unpin]' \
+                        '--toggle[Unpin it instead when it is already pinned]' \
                         ':module:_barctl_cmd_modules' \
                         '::instance: '
                     ;;

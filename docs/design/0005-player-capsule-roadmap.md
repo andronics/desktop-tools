@@ -2,7 +2,7 @@
 
 <!-- Add a line for this record to the index in docs/design/README.md (CI checks). -->
 
-Status: Proposed
+Status: Proposed (phase A: Approved and built; phases B-D: Proposed)
 Date: 2026-11-12
 Authors: Stephen Cox (direction, 2026-11-12: ideas 2-5 of record 0003 approved, all four; the old
 `audio-spectrum` module dropped; the old player buttons already retired on his bar); written up by the
@@ -78,6 +78,9 @@ time, beside A; only D's build waits for its numbers. Each phase is its own PR (
 release, and each can stop after it ships without leaving the next half-built.
 
 ### Phase A (idea 4): player chips
+
+Status: Approved (Stephen 2026-11-12, arbiter standing rule), built; open questions 11-13 and the chips' share of
+6 and 19 answered as recommended.
 
 **What it looks like.** A new module, `player-chips`, just before `player-capsule` in the same unit: one
 small chip per MPRIS player, its app icon (from the `player` tool's `instances.json`, as today's glyph),
@@ -489,3 +492,4 @@ from his bar or a live player. Then the trial on his bar, turned on by the dotfi
 | Date | Change |
 |---|---|
 | 2026-11-12 | Proposed by the desktop coordinator, after Stephen approved ideas 2-5 of record 0003 (2026-11-12) |
+| 2026-11-12 | Phase A (player chips) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (11 two or more players, 12 a second click unpins, 13 four then `+N`, and 6 and 19 for the chips) answered as recommended. Phases B-D stay Proposed |
