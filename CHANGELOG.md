@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.13](https://github.com/andronics/desktop-tools/compare/v0.1.12...v0.1.13) (2026-11-12)
+
+
+### ✨ Features
+
+* **crew:** strip, cycle and scroll show favourites plus live coordinators (record 0006) ([#46](https://github.com/andronics/desktop-tools/issues/46)) ([2604651](https://github.com/andronics/desktop-tools/commit/26046513e575f2f326e650ecc4602ab5b83abf9f))
+
+
+### 📚 Documentation
+
+* **design:** propose 0005, the player capsule's roadmap (ideas 2-5) ([#44](https://github.com/andronics/desktop-tools/issues/44)) ([e973abf](https://github.com/andronics/desktop-tools/commit/e973abf0ee2f435300867ddd755fcda562d66974))
+
 ## [0.1.12](https://github.com/andronics/desktop-tools/compare/v0.1.11...v0.1.12) (2026-11-12)
 
 
