@@ -13,7 +13,7 @@ import sys
 import time
 from typing import Any
 
-from desktop_tools.barctl import control, render
+from desktop_tools.barctl import control, render, transport
 from desktop_tools.barctl import modules as mods
 from desktop_tools.barctl import state as st
 from desktop_tools.barctl.store import store
@@ -246,6 +246,80 @@ def menu(name: str) -> mods.Row | None:
         except OSError as e:
             raise Failure(f"{argv[0]}: {e.strerror}", FAILED) from None
     return row
+
+
+# ---------------------------------------------------------------- the transport row
+
+
+def _capsule(name: str) -> mods.Module:
+    found = module(name)
+    if found.display != "capsule":
+        raise Failure(f"{name} is not a capsule: it has no transport row", USAGE)
+    return found
+
+
+def expand(
+    name: str,
+    seconds: float | None = None,
+    off: bool = False,
+    now: float | None = None,
+) -> float | None:
+    """Open a capsule's transport row (record 0005 phase C) for `seconds` (the capsule's
+    `expand_for` when None), or fold it (`off`, or None seconds while it is open: the icon's
+    second click). Writes `expanded_until`, as `alert` writes `alert_until`; the controller's
+    tick redraws it when the time is up, or, with no controller, a detached reload does.
+    Returns when it folds, None when it is folded. Exit 3 when `expand_for` is 0 (the row is
+    off) and it was asked to open."""
+    now = time.time() if now is None else now
+    found = _capsule(name)
+    data = st.read(name) or {}
+    is_open = render.expanded(found, data, now)
+    if seconds is None and not off:
+        off = is_open
+    if not off and found.expand_for <= 0:
+        raise Failure(f"{name}: expand_for is 0, so its transport row is off", REFUSED)
+    if seconds is None:
+        seconds = float(found.expand_for)
+    if seconds < 0 or seconds > mods.CAPSULE_KEYS["expand_for"][2]:
+        raise Failure("--for is 0 to 30 seconds", USAGE)
+    until = None if off or seconds == 0 else now + seconds
+    if until is None and "expanded_until" not in data:
+        return None
+    if until is None:
+        data.pop("expanded_until", None)
+    else:
+        data["expanded_until"] = until
+    data["updated"] = now
+    st.write(found.name, data)
+    if control.request("expand", module=name) is None:
+        polybar.poke(name)
+        if until is not None:
+            _redraw_later(name, seconds)
+    return until
+
+
+def transport_press(name: str, cell: str, now: float | None = None) -> list[str] | None:
+    """A press on a cell of a capsule's transport row (record 0005 phase C): the one
+    `playerctl -p <target>` argument list it maps to, run detached, then the row's count
+    starts again while it is open. None (nothing run) with no target, or nothing to act on."""
+    from desktop_tools.common import procs
+
+    now = time.time() if now is None else now
+    found = _capsule(name)
+    data = st.read(name)
+    try:
+        argv = transport.argv(cell, data)
+    except transport.UnknownCell as e:
+        raise Failure(str(e), USAGE) from None
+    if argv is None:
+        return None
+    try:
+        procs.detach(argv)
+    except OSError as e:
+        raise Failure(f"{argv[0]}: {e.strerror}", FAILED) from None
+    if render.expanded(found, data, now):
+        expand(name, float(found.expand_for), now=now)
+    return argv
 
 
 # ---------------------------------------------------------------- the player's pin

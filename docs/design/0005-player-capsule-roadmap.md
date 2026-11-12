@@ -2,7 +2,7 @@
 
 <!-- Add a line for this record to the index in docs/design/README.md (CI checks). -->
 
-Status: Proposed (phases A and B: Approved and built; phases C-D: Proposed)
+Status: Proposed (phases A-C: Approved and built; phase D: Proposed)
 Date: 2026-11-12
 Authors: Stephen Cox (direction, 2026-11-12: ideas 2-5 of record 0003 approved, all four; the old
 `audio-spectrum` module dropped; the old player buttons already retired on his bar); written up by the
@@ -201,6 +201,13 @@ Only `kind` is kept; the track id, URL and genre are read and dropped (Privacy).
 - Phase C's transport row uses ±30 s for its skip buttons (§C).
 
 ### Phase C (idea 2): the transport row
+
+Status: Approved (Stephen 2026-11-12, arbiter standing rule), built; open questions 2-6 and phase C's share of 19
+answered as recommended: a left-click on the icon opens the row, in place at the capsule's width, an instant swap (the
+wipe waits for phase D and his word after the preview), open 5 s after the last press in the dotfiles (`expand_for`,
+packaged 0: off), per-segment tables and `barctl transport`. Plain `barctl expand` folds a row already open (the
+icon's second click); on a capsule the segment id `icon` is the icon, whose clicks are `icon_clicks`; the row never
+opens on a faded capsule.
 
 **At rest** the capsule is as today: icon and title. **Expanded**, for `expand_for` seconds (default 5,
 0-30; 0 never expands, the packaged default), the same cells (no change of width, so nothing on the bar
@@ -499,3 +506,4 @@ from his bar or a live player. Then the trial on his bar, turned on by the dotfi
 | 2026-11-12 | Proposed by the desktop coordinator, after Stephen approved ideas 2-5 of record 0003 (2026-11-12) |
 | 2026-11-12 | Phase A (player chips) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (11 two or more players, 12 a second click unpins, 13 four then `+N`, and 6 and 19 for the chips) answered as recommended. Phases B-D stay Proposed |
 | 2026-11-12 | Phase B (quiet when idle, spoken-word controls) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (14 shrink to the icon, 15 ten minutes, 16 hidden with `unavailable = ""`, 17 rules 1-4, 18 the speed row in shuffle's place, and 19 for phase B) answered as recommended. Spoken word gets its own switch, `spoken` (default false), so every phase B behaviour is off until a setting turns it on. Phases C-D stay Proposed |
+| 2026-11-12 | Phase C (the transport row) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (2 a left-click on the icon, 3 in place, 4 instant now and a wipe after phase D, 5 five seconds, 6 tables and `barctl transport`, and 19 for phase C) answered as recommended. `expand_for` defaults to 0, so the row is off until a setting turns it on. Phase D stays Proposed |

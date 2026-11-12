@@ -239,7 +239,7 @@ def line(instance: str, status: str, title: str = "t", *extra: str) -> str:
 
 
 def test_the_format_reads_the_three_spoken_word_fields() -> None:
-    assert FORMAT.split(US)[7:] == ["{{mpris:trackid}}", "{{xesam:url}}", "{{xesam:genre}}"]
+    assert FORMAT.split(US)[7:10] == ["{{mpris:trackid}}", "{{xesam:url}}", "{{xesam:genre}}"]
 
 
 def test_status_at_follows_the_shown_players_status_and_who_is_shown(

@@ -23,6 +23,8 @@ VERBS = [
     "menu",
     "click",
     "pin",
+    "expand",
+    "transport",
     "reload",
     "restart",
     "theme",

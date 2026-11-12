@@ -26,6 +26,11 @@ wrote it:
                  became the shown one (record 0005 phase B: the capsule's fade clock)
     kind         `spoken` (a podcast or audiobook, record 0005 phase B) or empty: the player
                  menu's skip step and speed row
+    loop         the shown player's loop mode, `None`, `Track` or `Playlist` (record 0005 phase
+                 C: the transport row's loop button); absent when the player gives none
+    shuffle      true or false, the shown player's shuffle; absent when it gives none
+    expanded_until  epoch seconds: until then a capsule shows its transport row in place of
+                 its title (`barctl expand`, record 0005 phase C)
     source       who wrote it
     updated      epoch seconds
 
@@ -64,8 +69,12 @@ FIELDS = (
     "notice_until",
     "status_at",
     "kind",
+    "loop",
+    "shuffle",
+    "expanded_until",
 )
 KINDS = ("", "spoken")
+LOOPS = ("None", "Track", "Playlist")  # MPRIS LoopStatus, as playerctl prints it
 PROGRESS_FIELDS = ("position", "length", "rate", "at", "playing")
 VOLUME_MAX = 1000  # percent: pulse allows past 100 (153 is the usual top); past this, a mistake
 RATE_MAX = 16.0  # MPRIS lets a player say any rate; past this it is a mistake, not a speed
@@ -259,6 +268,16 @@ def validate(data: object) -> State:
             raise StateError("kind must be spoken or empty")
         if data["kind"]:
             out["kind"] = str(data["kind"])
+    if data.get("loop") not in (None, ""):
+        if data["loop"] not in LOOPS:
+            raise StateError(f"loop must be one of {', '.join(LOOPS)} or empty")
+        out["loop"] = str(data["loop"])
+    if data.get("shuffle") is not None:
+        if not isinstance(data["shuffle"], bool):
+            raise StateError("shuffle must be true, false or null")
+        out["shuffle"] = data["shuffle"]
+    if data.get("expanded_until") is not None:
+        out["expanded_until"] = _time(data["expanded_until"], "expanded_until")
     if "segments" in data and data["segments"] is not None:
         segs = data["segments"]
         if not isinstance(segs, list):

@@ -45,7 +45,10 @@ logout); barctl's journal lines name the module and button, never the label, and
 the player's state. `barctl status` shows the label to the user's own processes, as before. The player chips
 (design record 0005 phase A) hold only player instance names and icons, already in `barctl status`; a chip's click
 fills `{segment}` with that name as one whole argument, and the name must pass the segment-id check (no space, colon
-or `%`) before it goes into an action tag. Spoken-word detection (design record 0005 phase B, `spoken = true`) reads
+or `%`) before it goes into an action tag. The transport row (design record 0005 phase C) adds only barctl's own
+cells: its segment ids are fixed words (`previous` … `seek-15`), never a writer's text, and `barctl transport` maps
+each to one `playerctl -p <instance>` argument list (a seek's seconds worked out from the state's length, never
+passed in); an unknown cell is refused. While the row shows, the title is not drawn at all. Spoken-word detection (design record 0005 phase B, `spoken = true`) reads
 the track id, URL and genre to work out `kind` and keeps them nowhere: not in the state file, not in the journal;
 only `kind` is kept. Its only `busctl` call in the source is a read (`get-property Rate`); the speed row in `barmenu
 player` runs `busctl --user set-property … Rate d <value>` only when picked, as an argument list, the bus name built

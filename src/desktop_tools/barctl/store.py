@@ -39,6 +39,13 @@ def shown(module: Module, state: st.State | None, now: float | None = None) -> t
             bool(progress.get("playing")),
             state.get("accent"),
             state.get("status_at"),  # the fade's clock (record 0005 phase B)
+            # The transport row's buttons (record 0005 phase C) show the loop and shuffle
+            # modes and the skip step, but only while it is open: at rest they poke nothing.
+            *(
+                (state.get("loop"), state.get("shuffle"), state.get("kind"))
+                if float(state.get("expanded_until") or 0) > now
+                else ()
+            ),
         )
     elif module.display == "chips":
         parts = ()  # its segments are all it shows
@@ -90,10 +97,11 @@ def store(
 
 class Writer:
     """How a source sets its modules: tier, glyph, label, count, detail, target, the player's
-    progress, accent, status clock and kind, the output segment's numbers and notice, and the
-    cells of a module made of several (the player chips'), nothing else. An alert
-    someone set on the module is kept, and so is when the label last changed (`label_since`, the
-    capsule's scroll clock) while the label is the same. A source may start an alert of its own
+    progress, accent, status clock and kind, loop and shuffle, the output segment's numbers and
+    notice, and the cells of a module made of several (the player chips'), nothing else. An
+    alert someone set on the module is kept, and so is an open transport row (`expanded_until`,
+    record 0005 phase C) and when the label last changed (`label_since`, the capsule's scroll
+    clock) while the label is the same. A source may start an alert of its own
     (`alert_for` seconds, record 0004 §1: an alert that appears blinks once); `follow` (the
     controller's) is told, so the blink is drawn."""
 
@@ -124,6 +132,8 @@ class Writer:
         notice_until: float | None = None,
         status_at: float | None = None,
         kind: str = "",
+        loop: str = "",
+        shuffle: bool | None = None,
         alert_for: float | None = None,
         now: float | None = None,
     ) -> bool:
@@ -156,9 +166,15 @@ class Writer:
             new["status_at"] = status_at
         if kind:
             new["kind"] = kind
+        if loop:
+            new["loop"] = loop
+        if shuffle is not None:
+            new["shuffle"] = shuffle
         old = st.read(name)
         if old and old.get("alert_until"):
             new["alert_until"] = old["alert_until"]
+        if old and float(old.get("expanded_until") or 0) > now:
+            new["expanded_until"] = old["expanded_until"]
         if alert_for:
             new["alert_until"] = max(now + alert_for, float(new.get("alert_until") or 0))
         if label:

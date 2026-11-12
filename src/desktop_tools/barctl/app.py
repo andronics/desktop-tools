@@ -287,6 +287,65 @@ def pin(
 
 
 @app.command()
+def expand(
+    module: ModuleArg,
+    for_: Annotated[
+        str | None,
+        typer.Option("--for", help="How long it stays open: 5s (0 to 30s); default expand_for."),
+    ] = None,
+    off: Annotated[bool, typer.Option("--off", help="Fold it now.")] = False,
+) -> None:
+    """Open a capsule's transport row, or fold it: the icon's left-click.
+
+    The capsule shows previous, play-pause, next, loop, shuffle and a seek bar in place of its
+    title, in the same width, for the capsule's `expand_for` seconds (design record 0005 phase
+    C); run again while it is open, it folds. --for opens it (or keeps it open) that long;
+    --off folds it. Exit 3 when `expand_for` is 0 (the row is off), 2 for a module that is
+    not a capsule.
+    """
+    seconds = None
+    if for_ is not None:
+        try:
+            seconds = st.duration(for_)
+        except ValueError as e:
+            typer.echo(f"barctl expand: {e}", err=True)
+            raise typer.Exit(2) from None
+    if off and seconds is not None:
+        typer.echo("barctl expand: give --for or --off, not both", err=True)
+        raise typer.Exit(2)
+    try:
+        until = ops.expand(module, seconds, off)
+    except ops.Failure as e:
+        raise _fail(e) from None
+    typer.echo(f"open until {ops.iso(until)}" if until else "folded")
+
+
+@app.command()
+def transport(
+    module: ModuleArg,
+    cell: Annotated[
+        str,
+        typer.Argument(
+            help="previous, play-pause, next, loop, shuffle, back, forward or seek-0 to seek-15."
+        ),
+    ],
+) -> None:
+    """Press a cell of a capsule's transport row: what its cells' clicks run.
+
+    Runs one `playerctl -p <player>` command, detached, for the player the capsule shows:
+    previous, play-pause, next; loop steps None, Track, Playlist; shuffle toggles; seek-<i>
+    goes to i/16 of the track; back and forward skip 10 s (30 s for spoken word). Then the row
+    stays open another `expand_for` seconds. With no player shown it runs nothing.
+    """
+    try:
+        argv = ops.transport_press(module, cell)
+    except ops.Failure as e:
+        raise _fail(e) from None
+    if argv is None:
+        typer.echo("nothing to act on")
+
+
+@app.command()
 def reload(module: Annotated[str | None, typer.Argument(help="One module.")] = None) -> None:
     """Redraw every module, or one, without restarting polybar.
 

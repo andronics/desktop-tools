@@ -11,11 +11,14 @@
     # glyph_override = { idle = "\\U000F099D", alert = "\\U000F0ECC" }  # per tier; others unchanged
     separator = " "              # between segments, for a module made of several cells
     # width, scroll, scroll_rest, accent: for display = "capsule" only (record 0003 §2), and
-    # fade_after, spoken, spoken_players (record 0005 phase B)
+    # fade_after, spoken, spoken_players (record 0005 phase B), expand_for (phase C)
     # chips_min, chips_max: for display = "chips" only (record 0005 phase A)
 
     [modules.audio-level.clicks] # button -> command; {target} and {segment} are filled in
     left = ["audio", "mute-toggle"]
+
+    [modules.player-capsule.icon_clicks]       # a capsule's icon alone (record 0005 phase C)
+    left = ["barctl", "expand", "player-capsule"]
 
     [modules.player-chips.segment_clicks]      # a module of cells: one command per button
     left = ["barctl", "pin", "player-capsule", "{segment}", "--toggle"]
@@ -55,6 +58,7 @@ CAPSULE_KEYS: dict[str, tuple[float, float, float]] = {
     "scroll": (2.0, 0, 4),
     "scroll_rest": (10.0, 0, 120),
     "fade_after": (0, 0, 240),  # minutes paused before the capsule fades to its icon; 0 never
+    "expand_for": (0, 0, 30),  # seconds the transport row stays open (record 0005 C); 0 never
 }
 # The chips' keys (record 0005 phase A): (default, lowest, highest); read only for `chips`.
 CHIPS_KEYS: dict[str, tuple[float, float, float]] = {
@@ -63,6 +67,7 @@ CHIPS_KEYS: dict[str, tuple[float, float, float]] = {
 }
 TIERS = ("unavailable", "idle", "active", "alert")  # state.TIERS, kept here (no import cycle)
 OVERRIDE_ORDER = ("idle", "active", "alert", "unavailable")  # how doctor lists a table's tiers
+ICON = "icon"  # a capsule's icon, as a segment id: its clicks are `icon_clicks` (record 0005 C)
 PACKAGED = Path(__file__).with_name("modules.toml")
 
 
@@ -102,9 +107,11 @@ class Module:
         "chips_min",
         "clicks",
         "display",
+        "expand_for",
         "fade_after",
         "glyph",
         "glyph_override",
+        "icon_clicks",
         "menu",
         "name",
         "pusher",
@@ -141,6 +148,8 @@ class Module:
         fade_after: int = 0,
         spoken: bool = False,
         spoken_players: tuple[str, ...] = (),
+        expand_for: int = 0,
+        icon_clicks: dict[str, list[str]] | None = None,
     ) -> None:
         self.name, self.source, self.pusher = name, source, pusher
         self.width, self.scroll, self.scroll_rest, self.accent = width, scroll, scroll_rest, accent
@@ -151,6 +160,7 @@ class Module:
         self.cell_clicks = cell_clicks or {}
         self.chips_min, self.chips_max = chips_min, chips_max
         self.fade_after, self.spoken, self.spoken_players = fade_after, spoken, spoken_players
+        self.expand_for, self.icon_clicks = expand_for, icon_clicks or {}
         self.menu = menu or []
 
     @property
@@ -181,9 +191,12 @@ class Module:
     def clicks_for(self, segment: str | None) -> dict[str, list[str]]:
         """button -> command for a click on the module (None) or on one of its cells: the
         cell's own table (`segment_clicks.<id>`) wins, button by button, over the module's
-        `segment_clicks` (record 0005 phase A)."""
+        `segment_clicks` (record 0005 phase A). On a capsule, the segment `icon` is its icon,
+        whose clicks are `icon_clicks` alone (record 0005 phase C)."""
         if segment is None:
             return self.clicks
+        if segment == ICON and self.display == "capsule":
+            return self.icon_clicks
         return {**self.segment_clicks, **self.cell_clicks.get(segment, {})}
 
     def has_menu(self) -> bool:
@@ -211,6 +224,8 @@ class Module:
                 fade_after=self.fade_after,
                 spoken=self.spoken,
                 spoken_players=list(self.spoken_players),
+                expand_for=self.expand_for,
+                icon_clicks=self.icon_clicks,
             )
         if self.display == "chips":
             out.update(chips_min=self.chips_min, chips_max=self.chips_max)
@@ -300,7 +315,7 @@ def _override(value: object, where: str) -> str | dict[str, str] | None:
 def _number(table: dict[str, object], key: str, where: str) -> float:
     default, low, high = CAPSULE_KEYS.get(key) or CHIPS_KEYS[key]
     value = table.get(key, default)
-    whole = key in ("width", "fade_after", *CHIPS_KEYS)
+    whole = key in ("width", "fade_after", "expand_for", *CHIPS_KEYS)
     if isinstance(value, bool) or not isinstance(value, int if whole else (int, float)):
         raise ConfigError(f"{where}: {key} must be {'a whole number' if whole else 'a number'}")
     if not low <= value <= high:
@@ -328,6 +343,8 @@ def _capsule(module: Module, raw: dict[str, object], where: str) -> Module:
     if not isinstance(players, list) or not all(isinstance(n, str) and n for n in players):
         raise ConfigError(f"{where}: spoken_players must be a list of player names")
     module.spoken_players = tuple(str(n) for n in players)
+    module.expand_for = int(_number(raw, "expand_for", where))
+    module.icon_clicks = _clicks(raw.get("icon_clicks"), f"{where}.icon_clicks")
     return module
 
 

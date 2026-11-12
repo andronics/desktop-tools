@@ -61,6 +61,8 @@ These keys are read only for a capsule; a value out of range or of the wrong typ
 | `fade_after` | 0 | Minutes the shown player may be paused or stopped before the capsule draws its icon alone, in the `idle` colour, giving its width back to the bar; a whole number 0-240, 0 never (design record 0005 phase B). Playing again (from any player, a key, a chip or a left-click on the icon) brings it back |
 | `spoken` | `false` | Podcasts and audiobooks (design record 0005 phase B): `true` lets the source mark spoken word (below), which gives `barmenu player` ±30 s skips and a speed row and moves the line at the player's rate |
 | `spoken_players` | `[]` | Player names always taken as spoken word when `spoken = true`, any case, e.g. `["gpodder", "cozy", "kasts"]` |
+| `expand_for` | 0 | Seconds the transport row stays open after `barctl expand` or the last press in it, a whole number 0-30; 0 never opens it (design record 0005 phase C, below) |
+| `[modules.<m>.icon_clicks]` | none | Button = command for the icon alone, inside the capsule's own clicks (the inner tag wins): the transport row's opener |
 
 ```toml
 [modules.player-capsule]
@@ -87,6 +89,31 @@ minutes shows only its `idle` icon; nothing is written then (render works it out
 the controller pokes it once at that minute. To hide the capsule when there is no player at all, give it
 `glyph_override.unavailable = ""`: an empty `custom/ipc` module is not drawn, and the output segment beside it stays.
 Both are off in the packaged file and in a capsule without the keys.
+
+**The transport row** (design record 0005 phase C). Polybar has no hover, so a left-click on the capsule's icon opens
+it: for `expand_for` seconds the same cells (the capsule's `width`: nothing on the bar moves) show previous,
+play-pause, next, loop (off, track or playlist, by the player's mode) and shuffle (on or off), then a 16-cell seek bar,
+`━` in the accent up to the position and `─` in `idle` after it, each cell seeking to its place. With no length (a
+stream), or a capsule narrower than 24 cells, back and forward buttons (10 s; 30 s for spoken word) take the seek
+bar's place; loop or shuffle is left out when the player gives none. A left-click on the title is still play-pause; on
+the icon again it folds the row; every press in the row keeps it open another `expand_for` seconds. The swap is
+instant (one redraw). Three entries turn it on:
+
+```toml
+[modules.player-capsule]
+expand_for = 5
+
+[modules.player-capsule.icon_clicks]
+left = ["barctl", "expand", "player-capsule"]
+
+[modules.player-capsule.segment_clicks]
+left = ["barctl", "transport", "player-capsule", "{segment}"]
+```
+
+The row's cells are segments `previous`, `play-pause`, `next`, `loop`, `shuffle`, `back`, `forward` and `seek-0` to
+`seek-15`; on a capsule the segment `icon` is the icon, whose clicks are `icon_clicks`. While the row is open, a press
+between cells does nothing; middle, scroll and right keep the capsule's own commands. It is off in the packaged file
+and in a capsule without the keys, and it never opens on a faded capsule.
 
 **Spoken word.** With `spoken = true`, the shown player plays spoken word (the state's `kind` is `spoken`) when the
 first of these matches: the track id or URL names an episode (`spotify:episode:`, `/episode/`); the genre contains
