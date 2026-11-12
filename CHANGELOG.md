@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/andronics/desktop-tools/compare/v0.1.14...v0.1.15) (2026-11-12)
+
+
+### ✨ Features
+
+* **barctl:** the capsule's transport row (record 0005 phase C) ([#50](https://github.com/andronics/desktop-tools/issues/50)) ([d8830e0](https://github.com/andronics/desktop-tools/commit/d8830e02adb3602416bc316ab3d64ffccc22c9d2))
+
 ## [0.1.14](https://github.com/andronics/desktop-tools/compare/v0.1.13...v0.1.14) (2026-11-12)
 
 
