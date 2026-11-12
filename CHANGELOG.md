@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/andronics/desktop-tools/compare/v0.1.15...v0.1.16) (2026-11-12)
+
+
+### ✨ Features
+
+* **barctl:** the visualiser strip (record 0005 phase D) ([#52](https://github.com/andronics/desktop-tools/issues/52)) ([959f402](https://github.com/andronics/desktop-tools/commit/959f402e33af6245af2b315118aa557a679316c5))
+
 ## [0.1.15](https://github.com/andronics/desktop-tools/compare/v0.1.14...v0.1.15) (2026-11-12)
 
 
