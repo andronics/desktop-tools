@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.12](https://github.com/andronics/desktop-tools/compare/v0.1.11...v0.1.12) (2026-11-12)
+
+
+### ✨ Features
+
+* **devices,barctl,barmenu:** printer and scanner modules (record 0004) ([#42](https://github.com/andronics/desktop-tools/issues/42)) ([31603a3](https://github.com/andronics/desktop-tools/commit/31603a3c12052244295d40f40a90443c68e0f6a2))
+
 ## [0.1.11](https://github.com/andronics/desktop-tools/compare/v0.1.10...v0.1.11) (2026-11-12)
 
 
