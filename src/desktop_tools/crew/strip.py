@@ -14,7 +14,7 @@ Standard library only: `crew bar` and every Claude hook's refresh run it.
 from __future__ import annotations
 
 from desktop_tools.crew import conf, log, store, tmux, wm
-from desktop_tools.crew.registry import Registry
+from desktop_tools.crew.registry import Coordinator, Registry
 
 MODULE = "crew"
 SOURCE = "crew"
@@ -55,9 +55,23 @@ def scan(reg: Registry, tree: wm.Tree | None = None, sessions: set[str] | None =
     return found
 
 
+def visible(reg: Registry, found: Scan) -> list[Coordinator]:
+    """The coordinators the strip, `crew cycle` and the scroll show, in menu order (record 0006):
+    a favourite, or one running, or one shown (never hidden while shown). When no entry in the
+    registry says `favourite` (an older copy), all of them. The full menu and the verbs use
+    `reg.coordinators`, not this."""
+    if not reg.favourites_told:
+        return list(reg.coordinators)
+    return [
+        c
+        for c in reg.coordinators
+        if c.favourite or c.name in found.running or c.name in found.shown
+    ]
+
+
 def segments(reg: Registry, found: Scan) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
-    for c in reg.coordinators:
+    for c in visible(reg, found):
         cell: dict[str, object] = {
             "id": c.name,
             "tier": TIERS[found.activity(c.name)],

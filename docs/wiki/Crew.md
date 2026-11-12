@@ -42,6 +42,9 @@ live until the cut-over, and for 30 days after it as an alias.
   when waiting for an answer, underlined when shown. crew pushes it to barctl's `crew` module; barctl draws it. A
   left click on a glyph shows or hides that coordinator (`crew toggle --launch`), a right click opens its quick menu
   (`crew quick <name>`), a middle click anywhere on the strip opens the full menu (`crew menu`), and scrolling cycles.
+  Only favourites (`favourite: true` in the registry) and coordinators with a live session are on the strip and in
+  `crew cycle` and the scroll (record 0006); when no registry entry carries `favourite`, all are. The full menu, `crew
+  list` and the lifecycle verbs reach every coordinator, shown or not.
 - **The menus.** See [the menus](#the-menus) below.
 - **The Claude hooks.** `crew status` reads a Claude Code hook's JSON on stdin and records the coordinator busy,
   idle or waiting. Entering waiting raises a notification whose click shows it.
