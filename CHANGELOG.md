@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.14](https://github.com/andronics/desktop-tools/compare/v0.1.13...v0.1.14) (2026-11-12)
+
+
+### ✨ Features
+
+* **barctl:** player chips and per-segment click tables (record 0005 phase A) ([#47](https://github.com/andronics/desktop-tools/issues/47)) ([a31f76d](https://github.com/andronics/desktop-tools/commit/a31f76d3c98c2e6b22fd3853d835eb2e265cc86e))
+* **barctl:** quiet when idle and spoken-word controls (record 0005 phase B) ([#49](https://github.com/andronics/desktop-tools/issues/49)) ([9be18b3](https://github.com/andronics/desktop-tools/commit/9be18b3b2ded24600c84ffd0d4c0a114ea1e049d))
+
 ## [0.1.13](https://github.com/andronics/desktop-tools/compare/v0.1.12...v0.1.13) (2026-11-12)
 
 
