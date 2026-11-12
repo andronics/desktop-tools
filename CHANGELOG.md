@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/andronics/desktop-tools/compare/v0.1.10...v0.1.11) (2026-11-12)
+
+
+### ✨ Features
+
+* **barctl,barmenu:** the output segment and barmenu outputs (record 0003 §10) ([#40](https://github.com/andronics/desktop-tools/issues/40)) ([7813b6a](https://github.com/andronics/desktop-tools/commit/7813b6ac8211b2a68ebb313d937f609954c3912b))
+
 ## [0.1.10](https://github.com/andronics/desktop-tools/compare/v0.1.9...v0.1.10) (2026-11-12)
 
 
