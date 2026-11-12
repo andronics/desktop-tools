@@ -98,6 +98,24 @@ barmenu (rofi) above the module.
 |---|---|
 | `MODULE` | A module, as `barctl list` names it. |
 
+### `desktop-tools barctl pin`
+
+Show one player on a player module until it goes.
+
+The module's source (and every module it draws) shows that player while `playerctl -l`
+lists it; --auto goes back to Playing over Paused over Stopped. The controller holds the
+pin in memory: a restart forgets it. Exit 2 for a module the player source doesn't draw, 5
+for a player that isn't listed.
+
+| Argument | Description |
+|---|---|
+| `MODULE` | A module, as `barctl list` names it. |
+| `INSTANCE` | A player, as `playerctl -l` names it. |
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--auto` |  | Unpin: the bar picks the player again. |
+
 ### `desktop-tools barctl push`
 
 Set a module's state: the only way another tool changes the bar.
@@ -227,6 +245,14 @@ Every menu's name, one per line (for completion).
 ### `desktop-tools barmenu lock`
 
 Lock menu: rows from the lock provider
+
+### `desktop-tools barmenu player`
+
+Player menu: rows from the player provider
+
+### `desktop-tools barmenu players`
+
+Players menu: rows from the players provider
 
 ### `desktop-tools barmenu run`
 

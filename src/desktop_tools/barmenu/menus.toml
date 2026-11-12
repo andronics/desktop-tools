@@ -92,3 +92,20 @@ glyph = "\U000F033E" # md-lock
 title = "Passwords"
 side = "right"
 provider = "tessera"
+
+# Record 0003 §4: rows from barmenu/providers/player.py (next, previous, loop and shuffle marked,
+# the player choice, seeking), on the player barctl's player-capsule shows. Opened by its
+# right-click.
+[menus.player]
+glyph = "\U000F0387" # md-music_note
+title = "Player"
+side = "right"
+provider = "player"
+
+# Record 0003 §4: rows from barmenu/providers/players.py (every player, the shown one marked,
+# then Automatic); a pick pins it with `barctl pin player-capsule`.
+[menus.players]
+glyph = "\U000F0387" # md-music_note
+title = "Players"
+side = "right"
+provider = "players"

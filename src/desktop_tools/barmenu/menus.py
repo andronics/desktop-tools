@@ -322,8 +322,11 @@ def open_menu(menu: Menu, extra: list[str] | None = None) -> Row | None:
     if picked is None:
         return None
     row = menu.rows[picked]
+    argv = row.argv()
+    if not argv:  # a row that only says something (a provider's `No player`): nothing runs
+        return row
     settle(menu.settle)
-    procs.detach(row.argv())
+    procs.detach(argv)
     return row
 
 

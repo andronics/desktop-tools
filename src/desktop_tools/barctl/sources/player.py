@@ -1,30 +1,54 @@
 """player: every MPRIS player, from `playerctl -a --follow metadata`, shown as one (record 0001,
-question 3): Playing beats Paused beats Stopped, then the player whose status changed most
-recently.
+question 3): the pinned player while it is listed (record 0003 §5, `barctl pin`), else Playing
+beats Paused beats Stopped, then the player whose status changed most recently.
 
 Every module this source draws gets the same state: the glyph is the player's icon then its
-state's (from the `player` tool's instances.json and states.json), the label "artist: title" cut
-to 40 characters, and the target the player's instance name, so a click acts on the player the
-bar shows. Each module's display picks what it shows (player-play-pause the glyph,
-player-metadata the label). Unavailable with no player, idle paused or stopped, active playing.
+state's (from the `player` tool's instances.json and states.json), the label "Artist DASH
+Title" (an en dash), whole up to LABEL_MAX characters (`text` and `both` show 40 of it,
+`capsule` scrolls it), the target the player's instance name, so a click acts on the player
+the bar shows, and `progress` (position, length, rate, when it was read, whether it plays),
+for the capsule's line. Each
+module's display picks what it shows. Unavailable with no player, idle paused or stopped, active
+playing. A module with `accent = "art"` also gets the cover's colour (barctl/art.py).
+
+The position is not in the followed format (playerctl may re-print one with `{{position}}`
+every second): it is read with `playerctl -p <shown> position` on each event of the shown player
+and every POSITION_EVERY seconds while it plays, and render moves it on from the time. Nothing
+here controls a player: the only playerctl calls are the stream, `-l`, `position` (no value)
+and `metadata`.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+import threading
+import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
+from desktop_tools.barctl import art
 from desktop_tools.barctl import state as st
 from desktop_tools.barctl.modules import Row
-from desktop_tools.barctl.render import METADATA_MAX
 from desktop_tools.barctl.sources.base import Source
 from desktop_tools.barctl.store import Writer
 from desktop_tools.common import paths, procs
 
 US = "\x1f"
-FORMAT = US.join(("{{playerInstance}}", "{{playerName}}", "{{status}}", "{{artist}}", "{{title}}"))
+FIELDS = (
+    "{{playerInstance}}",
+    "{{playerName}}",
+    "{{status}}",
+    "{{artist}}",
+    "{{title}}",
+    "{{mpris:length}}",
+    "{{mpris:artUrl}}",
+)
+FORMAT = US.join(FIELDS)
 RANK = {"Playing": 3, "Paused": 2, "Stopped": 1}
+LABEL_MAX = 200
+DASH = "\u2013"  # an en dash between artist and title
+POSITION_EVERY = 30.0  # seconds between position re-reads while the shown player plays
+RATE = 1.0  # MPRIS Rate is idea 5's; the field is in `progress` already
 
 
 def _icons(file: str, field: str, fallback: str) -> dict[str, str]:
@@ -46,8 +70,18 @@ def player_icon(icons: dict[str, str], name: str) -> str:
 
 
 def track(artist: str, title: str) -> str:
-    text = f"{artist}: {title}" if artist and title else artist + title
-    return text if len(text) <= METADATA_MAX else text[: METADATA_MAX - 1] + "…"
+    """`Artist DASH Title` (an en dash), whole up to LABEL_MAX characters."""
+    text = f"{artist} {DASH} {title}" if artist and title else artist + title
+    return text if len(text) <= LABEL_MAX else text[: LABEL_MAX - 1] + "…"
+
+
+def seconds(micro: str) -> float | None:
+    """mpris:length (microseconds) in seconds; None when unknown (a stream gives none)."""
+    try:
+        value = int(micro.strip())
+    except ValueError:
+        return None
+    return value / 1_000_000 if value > 0 else None
 
 
 @dataclass
@@ -56,6 +90,8 @@ class Player:
     name: str
     track: str
     seq: int
+    length: float | None = None
+    art: str = ""
 
 
 class PlayerSource(Source):
@@ -68,9 +104,21 @@ class PlayerSource(Source):
         self.tick = 0
         self.names = _icons("instances.json", "name", "default")
         self.states = _icons("states.json", "state", "stopped")
+        self.pinned: str | None = None
+        # instance -> (position in seconds, None when it couldn't be read; when it was read):
+        # the shown player's, mostly. A failed read waits POSITION_EVERY like a good one.
+        self.positions: dict[str, tuple[float | None, float]] = {}
+        self.colours: dict[str, str | None] = {}  # art URL -> its accent (None: none)
+        self.fetching: set[str] = set()
+        self.lock = threading.RLock()
+        self.clock: Callable[[], float] = time.time
+
+    # ------------------------------------------------------------ the shown player
 
     def pick(self) -> str | None:
         """The shown player's instance, or None with no player."""
+        if self.pinned is not None and self.pinned in self.players:
+            return self.pinned
         best: tuple[int, int] | None = None
         chosen = None
         for instance, p in self.players.items():
@@ -79,54 +127,195 @@ class PlayerSource(Source):
                 best, chosen = key, instance
         return chosen
 
+    def listed(self) -> set[str]:
+        return set((procs.query(["playerctl", "-l"]) or "").split())
+
     def prune(self) -> None:
         """Forget players playerctl no longer lists: `--follow` prints an empty line when one
-        goes, but not always before the next event."""
-        out = procs.query(["playerctl", "-l"])
-        live = set((out or "").split())
+        goes, but not always before the next event. A pin ends with its player."""
+        live = self.listed()
         for instance in list(self.players):
             if instance not in live:
                 del self.players[instance]
+                self.positions.pop(instance, None)
+        if self.pinned is not None and self.pinned not in live:
+            self.pinned = None
+
+    def parse(self, line: str) -> str | None:
+        """One line of the stream into the players: its instance, or None for an empty one."""
+        fields = line.split(US)
+        if len(fields) < 5 or not fields[0]:
+            return None
+        instance, name, status, artist, title = fields[:5]
+        length = seconds(fields[5]) if len(fields) > 5 else None
+        art_url = fields[6].strip() if len(fields) > 6 else ""
+        old = self.players.get(instance)
+        if old is None or old.status != status:
+            self.tick += 1
+            seq = self.tick
+        else:
+            seq = old.seq
+        self.players[instance] = Player(status, name, track(artist, title), seq, length, art_url)
+        return instance
 
     def event(self, line: str) -> None:
-        """One line of the stream: instance, name, status, artist, title."""
-        fields = line.split(US)
-        if len(fields) >= 5 and fields[0]:
-            instance, name, status, artist, title = fields[:5]
-            old = self.players.get(instance)
-            if old is None or old.status != status:
-                self.tick += 1
-                seq = self.tick
+        """One line of the stream: instance, name, status, artist, title, length, art."""
+        with self.lock:
+            instance = self.parse(line)
+            self.prune()
+            shown = self.pick()
+            if shown is not None and (instance == shown or shown not in self.positions):
+                self.read_position(shown)
+            self.update()
+
+    def read_position(self, instance: str) -> None:
+        """`playerctl -p <instance> position`: the one query that reads where a track is. It
+        is given no value, so it never seeks."""
+        out = procs.query(["playerctl", "-p", instance, "position"])
+        try:
+            position: float | None = max(0.0, float((out or "").strip()))
+        except ValueError:
+            position = None
+        self.positions[instance] = (position, self.clock())
+
+    def refresh(self, now: float | None = None) -> bool:
+        """Re-read the shown player's position if it plays and the last read is
+        POSITION_EVERY seconds old (it catches seeks made elsewhere). Returns whether it read."""
+        now = self.clock() if now is None else now
+        with self.lock:
+            shown = self.pick()
+            if shown is None or self.players[shown].status != "Playing":
+                return False
+            last = self.positions.get(shown)
+            if last is not None and now - last[1] < POSITION_EVERY:
+                return False
+            self.read_position(shown)
+            self.update()
+            return True
+
+    def pin(self, instance: str | None) -> str | None:
+        """Show this player while it is listed (None: back to the rank). Returns the pin.
+        Raises LookupError when playerctl doesn't list it."""
+        with self.lock:
+            if instance is None:
+                self.pinned = None
             else:
-                seq = old.seq
-            self.players[instance] = Player(status, name, track(artist, title), seq)
-        self.prune()
-        self.update()
+                if instance not in self.listed():
+                    raise LookupError(f"no player {instance!r} (playerctl -l lists them)")
+                if instance not in self.players:
+                    out = procs.query(["playerctl", "-p", instance, "metadata", "--format", FORMAT])
+                    if not out or self.parse(out.splitlines()[0]) is None:
+                        self.players[instance] = Player("Stopped", instance.split(".")[0], "", 0)
+                self.pinned = instance
+                self.read_position(instance)
+            self.update()
+            return self.pinned
+
+    # ------------------------------------------------------------ writing
+
+    def wants_art(self) -> bool:
+        return any(
+            (m := self.writer.modules.get(name)) is not None and m.accent == "art"
+            for name in self.modules
+        )
+
+    def accent_for(self, url: str) -> str | None:
+        """The art's colour if it is known; a fetch started for a new URL, once."""
+        if not url or not self.wants_art():
+            return None
+        if url in self.colours:
+            return self.colours[url]
+        if url not in self.fetching:
+            self.fetching.add(url)
+            threading.Thread(target=self._fetch, args=(url,), name="art", daemon=True).start()
+        return None
+
+    def _fetch(self, url: str) -> None:
+        try:
+            found = art.colour(url)
+        except OSError:
+            found = None
+        with self.lock:
+            self.colours[url] = found
+            self.fetching.discard(url)
+            if len(self.colours) > art.CACHE_MAX:
+                self.colours.pop(next(iter(self.colours)))
+            if not self.stopping:
+                self.update()
+
+    def progress(self, instance: str, p: Player) -> st.State | None:
+        read = self.positions.get(instance)
+        if read is None or read[0] is None:
+            return None
+        return {
+            "position": read[0],
+            "length": p.length,
+            "rate": RATE,
+            "at": read[1],
+            "playing": p.status == "Playing",
+        }
 
     def update(self) -> None:
-        instance = self.pick()
-        if instance is None:
-            self.set_all("unavailable")
-            return
-        p = self.players[instance]
-        tier = "active" if p.status == "Playing" else "idle"
-        icon = player_icon(self.names, p.name)
-        state_icon = player_icon(self.states, p.status.lower())
-        glyph = " ".join(g for g in (icon, state_icon) if g)
-        self.set_all(tier, glyph=glyph, label=p.track, target=instance)
+        with self.lock:
+            instance = self.pick()
+            if instance is None:
+                self.set_all("unavailable")
+                return
+            p = self.players[instance]
+            tier = "active" if p.status == "Playing" else "idle"
+            icon = player_icon(self.names, p.name)
+            state_icon = player_icon(self.states, p.status.lower())
+            glyph = " ".join(g for g in (icon, state_icon) if g)
+            progress = self.progress(instance, p)
+            accent = self.accent_for(p.art)
+            now = self.clock()
+            for name in self.modules:
+                module = self.writer.modules.get(name)
+                self.writer.set(
+                    name,
+                    self.name,
+                    tier,
+                    glyph=glyph,
+                    label=p.track,
+                    target=instance,
+                    progress=progress,
+                    accent=accent if module is not None and module.accent == "art" else None,
+                    now=now,
+                )
 
-    def follow(self) -> None:
-        self.players.clear()
-        self.update()
-        stream = self.stream(["playerctl", "-a", "--follow", "metadata", "--format", FORMAT])
-        for line in stream.lines():
+    # ------------------------------------------------------------ following
+
+    def _refresher(self, done: threading.Event) -> None:
+        while not done.wait(1.0):
             if self.stopping:
                 return
-            self.event(line)
+            self.refresh()
+
+    def follow(self) -> None:
+        with self.lock:
+            self.players.clear()
+            self.positions.clear()
+            self.update()
+        # An event of its own per stream: a restarted stream never shares the old timer's.
+        done = threading.Event()
+        timer = threading.Thread(
+            target=self._refresher, args=(done,), name="player-position", daemon=True
+        )
+        timer.start()
+        try:
+            stream = self.stream(["playerctl", "-a", "--follow", "metadata", "--format", FORMAT])
+            for line in stream.lines():
+                if self.stopping:
+                    return
+                self.event(line)
+        finally:
+            done.set()
 
     def gone(self) -> None:
-        self.players.clear()
-        self.update()
+        with self.lock:
+            self.players.clear()
+            self.positions.clear()
+            self.update()  # a pin outlives a restarted stream; prune ends it with its player
 
     @classmethod
     def menu_rows(cls, module: str, state: st.State | None) -> list[Row]:

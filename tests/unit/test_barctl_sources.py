@@ -14,12 +14,20 @@ from pathlib import Path
 import pytest
 
 from desktop_tools.barctl import modules as mods
+from desktop_tools.barctl import render
 from desktop_tools.barctl import state as st
 from desktop_tools.barctl.sources import PlayerSource, VolumeSource
 from desktop_tools.barctl.sources.player import US, player_icon, track
 from desktop_tools.barctl.store import Writer
 
 PLAYER_MODS = ["player-play-pause", "player-metadata"]
+
+
+def strip_tags(text: str) -> str:
+    """What polybar shows of a rendered line: its tags gone, escaped `%%{` back to `%{`."""
+    import re
+
+    return re.sub(r"(?<!%)%\{[^}]*\}", "", text).replace("%%{", "%{")
 
 
 class Pokes:
@@ -132,10 +140,14 @@ def test_gone_players_dropped(
 
 
 def test_track_text() -> None:
-    assert track("Dear Rouge", "I Heard I Had") == "Dear Rouge: I Heard I Had"
+    """Record 0003 §5: `Artist, en dash, Title`, whole up to 200 characters; render cuts
+    it to 40 for `text` and `both`."""
+    assert track("Dear Rouge", "I Heard I Had") == "Dear Rouge \u2013 I Heard I Had"
     assert track("", "only title") == "only title"
     long = track("An Artist With A Long Name", "And A Title Long Enough To Be Cut")
-    assert len(long) == 40 and long.endswith("…")
+    assert long == "An Artist With A Long Name \u2013 And A Title Long Enough To Be Cut"
+    capped = track("a" * 150, "b" * 150)
+    assert len(capped) == 200 and capped.endswith("…")
     assert player_icon({"*": "D"}, "unknown") == "D"
     assert player_icon({}, "unknown") == ""
 
@@ -292,6 +304,8 @@ if args == ['-l']:
     print(open({str(listing)!r}).read(), end='')
 elif args[:4] == ['-a', '--follow', 'metadata', '--format']:
     os.execvp('cat', ['cat', {str(stream)!r}])
+elif args[0] == '-p' and args[2:] == ['position']:
+    print('12.5')  # record 0003 §5: the shown player's position, read on its events
 else:
     open(here + '/unexpected', 'a').write(' '.join(args) + '\\n'); sys.exit(1)
 """
@@ -319,7 +333,7 @@ def test_player_follows_playerctl(
     state = st.read("player-metadata") or {}
     assert (state["tier"], state["label"], state["target"]) == (
         "active",
-        "Dear Rouge: I Heard I Had",
+        "Dear Rouge \u2013 I Heard I Had",
         "spotify",
     )
     assert (st.read("player-play-pause") or {})["glyph"] == " "
@@ -339,8 +353,11 @@ def test_player_follows_playerctl(
     long = ["An Artist With A Long Name", "And A Title Long Enough To Be Cut %{F#ff0000}"]
     feed.line(US.join(["spotify", "spotify", "Playing", *long]))
     time.sleep(0.4)
+    # The state holds the whole label (record 0003 §5); render shows 40 of it, escaped.
     label = (st.read("player-metadata") or {})["label"]
-    assert len(label) == 40 and label.endswith("…") and "%{F" not in label
+    assert label == f"{long[0]} \u2013 {long[1]}"
+    shown = strip_tags(render.render(mods.load()["player-metadata"], st.read("player-metadata")))
+    assert len(shown) == 40 and shown.endswith("…") and "%{F" not in shown
 
     feed.close()
     thread.join(3)

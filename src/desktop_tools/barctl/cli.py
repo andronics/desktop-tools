@@ -22,6 +22,7 @@ VERBS = [
     "alert",
     "menu",
     "click",
+    "pin",
     "reload",
     "restart",
     "theme",

@@ -14,6 +14,8 @@ from desktop_tools.barctl.sources import SOURCES
 from desktop_tools.common import paths, polybar, theme
 
 Check = dict[str, Any]
+# Set in an agent's or coordinator's session; the bar must never run with them (record 0003 §6).
+AGENT_VARIABLES = (b"COORDINATOR", b"CLAUDECODE", b"TESSERA_ACTOR")
 
 
 def _check(name: str, ok: bool, detail: str, fix: str = "", warn: bool = False) -> Check:
@@ -66,6 +68,38 @@ def zsh_controller_running() -> int | None:
     return pid if b"zsh" in cmdline and polybar.alive(pid) else None
 
 
+def agent_variables(pid: int) -> list[str]:
+    """Which of AGENT_VARIABLES a process (the user's own) was started with: names only."""
+    try:
+        data = (polybar.proc_root() / str(pid) / "environ").read_bytes()
+    except OSError:
+        return []
+    names = {entry.split(b"=", 1)[0] for entry in data.split(b"\0") if b"=" in entry}
+    return [v.decode() for v in AGENT_VARIABLES if v in names]
+
+
+def environment(controller: int | None, bars: list[int]) -> list[Check]:
+    """One warning per process that runs in an agent's environment, naming the variable and
+    never its value."""
+    out = []
+    for kind, pid in [("controller", controller)] + [("bar", b) for b in bars]:
+        if pid is None:
+            continue
+        found = agent_variables(pid)
+        if found:
+            out.append(
+                _check(
+                    f"environment {kind} {pid}",
+                    False,
+                    "the bar runs in an agent's environment: restart it from a clean session"
+                    f" ({', '.join(found)} set)",
+                    "barctl restart, from a terminal outside any agent or coordinator session",
+                    warn=True,
+                )
+            )
+    return out
+
+
 def checks(now: float | None = None) -> list[Check]:
     now = time.time() if now is None else now
     out: list[Check] = []
@@ -93,6 +127,7 @@ def checks(now: float | None = None) -> list[Check]:
     pids = sorted(set(polybar.bar_pids()) | set(polybar.sockets()))
     if not pids:
         out.append(_check("bars", False, "no polybar running", "barctl restart"))
+    out.extend(environment(running[0] if running else None, pids))
     for pid in pids:
         reply = polybar.ping(pid)
         if reply is None:
@@ -175,6 +210,21 @@ def checks(now: float | None = None) -> list[Check]:
                 not missing,
                 "needs " + ", ".join(kind.commands),
                 "install " + ", ".join(missing),
+            )
+        )
+
+    art = sorted(m.name for m in modules.values() if m.display == "capsule" and m.accent == "art")
+    if art:
+        from desktop_tools.barctl import art as artwork
+
+        missing = [c for c in artwork.COMMANDS if shutil.which(c) is None]
+        out.append(
+            _check(
+                "art accent",
+                not missing,
+                f"{', '.join(art)} asks for the art's colour: needs curl, magick",
+                "install " + ", ".join(missing) + ' (or accent = "role")',
+                warn=True,
             )
         )
 

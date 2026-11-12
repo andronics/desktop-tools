@@ -253,6 +253,33 @@ def click(
 
 
 @app.command()
+def pin(
+    module: ModuleArg,
+    instance: Annotated[
+        str | None, typer.Argument(help="A player, as `playerctl -l` names it.")
+    ] = None,
+    auto: Annotated[
+        bool, typer.Option("--auto", help="Unpin: the bar picks the player again.")
+    ] = False,
+) -> None:
+    """Show one player on a player module until it goes.
+
+    The module's source (and every module it draws) shows that player while `playerctl -l`
+    lists it; --auto goes back to Playing over Paused over Stopped. The controller holds the
+    pin in memory: a restart forgets it. Exit 2 for a module the player source doesn't draw, 5
+    for a player that isn't listed.
+    """
+    if auto == (instance is not None):
+        typer.echo("barctl pin: give a player or --auto", err=True)
+        raise typer.Exit(2)
+    try:
+        pinned = ops.pin(module, instance)
+    except ops.Failure as e:
+        raise _fail(e) from None
+    typer.echo(f"pinned {pinned}" if pinned else "automatic")
+
+
+@app.command()
 def reload(module: Annotated[str | None, typer.Argument(help="One module.")] = None) -> None:
     """Redraw every module, or one, without restarting polybar.
 

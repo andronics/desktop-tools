@@ -33,6 +33,8 @@ def test_the_zsh_menus_carried_over() -> None:
     assert list(menus) == [
         "layout",
         "lock",
+        "player",
+        "players",
         "screenshot",
         "session",
         "settings",

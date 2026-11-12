@@ -53,6 +53,12 @@ the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_
   JSON their `--json` verbs give, or fail, or sleep past the 2 s limit; each row's label, command and mark are checked
   for every state, and the state-free rows for every failure. Patch barmenu's own `time` (`bm.time`), never
   `time.sleep`: subprocess's wait loop sleeps too.
+- **The player capsule** (`tests/unit/test_player_capsule.py`, design record 0003 §8): its fake `playerctl` starts with
+  a guard that logs and fails any call that would control a player (`play`, `pause`, `play-pause`, `stop`, `next`,
+  `previous`, `volume`, or `position`, `loop` or `shuffle` with a value), and the `config` fixture fails the test if
+  it was reached, so no source or provider code can control a player. Scroll and progress are pure functions of the
+  state and a time the test passes (`now=`); the source's clock is `source.clock`, so the 30-second position re-read
+  runs on a fake clock. The art accent runs on fake `curl` and `magick`.
 - **crew's menus** (`tests/unit/test_crew_menu.py`): the quick menu runs on meta's real JSON
   (`tests/fixtures/meta-menu-*.json`, from the live `meta <name> menu --json` with its paths made generic). The fake
   rofi answers from `rofi-answers`, one line per call ("" is Escape), and keeps each call's rows. `rofi-race`

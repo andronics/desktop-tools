@@ -2,7 +2,7 @@
 
 <!-- Add a line for this record to the index in docs/design/README.md (CI checks). -->
 
-Status: Proposed
+Status: Approved
 Date: 2026-11-12
 Authors: Stephen Cox (direction, 2026-11-12: replace the bar's player group with one large barctl-drawn
 module, idea 1 first and ideas 2-5 to follow; and that it takes in volume, the audio output and
@@ -571,51 +571,66 @@ kept, so the Bluetooth source writes into the same fields.
 1. **Phase 1's shape.** (a) One capsule as §1-5, the rare actions in `barmenu player`; (b) the capsule
    plus previous and next buttons kept beside it. Recommendation: **(a)**: middle-click is next, and
    the menu has previous; two buttons more brings back the row this replaces.
+   **Answered (2026-11-12): (a)**, as recommended.
 2. **The spectrum.** (a) Keep `audio-spectrum` as its own module, unchanged, for now; (b) remove it now
    (it draws nothing); (c) fold it into the capsule now. Recommendation: **(a)**: it is
    inert, and idea 3 decides its future after the rate is measured; removing it is a one-word
    change then.
+   **Answered (2026-11-12): (a)**, as recommended.
 3. **What scrolling changes.** (a) The player's own volume (`playerctl volume 0.05±`); (b) the default
    sink's (`audio volume-increase`/`-decrease`, as `audio-level`). Recommendation: **(a)**: the sink is
    already one module over, and the capsule is the player's. Some players ignore MPRIS volume; if
    Stephen's does, switch to (b) in `modules.toml` alone, no code.
+   **Answered (2026-11-12): (a)**, as recommended.
 4. **The trial.** (a) Capsule and old group side by side on the main bar (PR A), then PR B; (b) a bar
    variant `main-capsule`, started instead of `main`. Recommendation: **(a)**: one restart, both in
    front of him, and rollback is one word.
+   **Answered (2026-11-12): (a)**, as recommended.
 5. **The art accent.** (a) Build `accent = "art"` in phase 1, off by default, with `file://` and
    `https://` (§5); (b) `file://` only; (c) role accent only, art later. Recommendation: **(a)**: it is
    self-contained and off until he turns it on; (b) would rarely help, since Spotify's art is
    `https://`.
+   **Answered (2026-11-12): (a)**, as recommended.
 6. **How titles scroll.** (a) One pass, then 10 s resting at the start, while playing; (b) scroll all the
    time while playing; (c) never: cut with "…". Recommendation: **(a)**: readable, and about half the
    redraws of (b).
+   **Answered (2026-11-12): (a)**, as recommended.
 7. **Stop.** (a) No stop anywhere on the capsule or its menu; (b) a `Stop` row in the menu (nine rows,
    one past the window). Recommendation: **(a)**: pause covers it, and the menu stays inside eight.
+   **Answered (2026-11-12): (a)**, as recommended.
 8. **The pin's life.** (a) In memory, ends with the player or a controller restart; (b) saved in
    barctl's settings across restarts. Recommendation: **(a)**: a saved pin to a player that comes back
    days later would surprise.
+   **Answered (2026-11-12): (a)**, as recommended.
 9. **Width.** (a) 32 cells; (b) 40, as the metadata cut; (c) Stephen picks after the trial.
    Recommendation: **(a)** to start, then (c): the right side is already full, and the key changes it
    without code.
+   **Answered (2026-11-12): (a)**, as recommended: 32 to start, Stephen's pick after the trial.
 10. **The sxhkd media keys.** (a) Leave them on playerctl's default player; (b) point them at the
     capsule's player (`barctl click player-capsule left` and `middle`). Recommendation: **(b)**, in
     PR B: keys and bar then act on the same player. Its own small change, not needed for phase 1.
+    **Answered (2026-11-12): (b)**, as recommended.
 
 11. **The unit's shape.** (a) Two adjacent modules, `player-capsule` and `output-capsule`, on one
     background (§10); (b) one module with three sources now. Recommendation: **(a)**: it looks like one
     unit, needs no change to how barctl stores modules, and (b) stays open as idea 6.
+    **Answered (2026-11-12): (a)**, as recommended.
 12. **Switching to new headphones.** (a) Never: show only, WirePlumber decides; (b) an opt-in
     `follow_new = "bluetooth"` setting; (c) always. Recommendation: **(a)**, (b) if the trial shows
     WirePlumber choosing wrong (§10).
+    **Answered (2026-11-12): (a)**, as recommended.
 13. **What shows at the moment headphones connect.** (a) A 5-second `<name> connected` notice, then the
     default sink; (b) only the glyph and name changing, if they become the default; (c) a desktop
     notification as well. Recommendation: **(a)**: it says the connection happened even when the default
     stays on the speakers, and needs no notification daemon.
+    **Answered (2026-11-12): (a)**, as recommended.
 14. **`bluetooth-status`'s scroll.** (a) Keep it as it is in phase 1; (b) drop its scroll-up and
     scroll-down in PR B, since a stray scroll-down disconnects the first connected device and `Output ›`
     now connects and disconnects on purpose. Recommendation: **(b)**.
+    **Answered (2026-11-12): (b)**, as recommended.
 15. **Where mute lives.** (a) Left-click on the output segment, as `audio-level` today; (b) a `Mute` row
     in `Output ›` only. Recommendation: **(a)**: the same place it is now, one click.
+    **Answered (2026-11-12): (a)**, as recommended.
 
 ## Change log
 
@@ -623,3 +638,4 @@ kept, so the Bluetooth source writes into the same fields.
 |---|---|
 | 2026-11-12 | Proposed by the desktop coordinator |
 | 2026-11-12 | §10, idea 6 and open questions 11-15 added: volume, the audio output and Bluetooth in the same unit (Stephen, 2026-11-12) |
+| 2026-11-12 | Approved as written: Stephen via the arbiter, 2026-11-12, ❓ 2026-11-12 Approve Desktop Tools Record 0003 Player Capsule; each open question answered as recommended. Phase 1 §1-9 built in desktop-tools; §10 (the output segment) and the dotfiles' entries are later tasks |

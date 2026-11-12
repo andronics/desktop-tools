@@ -35,13 +35,31 @@ barmenu never sets or clears `COORDINATOR`, `CLAUDECODE` or `TESSERA_ACTOR`: tes
 calling. When one is set in barmenu's own environment, the menu shows one `Not available` row instead of the
 actions, since tessera would refuse them.
 
+### The player capsule
+
+The capsule and its menus (design record 0003) never control a player on their own: the player source's only
+`playerctl` calls are its stream, `-l`, `position` with no value and `metadata`, and a click or menu row runs a
+`playerctl -p <instance>` argument list, the instance from barctl's state and `playerctl -l`, never a shell string.
+The track (artist, title) lives only in the module's state file in `$XDG_RUNTIME_DIR/barctl` (700, emptied at
+logout); barctl's journal lines name the module and button, never the label, and the menus' providers log nothing of
+the player's state. `barctl status` shows the label to the user's own processes, as before.
+
+- **The art fetch** (`accent = "art"`, off by default) goes only to the cover URL the player itself gives, once per
+  new URL: `curl -q` (no `.curlrc`, so no cookie jar), HTTPS only (redirects too), 2 seconds, 1 MiB at most, into a
+  20-file cache in the runtime folder; `file://` covers are read where they are. The colour it gives is checked to
+  `#` and six hex digits, so no cover can put a polybar tag on the bar.
+- **The environment rule:** barctl and barmenu never set, clear or change `COORDINATOR`, `CLAUDECODE` or
+  `TESSERA_ACTOR` for a click or a row: commands get the bar's environment untouched. `barctl doctor` warns when the
+  running controller or a bar was started with any of them set ("the bar runs in an agent's environment"), naming
+  the variable, never its value; restart the bar from a clean session.
+
 ## Hardening
 
 - **Supply chain:** dependencies are pinned in the lock file and updated weekly by Dependabot. GitHub Actions are pinned to commit SHAs.
 - **Dependency auto-merge:** Dependabot patch updates get auto-merge queued by `dependabot-automerge.yml`: they still need a code owner's approval, then merge once CI passes.
 
-- **Input validation:** a pushed state is checked field by field (tiers, counts, segment ids) and anything unknown is
-  dropped; module and segment names are restricted to the characters a file name and an action tag can carry.
+- **Input validation:** a pushed state is checked field by field (tiers, counts, segment ids, the capsule's `progress`
+  numbers and its `accent`, which must be `#` and six hex digits) and anything unknown is dropped; module and segment names are restricted to the characters a file name and an action tag can carry.
 - **No root:** nothing here needs it (brain record 0016).
 
 ## Reporting a vulnerability

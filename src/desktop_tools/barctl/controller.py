@@ -2,8 +2,9 @@
 
 One at a time (a lock in the runtime folder). It runs every enabled source in a thread of its
 own, restarting a source whose stream ended after BARCTL_RETRY seconds; serves the control socket
-for `push`, `alert`, `reload`, `enable` and `disable`; blinks alerting modules; and redraws a
-pushed module when its ttl runs out. On start it clears its own sources' states (they are
+for `push`, `alert`, `reload`, `enable`, `disable` and `pin`; blinks alerting modules; redraws a
+pushed module when its ttl runs out; and pokes a capsule when its frame changes (the next scroll
+step or progress cell, record 0003 §3). On start it clears its own sources' states (they are
 redrawn within a second from the live sources) and keeps pushed ones.
 
 It runs from systemd (barctl.service), never from polybar: polybar 3.7 leaks its module pipes
@@ -26,13 +27,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from desktop_tools.barctl import control
+from desktop_tools.barctl import control, render
 from desktop_tools.barctl import modules as mods
 from desktop_tools.barctl import state as st
-from desktop_tools.barctl.sources import SOURCES, Source
+from desktop_tools.barctl.sources import SOURCES, PlayerSource, Source
 from desktop_tools.barctl.store import Writer
 from desktop_tools.common import journal, polybar
 
+LATE = 0.02  # seconds after a change the tick wakes, so the render lands past it
 QUICK = 5.0  # a stream that ends sooner than this after starting counts as a failure
 MAX_CRASHES = 3  # unexpected exceptions in a row from one source before the controller exits
 
@@ -61,6 +63,7 @@ class Controller:
         self.running: dict[str, tuple[Source, threading.Thread]] = {}
         self.alerts: dict[str, float] = {}
         self.expiries: dict[str, float] = {}
+        self.frames: dict[str, tuple[str, int]] = {}  # capsule -> the frame last drawn
         self._lock_fd: int | None = None
         self._server: socket.socket | None = None
         self.log: Callable[[str], None] = journal.warning
@@ -211,7 +214,14 @@ class Controller:
         op = request.get("op")
         module = request.get("module")
         if op == "ping":
-            return {"ok": True, "pid": os.getpid(), "sources": sorted(self.running)}
+            return {
+                "ok": True,
+                "pid": os.getpid(),
+                "sources": sorted(self.running),
+                "pinned": self.pins(),
+            }
+        if op == "pin":
+            return self.pin(module, request.get("instance"))
         if op in ("pushed", "alert") and isinstance(module, str) and module in self.modules:
             self.follow_state(module)
             self.poke(module)
@@ -232,6 +242,35 @@ class Controller:
                 self.poke(module)
             return {"ok": True}
         return {"ok": False, "error": f"unknown request {op!r}"}
+
+    def _player(self) -> PlayerSource | None:
+        entry = self.running.get("player")
+        source = entry[0] if entry else None
+        return source if isinstance(source, PlayerSource) else None
+
+    def pins(self) -> dict[str, str | None]:
+        """source -> its pinned instance (or None), for `status --json`."""
+        source = self._player()
+        return {"player": source.pinned} if source is not None else {}
+
+    def pin(self, module: object, instance: object) -> dict[str, Any]:
+        """Show one player on a player module's source until it goes (None: back to the rank).
+        Held here, in memory: a restart forgets it (record 0003 §5, open question 8)."""
+        found = self.modules.get(module) if isinstance(module, str) else None
+        if found is None:
+            return {"ok": False, "error": f"unknown module {module!r}"}
+        if found.source != "player":
+            return {"ok": False, "error": f"{found.name} is not drawn by the player source"}
+        if instance is not None and (not isinstance(instance, str) or not instance):
+            return {"ok": False, "error": "instance is a player's name"}
+        source = self._player()
+        if source is None:
+            return {"ok": False, "error": "the player source is not running"}
+        try:
+            pinned = source.pin(instance)
+        except LookupError as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, "pinned": pinned}
 
     def follow_state(self, module: str) -> None:
         """Note a module's alert and expiry, to redraw it when they change."""
@@ -269,12 +308,39 @@ class Controller:
                     del self.expiries[module]
             blinking = bool(self.alerts)
             nearest = min(self.expiries.values(), default=now + 1.0)
+        moving, frames = self.capsules(now)
+        due.extend(frames)
         for module in sorted(set(due)):
             self.poke(module)
+        if moving is not None:
+            nearest = min(nearest, moving + LATE)
         # Wake at the next half of a blink, a little after it, so a render lands in it.
         if blinking:
-            return max(0.05, st.BLINK - (now % st.BLINK) + 0.02)
+            nearest = min(nearest, now + st.BLINK - (now % st.BLINK) + LATE)
         return max(0.05, min(1.0, nearest - now))
+
+    def capsules(self, now: float) -> tuple[float | None, list[str]]:
+        """The capsules whose frame changed since it was last drawn (to poke), and when the
+        next one changes. A source's own write pokes what it changed; this covers the scroll
+        and the progress line, which move with the time alone."""
+        changed: list[str] = []
+        soonest: float | None = None
+        with self.lock:
+            capsules = [m for m in self.modules.values() if m.display == "capsule"]
+        off = st.disabled() if capsules else set()
+        for module in capsules:
+            if module.name in off:
+                self.frames.pop(module.name, None)
+                continue
+            data = st.read(module.name)
+            frame = render.capsule_frame(module, data, now)
+            if self.frames.get(module.name, frame) != frame:
+                changed.append(module.name)
+            self.frames[module.name] = frame
+            wake = render.next_change(module, data, now)
+            if wake is not None:
+                soonest = wake if soonest is None else min(soonest, wake)
+        return soonest, changed
 
     # ------------------------------------------------------------ run
 
