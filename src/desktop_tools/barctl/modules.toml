@@ -52,6 +52,15 @@ display = "text"
 # spoken = false         # podcasts and audiobooks (record 0005 phase B): ±30 s and a speed
 #                        # row in barmenu player, the line at the player's rate
 # spoken_players = []    # player names always taken as spoken word, e.g. ["gpodder", "cozy"]
+# expand_for = 0         # seconds the transport row stays open (record 0005 phase C; 0-30, 0
+#                        # never): previous, play-pause, next, loop, shuffle and a seek bar in
+#                        # the title's place, opened by a left-click on the icon
+#
+# [modules.player-capsule.icon_clicks]       # the icon alone: opens and folds the row
+# left = ["barctl", "expand", "player-capsule"]
+#
+# [modules.player-capsule.segment_clicks]    # the row's cells
+# left = ["barctl", "transport", "player-capsule", "{segment}"]
 #
 # [modules.player-capsule.clicks]
 # left = ["playerctl", "-p", "{target}", "play-pause"]

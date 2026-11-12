@@ -92,10 +92,26 @@ make it an alert instead (`not reachable, 2 waiting`). Without `avahi-browse`, p
 `devices` was run with `COORDINATOR`, `CLAUDECODE` or `TESSERA_ACTOR` set, as a bar started from an agent's session
 is. Restart the bar from a clean session.
 
+### Clicking the capsule's icon doesn't open the transport row
+
+The row needs three entries on the capsule: `expand_for` above 0, `icon_clicks.left = ["barctl", "expand",
+"player-capsule"]` and `segment_clicks.left = ["barctl", "transport", "player-capsule", "{segment}"]` (In-Depth
+Configuration). `barctl expand player-capsule` says `expand_for is 0` (exit 3) when the first is missing. It never
+opens on a faded capsule or with no player: a click on a faded icon plays, as before. Without the controller the row
+still opens and a detached `barctl reload` folds it; `barctl status` says whether the controller runs.
+
+### The transport row's loop or shuffle button shows the old mode
+
+The loop and shuffle buttons draw the `loop` and `shuffle` the player source last read from `playerctl --follow`; a
+press runs `playerctl -p <player> loop <next>` or `shuffle toggle`, and the button follows when playerctl prints the
+change. If a player changes mode without telling playerctl, the button catches up on its next event (a new track, a
+pause). `barctl watch player-capsule --json` prints the state barctl holds, `loop` and `shuffle` with it.
+
 ### `modules.toml` fails, and every barctl module is blank, after a downgrade
 
 An older barctl rejects `display = "capsule"`, `"output"` or `"chips"` as an unknown display, and a per-segment click
-table (`segment_clicks.<id>`) as an unknown button, which fails the whole file. Take `[modules.player-capsule]`,
+table (`segment_clicks.<id>`) as an unknown button, which fails the whole file (one from before the transport row
+ignores `expand_for` and `icon_clicks`: the icon just plays and pauses). Take `[modules.player-capsule]`,
 `[modules.output-capsule]` and `[modules.player-chips]` out of the dotfiles' `modules.toml` (or revert the dotfiles
 change that added them) before
 downgrading desktop-tools; `barctl doctor` names the key it can't read.

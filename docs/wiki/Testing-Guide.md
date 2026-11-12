@@ -71,6 +71,11 @@ CUPS's and SANE's commands are tripwires on PATH; `no_device_sockets` fails a te
   guarded `playerctl`, and a fake `busctl` that fails the test on any `set-property` and prints the Rate lines the test
   gives (or fails, for an unreadable range). The fade runs on `now=` and the source's fake clock; the speed row's
   `set-property` is checked by its argv, never run.
+- **The transport row** (`tests/unit/test_player_transport.py`, design record 0005 phase C): the same guarded
+  `playerctl`; every press is checked by the argv the `launched` fixture records, never run, and `transport.argv` is
+  checked cell by cell (the loop cycle, the seek fractions, the 10 and 30 s skips, no target). The row's cells at
+  widths 32 and 20, the fold and the seek bar's next cell run on `now=`; `barctl expand` is checked with
+  `control.request` answering (a controller) and returning None (none: the poke and the detached reload recorded).
 - **The output segment** (`tests/unit/test_output_capsule.py`, design record 0003 §8 and §10): fake `pactl` (a wired,
   an HDMI and a Bluetooth headset sink in `-f json list sinks`, the default, volume and mute in files the test
   changes), `busctl` (the battery and BlueZ's managed objects) and `bluetoothctl`. Each starts with a guard that logs

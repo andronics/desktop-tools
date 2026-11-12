@@ -2,9 +2,10 @@
 
 One at a time (a lock in the runtime folder). It runs every enabled source in a thread of its
 own, restarting a source whose stream ended after BARCTL_RETRY seconds; serves the control socket
-for `push`, `alert`, `reload`, `enable`, `disable` and `pin`; blinks alerting modules; redraws a
-pushed module when its ttl runs out; pokes a capsule when its frame changes (the next scroll
-step or progress cell, record 0003 §3); and pokes an output segment when its notice ends (§10).
+for `push`, `alert`, `reload`, `enable`, `disable`, `pin` and `expand`; blinks alerting modules;
+redraws a pushed module when its ttl runs out; pokes a capsule when its frame changes (the next
+scroll step or progress cell, record 0003 §3, and its transport row folding, record 0005 phase
+C); and pokes an output segment when its notice ends (§10).
 On start it clears its own sources' states (they are redrawn within a second from the live
 sources) and keeps pushed ones.
 
@@ -226,6 +227,14 @@ class Controller:
             return self.pin(module, request.get("instance"), request.get("toggle") is True)
         if op in ("pushed", "alert") and isinstance(module, str) and module in self.modules:
             self.follow_state(module)
+            self.poke(module)
+            return {"ok": True}
+        if op == "expand" and isinstance(module, str) and module in self.modules:
+            # The row opened or folded (record 0005 phase C): draw it now, and note the frame,
+            # so the tick pokes only when it next changes (the fold, or the seek bar).
+            found = self.modules[module]
+            with self.lock:
+                self.frames[module] = render.capsule_frame(found, st.read(module), time.time())
             self.poke(module)
             return {"ok": True}
         if op == "reload":

@@ -12,6 +12,9 @@ and the time, as the blink is, so the source writes once per real change; the co
 pokes the capsule when its frame changes (`next_change`). With `fade_after` (record 0005 phase
 B), a capsule whose player has been paused or stopped that many minutes since `status_at` draws
 its icon alone, in the idle colour: worked out from the time too, so nothing is written then.
+With `expand_for` (record 0005 phase C), a capsule whose `expanded_until` is still to come shows
+its transport row (barctl/transport.py) in the same cells as the title, so nothing moves; its
+icon carries `icon_clicks` (the segment `icon`) and each cell of the row its own action tag.
 
 `display = "chips"` (record 0005 phase A) is drawn only from its segments, one per player, which
 the player source writes; with none it draws nothing.
@@ -27,9 +30,9 @@ from __future__ import annotations
 import contextlib
 import time
 
-from desktop_tools.barctl import outputs
+from desktop_tools.barctl import outputs, transport
 from desktop_tools.barctl import state as st
-from desktop_tools.barctl.modules import BUTTONS, Module, shown_tier
+from desktop_tools.barctl.modules import BUTTONS, ICON, Module, shown_tier
 from desktop_tools.common import theme
 
 METADATA_MAX = 40
@@ -73,10 +76,16 @@ def colour(tier: str, alert_until: float | None, now: float, controller: bool) -
     return tier
 
 
-def _actions(module: Module, text: str, segment: str | None = None) -> str:
+def _actions(
+    module: Module,
+    text: str,
+    segment: str | None = None,
+    without: str | None = None,
+    menu: bool = True,
+) -> str:
     clicks = module.clicks_for(segment)
-    buttons = [b for b in BUTTONS if b in clicks]
-    if "right" not in buttons and module.has_menu():
+    buttons = [b for b in BUTTONS if b in clicks and b != without]
+    if menu and "right" not in buttons and module.has_menu():
         buttons.append("right")
     suffix = f" --segment {segment}" if segment is not None else ""
     for button in sorted(buttons, key=BUTTONS.__getitem__):
@@ -181,11 +190,29 @@ def faded(module: Module, state: st.State | None, now: float) -> bool:
     return at is not None and now >= at
 
 
+def expanded(module: Module, state: st.State | None, now: float) -> bool:
+    """Whether the capsule shows its transport row (record 0005 phase C): `expand_for` above 0,
+    a player shown and not faded, and `expanded_until` still to come."""
+    if module.display != "capsule" or module.expand_for <= 0 or state is None:
+        return False
+    until = state.get("expanded_until")
+    if isinstance(until, bool) or not isinstance(until, (int, float)) or until <= now:
+        return False
+    return shown_tier(state, now) != "unavailable" and not faded(module, state, now)
+
+
+def row(module: Module, state: st.State | None, now: float) -> list[transport.Cell]:
+    return transport.row(module.width, state, fraction(state, now))
+
+
 def capsule_frame(module: Module, state: st.State | None, now: float) -> tuple[str, int]:
     """(the text cells, padded to the width; how many are underlined): what a capsule shows
-    beside its icon. Nothing with no player, or once it has faded (record 0005 phase B)."""
+    beside its icon. Nothing with no player, or once it has faded (record 0005 phase B); the
+    transport row while it is expanded (phase C)."""
     if state is None or shown_tier(state, now) == "unavailable" or faded(module, state, now):
         return "", 0
+    if expanded(module, state, now):
+        return transport.plain(row(module, state, now)), 0
     label = str(state.get("label") or "")
     width = module.width
     if scrolls(module, state, now):
@@ -205,6 +232,8 @@ def next_change(module: Module, state: st.State | None, now: float) -> float | N
         return None
     if shown_tier(state, now) == "unavailable":
         return None
+    if expanded(module, state, now):
+        return _row_change(module, state, now)
     fade = fade_at(module, state, now)
     if fade is not None:
         return fade if fade > now else None
@@ -230,6 +259,26 @@ def next_change(module: Module, state: st.State | None, now: float) -> float | N
             at = max(at, now + 1.0)
             best = at if best is None else min(best, at)
     return best
+
+
+def _row_change(module: Module, state: st.State, now: float) -> float:
+    """An expanded capsule's next change: the row folding, or sooner the seek bar's next cell
+    while it plays (never sooner than a second)."""
+    until = float(state["expanded_until"])
+    p = state.get("progress")
+    part = fraction(state, now)
+    if not isinstance(p, dict) or not p.get("playing") or part is None:
+        return until
+    if module.width < transport.SEEK_MIN:
+        return until  # no seek bar: back and forward buttons, which don't move
+    cells = min(transport.SEEK_CELLS, int(part * transport.SEEK_CELLS + 0.5))
+    rate = float(p.get("rate") or 0)
+    if cells >= transport.SEEK_CELLS or rate <= 0:
+        return until
+    length, position = float(p["length"]), float(p.get("position") or 0)
+    boundary = (cells + 0.5) / transport.SEEK_CELLS * length
+    at = max(float(p.get("at") or now) + (boundary - position) / rate, now + 1.0)
+    return min(until, at)
 
 
 def _hex_paint(text: str, hex_: str | None) -> str:
@@ -264,10 +313,45 @@ def capsule(
     text, cells = capsule_frame(module, state, now)
     if not text:
         return _actions(module, icon) if icon else ""
+    if icon and module.icon_clicks:
+        # The icon's own tag, inside the capsule's: polybar runs the innermost (record 0005 C).
+        icon = _actions(module, icon, ICON, menu=False)
+    if expanded(module, state, now):
+        return _expanded(module, state, now, colours, shown, accent, icon)
     lined, rest = text[:cells], text[cells:]
     body = (_underline(_safe(lined), accent) if lined else "") + _safe(rest)
     painted = _paint(body, shown, colours)
     return _actions(module, f"{icon} {painted}" if icon else painted)
+
+
+def _expanded(
+    module: Module,
+    state: st.State | None,
+    now: float,
+    colours: dict[str, str],
+    shown: str,
+    accent: str | None,
+    icon: str,
+) -> str:
+    """The transport row (record 0005 phase C): each button and seek cell in its own action
+    tag (`--segment <id>`), the buttons in the tier's colour, the seek bar in the accent up to
+    the position and `idle` after it. The capsule's own tag still wraps the line, without its
+    left click, so a press between cells does nothing; middle, scroll and right keep theirs."""
+    hexes = {
+        "button": colours.get(shown) or colours.get("unavailable"),
+        "filled": accent,
+        "empty": colours.get("idle"),
+    }
+    parts = []
+    for cell in row(module, state, now):
+        if cell.id is None:
+            parts.append(cell.text)
+            continue
+        # No menu tag per cell: the capsule's own, round the line, opens it.
+        painted = _hex_paint(cell.text, hexes[cell.paint])
+        parts.append(_actions(module, painted, cell.id, menu=False))
+    body = "".join(parts)
+    return _actions(module, f"{icon} {body}" if icon else body, without="left")
 
 
 # ---------------------------------------------------------------- the output segment

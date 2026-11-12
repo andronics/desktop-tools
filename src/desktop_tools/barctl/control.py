@@ -2,8 +2,9 @@
 
 One JSON object per line each way: a request `{"op": ...}` and its answer `{"ok": ...}`.
 Requests: `ping`, `pushed <module>` (a push changed what it shows: poke it, follow its ttl),
-`alert <module>` (follow its blink), `reload` (re-read modules.toml) and `settings` (a module was
-enabled or disabled). A client waits at most a second: no answer means no controller.
+`alert <module>` (follow its blink), `expand <module>` (a capsule's transport row opened or
+folded: draw it, record 0005 phase C), `pin`, `reload` (re-read modules.toml) and `settings` (a
+module was enabled or disabled). A client waits at most a second: no answer means no controller.
 """
 
 from __future__ import annotations

@@ -31,6 +31,7 @@ _barctl_cmd() {
         'disable:Blank a module and stop its source'
         'doctor:Check everything barctl needs, each with a fix to try'
         'enable:Show a module again and start its source'
+        'expand:Open a capsule'\''s transport row, or fold it'
         'hide:Hide the bars (bsp-hide calls it)'
         'list:List every module, one per line, sorted'
         'menu:Open a module'\''s right-click menu'
@@ -43,6 +44,7 @@ _barctl_cmd() {
         'show:Show one module in detail'
         'status:Show the controller, the bars and every module'
         'theme:Follow a new theme'
+        'transport:Press a cell of a capsule'\''s transport row'
         'unhide:Show the bars again (bsp-unhide calls it)'
         'watch:Follow state changes as they happen, until interrupted'
     )
@@ -86,6 +88,13 @@ _barctl_cmd() {
                 enable)
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]' \
+                        ':module:_barctl_cmd_modules'
+                    ;;
+                expand)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]' \
+                        '--for=[How long it stays open]:for_: ' \
+                        '--off[Fold it now]' \
                         ':module:_barctl_cmd_modules'
                     ;;
                 hide)
@@ -157,6 +166,12 @@ _barctl_cmd() {
                 theme)
                     _arguments -s -S \
                         '(- *)'{-h,--help}'[Show help and exit]'
+                    ;;
+                transport)
+                    _arguments -s -S \
+                        '(- *)'{-h,--help}'[Show help and exit]' \
+                        ':module:_barctl_cmd_modules' \
+                        ':cell: '
                     ;;
                 unhide)
                     _arguments -s -S \

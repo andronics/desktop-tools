@@ -39,9 +39,10 @@ flowchart LR
 | `barctl/state.py` | The state model and where states and settings live |
 | `barctl/store.py` | Writing a state; poking only when what shows changed |
 | `barctl/render.py` | A state as polybar text: colour, escaping, action tags, blink, segments, and the capsule (its scroll offset and progress cells worked out from the state and the time; `next_change` for the controller's tick) |
+| `barctl/transport.py` | The capsule's transport row (record 0005 phase C): its cells laid out in the capsule's width, and the one `playerctl -p <target>` argv each press maps to |
 | `barctl/art.py` | The capsule's art accent: the cover fetched once (curl, HTTPS only, 2 s, 1 MiB) into a 20-file cache in the runtime folder, its average colour (magick), dropped under 3:1 against the theme's `bg` |
 | `barctl/control.py` | The control socket's client |
-| `barctl/controller.py` | `barctl run`: sources, control socket (with `pin`), alert and ttl timers, and the capsule timer: it pokes a capsule when its frame changes and sleeps until the next scroll step or progress cell |
+| `barctl/controller.py` | `barctl run`: sources, control socket (with `pin` and `expand`), alert and ttl timers, and the capsule timer: it pokes a capsule when its frame changes and sleeps until the next scroll step or progress cell |
 | `barctl/doctor.py` | `barctl doctor`'s checks |
 | `barctl/outputs.py` | The audio outputs (record 0003 §10): sinks from `pactl -f json list sinks` with their kind glyph and short name, a Bluetooth sink's battery (`busctl get-property … Battery1 Percentage`), BlueZ's paired audio devices; read-only, each name, path and address checked before it goes into an argv |
 | `barctl/sources/` | The controller's sources: `volume` (for an output segment also the sinks' properties, on a new default or a sink added or removed; the connect and disconnect notices; the battery every 5 minutes while a Bluetooth sink is the default; events coalesced to one read per 100 ms), `player` (the label `Artist – Title` whole; `progress` from `mpris:length` and `playerctl -p <shown> position`, read on the shown player's events and every 30 s while it plays; the in-memory pin; the art URL) |
@@ -106,6 +107,18 @@ place). If what it shows changed, barctl sends `#audio-level.hook.0` to every ba
   (`busctl --user get-property`, 2 s) into
   `progress.rate`; `barmenu player` reads `kind` from the capsule's state, and `Rate`, `MinimumRate` and
   `MaximumRate` in one `busctl` call when it opens.
+- **The transport row** (design record 0005 phase C): `barctl expand <capsule>` writes `expanded_until` into the
+  capsule's state (as `alert` writes `alert_until`) and sends an `expand` request; the controller pokes the capsule
+  and notes its frame. `Writer.set` keeps an `expanded_until` still to come across the source's writes. While it is
+  to come (and `expand_for` is above 0, a player shown, not faded), `render.capsule_frame` is the row's plain text and
+  `next_change` the fold (or sooner the seek bar's next cell while it plays), so the tick pokes once when it folds.
+  The row is never in the state: render builds it from `loop`, `shuffle`, `kind` and `progress`, which the player
+  source now writes a capsule (the stream adds `{{loop}}` and `{{shuffle}}`); `store.shown` counts them only while the
+  row is open. Each cell is wrapped in `barctl click <capsule> left --segment <id>`, the icon in `--segment icon`
+  (`Module.clicks_for("icon")` is `icon_clicks` on a capsule), and the capsule's own tag wraps the line without its
+  left click. `barctl transport` maps a cell to one detached `playerctl -p <target>` argv and, while the row is open,
+  calls `expand` again with `expand_for`. With no controller, `expand` pokes the bar and a detached `barctl reload`
+  redraws it after the time.
 - **The output segment** (design record 0003 §10): the volume source writes the kind glyph, short name, `output`
   (`volume`, `battery`) and, for 5 seconds after a Bluetooth sink comes or goes, `notice` with `notice_until`. Render
   draws the notice in place of the name until it ends; the controller's tick pokes the segment once when it does.

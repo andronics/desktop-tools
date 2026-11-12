@@ -73,6 +73,25 @@ Remembered across logins.
 |---|---|
 | `MODULE` | A module, as `barctl list` names it. |
 
+### `desktop-tools barctl expand`
+
+Open a capsule's transport row, or fold it: the icon's left-click.
+
+The capsule shows previous, play-pause, next, loop, shuffle and a seek bar in place of its
+title, in the same width, for the capsule's `expand_for` seconds (design record 0005 phase
+C); run again while it is open, it folds. --for opens it (or keeps it open) that long;
+--off folds it. Exit 3 when `expand_for` is 0 (the row is off), 2 for a module that is
+not a capsule.
+
+| Argument | Description |
+|---|---|
+| `MODULE` | A module, as `barctl list` names it. |
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--for` |  | How long it stays open: 5s (0 to 30s); default expand_for. |
+| `--off` |  | Fold it now. |
+
 ### `desktop-tools barctl hide`
 
 Hide the bars (bsp-hide calls it).
@@ -216,6 +235,20 @@ Follow a new theme: what `theme apply` calls.
 
 Re-reads the theme roles, then restarts the bars, since polybar reads its ini colours only
 at start.
+
+### `desktop-tools barctl transport`
+
+Press a cell of a capsule's transport row: what its cells' clicks run.
+
+Runs one `playerctl -p <player>` command, detached, for the player the capsule shows:
+previous, play-pause, next; loop steps None, Track, Playlist; shuffle toggles; seek-<i>
+goes to i/16 of the track; back and forward skip 10 s (30 s for spoken word). Then the row
+stays open another `expand_for` seconds. With no player shown it runs nothing.
+
+| Argument | Description |
+|---|---|
+| `MODULE` | A module, as `barctl list` names it. |
+| `CELL` | previous, play-pause, next, loop, shuffle, back, forward or seek-0 to seek-15. |
 
 ### `desktop-tools barctl unhide`
 

@@ -22,7 +22,8 @@ URL is a local `.m4b` or `.aax` file or under a `Podcasts` or `Audiobooks` folde
 name is in `spoken_players`. The track id, URL and genre are read for that and kept nowhere.
 For spoken word the shown player's MPRIS `Rate` is read once per track and with each 30-second
 position re-read (`busctl --user get-property`, read only) into `progress.rate`, so the line
-moves at the player's speed.
+moves at the player's speed. A capsule also gets the shown player's `loop` mode and `shuffle`
+(record 0005 phase C), for its transport row's buttons; absent when the player gives none.
 
 The position is not in the followed format (playerctl may re-print one with `{{position}}`
 every second): it is read with `playerctl -p <shown> position` on each event of the shown player
@@ -59,6 +60,8 @@ FIELDS = (
     "{{mpris:trackid}}",  # these three only say whether it is spoken word (record 0005 B)
     "{{xesam:url}}",
     "{{xesam:genre}}",
+    "{{loop}}",  # the transport row's loop and shuffle buttons (record 0005 C)
+    "{{shuffle}}",
 )
 FORMAT = US.join(FIELDS)
 RANK = {"Playing": 3, "Paused": 2, "Stopped": 1}
@@ -151,6 +154,12 @@ def read_rate(instance: str) -> float | None:
     return rate_of(out)
 
 
+def shuffle_of(text: str) -> bool | None:
+    """playerctl's `{{shuffle}}` (`true`, `false`, empty when the player gives none)."""
+    lowered = text.strip().lower()
+    return True if lowered == "true" else False if lowered == "false" else None
+
+
 def seconds(micro: str) -> float | None:
     """mpris:length (microseconds) in seconds; None when unknown (a stream gives none)."""
     try:
@@ -171,6 +180,8 @@ class Player:
     first: int = 0  # the order it was first seen in: the chips' order
     changed_at: float = 0.0  # when its status last changed (record 0005 phase B)
     spoken: bool = False  # rules 1-3 of spoken word matched its track; its fields aren't kept
+    loop: str = ""  # None, Track or Playlist; empty when the player gives none (record 0005 C)
+    shuffle: bool | None = None
 
 
 class PlayerSource(Source):
@@ -234,7 +245,9 @@ class PlayerSource(Source):
         instance, name, status, artist, title = fields[:5]
         length = seconds(fields[5]) if len(fields) > 5 else None
         art_url = fields[6].strip() if len(fields) > 6 else ""
-        trackid, url, genre = (fields[i].strip() if len(fields) > i else "" for i in (7, 8, 9))
+        trackid, url, genre, loop, shuffle = (
+            fields[i].strip() if len(fields) > i else "" for i in (7, 8, 9, 10, 11)
+        )
         old = self.players.get(instance)
         if old is None or old.status != status:
             self.tick += 1
@@ -252,6 +265,8 @@ class PlayerSource(Source):
             first,
             changed_at,
             spoken_hint(trackid, url, genre),
+            loop if loop in st.LOOPS else "",
+            shuffle_of(shuffle),
         )
         return instance
 
@@ -458,6 +473,7 @@ class PlayerSource(Source):
                         name, self.name, tier, segments=self.chips(module, instance), now=now
                     )
                     continue
+                capsule = module is not None and module.display == "capsule"
                 self.writer.set(
                     name,
                     self.name,
@@ -467,10 +483,10 @@ class PlayerSource(Source):
                     target=instance,
                     progress=progress,
                     accent=accent if module is not None and module.accent == "art" else None,
-                    status_at=status_at
-                    if module is not None and module.display == "capsule"
-                    else None,
+                    status_at=status_at if capsule else None,
                     kind=kinds[name],
+                    loop=p.loop if capsule else "",
+                    shuffle=p.shuffle if capsule else None,
                     now=now,
                 )
 
