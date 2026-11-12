@@ -47,6 +47,11 @@ display = "text"
 # scroll = 2.0           # steps per second (0-4); 0 cuts with "…" instead
 # scroll_rest = 10       # seconds the start of the title rests between passes (0-120)
 # accent = "role"        # or "art": the cover's colour on the line and icon (curl, magick)
+# fade_after = 0         # minutes paused or stopped before it shows its icon alone (0-240;
+#                        # 0 never). glyph_override.unavailable = "" hides it with no player
+# spoken = false         # podcasts and audiobooks (record 0005 phase B): ±30 s and a speed
+#                        # row in barmenu player, the line at the player's rate
+# spoken_players = []    # player names always taken as spoken word, e.g. ["gpodder", "cozy"]
 #
 # [modules.player-capsule.clicks]
 # left = ["playerctl", "-p", "{target}", "play-pause"]

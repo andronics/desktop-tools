@@ -50,7 +50,7 @@ The package ships a default for the live modules (`src/desktop_tools/barctl/modu
 `display = "capsule"` (design record 0003 §1-3) draws the `player` source as one module: the play-state glyph (set
 per tier with `glyph_override`), then `Artist – Title` padded to a fixed width, scrolling while it plays when it is
 longer (one pass round to the start, then a rest), and the track's progress as an underline under the first cells.
-Four keys, read only for a capsule; a value out of range or of the wrong type is a load error naming the key:
+These keys are read only for a capsule; a value out of range or of the wrong type is a load error naming the key:
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -58,6 +58,9 @@ Four keys, read only for a capsule; a value out of range or of the wrong type is
 | `scroll` | 2 | Steps a second, 0-4; 0 never scrolls (the title is cut with "…") |
 | `scroll_rest` | 10 | Seconds the start of the title rests between passes, 0-120 |
 | `accent` | `"role"` | The line's and icon's colour: the theme's `accent`, or `"art"`, the cover's average colour (needs `curl` and ImageMagick's `magick`; one fetch per new cover; a colour under 3:1 against the theme's `bg` falls back to the role). The text keeps the tier's role colour either way |
+| `fade_after` | 0 | Minutes the shown player may be paused or stopped before the capsule draws its icon alone, in the `idle` colour, giving its width back to the bar; a whole number 0-240, 0 never (design record 0005 phase B). Playing again (from any player, a key, a chip or a left-click on the icon) brings it back |
+| `spoken` | `false` | Podcasts and audiobooks (design record 0005 phase B): `true` lets the source mark spoken word (below), which gives `barmenu player` ±30 s skips and a speed row and moves the line at the player's rate |
+| `spoken_players` | `[]` | Player names always taken as spoken word when `spoken = true`, any case, e.g. `["gpodder", "cozy", "kasts"]` |
 
 ```toml
 [modules.player-capsule]
@@ -78,6 +81,21 @@ The packaged file keeps `player-play-pause` and `player-metadata` and has this c
 source writes every player module the same state, so a capsule can run beside the old buttons. `barctl pin
 player-capsule <instance>` shows one player until it goes (`--auto` undoes it; `--toggle` unpins it when it is
 already the pinned one; a controller restart forgets it).
+
+**Quiet when idle** (design record 0005 phase B). With `fade_after = 10`, a capsule whose player has been paused ten
+minutes shows only its `idle` icon; nothing is written then (render works it out from the state's `status_at`), and
+the controller pokes it once at that minute. To hide the capsule when there is no player at all, give it
+`glyph_override.unavailable = ""`: an empty `custom/ipc` module is not drawn, and the output segment beside it stays.
+Both are off in the packaged file and in a capsule without the keys.
+
+**Spoken word.** With `spoken = true`, the shown player plays spoken word (the state's `kind` is `spoken`) when the
+first of these matches: the track id or URL names an episode (`spotify:episode:`, `/episode/`); the genre contains
+`podcast`, `audiobook`, `audio book` or `spoken`, any case; the URL is a local `.m4b` or `.aax` file, or under a folder
+named `Podcasts` or `Audiobooks`; the player's name is in `spoken_players`. Length is not used. Then `barmenu player`
+shows `Back 30 s` and `Forward 30 s` in place of the 10-second rows, and `Speed: 1.25×` in place of shuffle, which steps
+through 0.75, 1, 1.25, 1.5, 1.75 and 2 within the player's own MPRIS range and back round (hidden when the range is 1
+to 1 or can't be read), so the menu stays at eight rows. A miss leaves the music controls; a false match only changes
+the skip step and adds the speed row.
 
 `display = "chips"` (design record 0005 phase A) draws the `player` source as one small chip per MPRIS player, just
 before the capsule: each player's app icon (from the `player` tool's `instances.json`; `glyph` for a player with

@@ -22,6 +22,10 @@ wrote it:
                  sink's volume in percent and its Bluetooth battery (null when BlueZ gives none)
     notice       a short line the output segment shows in place of its name (`<name>
                  connected`), until `notice_until` (epoch seconds)
+    status_at    epoch seconds: when the shown player's status last changed, or another player
+                 became the shown one (record 0005 phase B: the capsule's fade clock)
+    kind         `spoken` (a podcast or audiobook, record 0005 phase B) or empty: the player
+                 menu's skip step and speed row
     source       who wrote it
     updated      epoch seconds
 
@@ -58,7 +62,10 @@ FIELDS = (
     "output",
     "notice",
     "notice_until",
+    "status_at",
+    "kind",
 )
+KINDS = ("", "spoken")
 PROGRESS_FIELDS = ("position", "length", "rate", "at", "playing")
 VOLUME_MAX = 1000  # percent: pulse allows past 100 (153 is the usual top); past this, a mistake
 RATE_MAX = 16.0  # MPRIS lets a player say any rate; past this it is a mistake, not a speed
@@ -245,6 +252,13 @@ def validate(data: object) -> State:
         out["output"] = output(data["output"])
     if data.get("notice_until") is not None:
         out["notice_until"] = _time(data["notice_until"], "notice_until")
+    if data.get("status_at") is not None:
+        out["status_at"] = _time(data["status_at"], "status_at")
+    if data.get("kind") is not None:
+        if data["kind"] not in KINDS:
+            raise StateError("kind must be spoken or empty")
+        if data["kind"]:
+            out["kind"] = str(data["kind"])
     if "segments" in data and data["segments"] is not None:
         segs = data["segments"]
         if not isinstance(segs, list):

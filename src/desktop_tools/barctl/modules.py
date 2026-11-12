@@ -10,7 +10,8 @@
     glyph_override = "\\U000F099D" # wins over the pushed glyph: a string (every tier) or a table
     # glyph_override = { idle = "\\U000F099D", alert = "\\U000F0ECC" }  # per tier; others unchanged
     separator = " "              # between segments, for a module made of several cells
-    # width, scroll, scroll_rest, accent: for display = "capsule" only (record 0003 §2)
+    # width, scroll, scroll_rest, accent: for display = "capsule" only (record 0003 §2), and
+    # fade_after, spoken, spoken_players (record 0005 phase B)
     # chips_min, chips_max: for display = "chips" only (record 0005 phase A)
 
     [modules.audio-level.clicks] # button -> command; {target} and {segment} are filled in
@@ -53,6 +54,7 @@ CAPSULE_KEYS: dict[str, tuple[float, float, float]] = {
     "width": (32, 8, 80),
     "scroll": (2.0, 0, 4),
     "scroll_rest": (10.0, 0, 120),
+    "fade_after": (0, 0, 240),  # minutes paused before the capsule fades to its icon; 0 never
 }
 # The chips' keys (record 0005 phase A): (default, lowest, highest); read only for `chips`.
 CHIPS_KEYS: dict[str, tuple[float, float, float]] = {
@@ -100,6 +102,7 @@ class Module:
         "chips_min",
         "clicks",
         "display",
+        "fade_after",
         "glyph",
         "glyph_override",
         "menu",
@@ -110,6 +113,8 @@ class Module:
         "segment_clicks",
         "separator",
         "source",
+        "spoken",
+        "spoken_players",
         "width",
     )
 
@@ -133,6 +138,9 @@ class Module:
         accent: str = "role",
         chips_min: int = 2,
         chips_max: int = 4,
+        fade_after: int = 0,
+        spoken: bool = False,
+        spoken_players: tuple[str, ...] = (),
     ) -> None:
         self.name, self.source, self.pusher = name, source, pusher
         self.width, self.scroll, self.scroll_rest, self.accent = width, scroll, scroll_rest, accent
@@ -142,6 +150,7 @@ class Module:
         self.segment_clicks = segment_clicks or {}
         self.cell_clicks = cell_clicks or {}
         self.chips_min, self.chips_max = chips_min, chips_max
+        self.fade_after, self.spoken, self.spoken_players = fade_after, spoken, spoken_players
         self.menu = menu or []
 
     @property
@@ -199,6 +208,9 @@ class Module:
                 scroll=self.scroll,
                 scroll_rest=self.scroll_rest,
                 accent=self.accent,
+                fade_after=self.fade_after,
+                spoken=self.spoken,
+                spoken_players=list(self.spoken_players),
             )
         if self.display == "chips":
             out.update(chips_min=self.chips_min, chips_max=self.chips_max)
@@ -288,7 +300,7 @@ def _override(value: object, where: str) -> str | dict[str, str] | None:
 def _number(table: dict[str, object], key: str, where: str) -> float:
     default, low, high = CAPSULE_KEYS.get(key) or CHIPS_KEYS[key]
     value = table.get(key, default)
-    whole = key in ("width", *CHIPS_KEYS)
+    whole = key in ("width", "fade_after", *CHIPS_KEYS)
     if isinstance(value, bool) or not isinstance(value, int if whole else (int, float)):
         raise ConfigError(f"{where}: {key} must be {'a whole number' if whole else 'a number'}")
     if not low <= value <= high:
@@ -307,6 +319,15 @@ def _capsule(module: Module, raw: dict[str, object], where: str) -> Module:
     module.scroll = _number(raw, "scroll", where)
     module.scroll_rest = _number(raw, "scroll_rest", where)
     module.accent = accent
+    module.fade_after = int(_number(raw, "fade_after", where))
+    spoken = raw.get("spoken", False)
+    if not isinstance(spoken, bool):
+        raise ConfigError(f"{where}: spoken must be true or false")
+    module.spoken = spoken
+    players = raw.get("spoken_players", [])
+    if not isinstance(players, list) or not all(isinstance(n, str) and n for n in players):
+        raise ConfigError(f"{where}: spoken_players must be a list of player names")
+    module.spoken_players = tuple(str(n) for n in players)
     return module
 
 
