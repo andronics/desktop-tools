@@ -25,6 +25,8 @@ def test_keys_and_variables() -> None:
     # Renaming one breaks every deployment that sets it: this list changes only on purpose.
     assert [(s.key, s.env) for s in SETTINGS] == [
         ("log_level", "DESKTOP_TOOLS_LOG_LEVEL"),
+        ("scanner", "DESKTOP_TOOLS_SCANNER"),  # record 0004 §2
+        ("scan_dir", "DESKTOP_TOOLS_SCAN_DIR"),  # record 0004 §3
     ]
     assert CONFIG_ENV == "DESKTOP_TOOLS_CONFIG"
     assert Path("/etc/desktop-tools/config.yaml") == DEFAULT_CONFIG_PATH

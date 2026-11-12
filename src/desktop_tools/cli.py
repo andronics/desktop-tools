@@ -48,10 +48,12 @@ def _mount() -> None:
     from desktop_tools.barctl.app import app as barctl
     from desktop_tools.barmenu.cli import app as barmenu
     from desktop_tools.crew.app import app as crew
+    from desktop_tools.devices.cli import app as devices
 
     app.add_typer(barctl, name="barctl")
     app.add_typer(barmenu, name="barmenu")
     app.add_typer(crew, name="crew")
+    app.add_typer(devices, name="devices")
 
 
 _mount()
@@ -62,7 +64,8 @@ def completions(
     shell: Annotated[str, typer.Argument(help="The shell: zsh.")],
     out: Annotated[Path, typer.Option("--out", help="The folder to write them into.")],
 ) -> None:
-    """Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`, `_crew_cmd`) for this
+    """Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`, `_crew_cmd`,
+    `_devices_cmd`) for this
     version."""
     from desktop_tools import completions as comp
 
@@ -84,6 +87,8 @@ def show_config(config: ConfigOption = None) -> None:
     cfg = _load(config)
     values = {
         "log_level": cfg.log_level,
+        "scanner": cfg.scanner,
+        "scan_dir": cfg.scan_dir,
     }
     # A secret shows whether it is set, never its value: a Secret is truthy when it isn't
     # empty. Read from the resolved settings, so a secret Config holds needs no entry above.

@@ -338,6 +338,13 @@ def test_desktop_tools_mounts_the_tools(isolate: Path, monkeypatch: pytest.Monke
         "outputs",
         "player",
         "players",
+        "printer",  # record 0004 §3
+        "printer-default",
+        "printer-queue",
+        "scanner",
+        "scanner-devices",
+        "scanner-folders",
+        "scanner-presets",
         "screenshot",
         "session",
         "settings",
@@ -348,7 +355,12 @@ def test_desktop_tools_mounts_the_tools(isolate: Path, monkeypatch: pytest.Monke
     out = isolate / "completions"
     r = runner.invoke(top, ["completions", "zsh", "--out", str(out)])
     assert r.exit_code == 0
-    assert sorted(p.name for p in out.iterdir()) == ["_barctl_cmd", "_barmenu_cmd", "_crew_cmd"]
+    assert sorted(p.name for p in out.iterdir()) == [
+        "_barctl_cmd",
+        "_barmenu_cmd",
+        "_crew_cmd",
+        "_devices_cmd",
+    ]
     assert runner.invoke(top, ["completions", "bash", "--out", str(out)]).exit_code == 2
 
 

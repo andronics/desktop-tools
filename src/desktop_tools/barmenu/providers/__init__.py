@@ -17,7 +17,21 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from desktop_tools.barmenu.menus import Row
 
-NAMES = ("lock", "outputs", "player", "players", "tessera", "theme")
+NAMES = (
+    "lock",
+    "outputs",
+    "player",
+    "players",
+    "printer",
+    "printer_default",
+    "printer_queue",
+    "scanner",
+    "scanner_devices",
+    "scanner_folders",
+    "scanner_presets",
+    "tessera",
+    "theme",
+)
 TIMEOUT = 2.0  # seconds a provider's query may take before its menu opens without the state
 
 

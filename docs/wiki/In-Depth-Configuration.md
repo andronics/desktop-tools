@@ -22,6 +22,8 @@ Generated from the code: don't edit the table, run `uv run scripts/gen-wiki.py`.
 | Key | Environment variable | Default | Description |
 |---|---|---|---|
 | `log_level` | `DESKTOP_TOOLS_LOG_LEVEL` | `INFO` | Log level: `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
+| `scanner` | `DESKTOP_TOOLS_SCANNER` | *(none)* | The scanner `devices` and barctl's scanner module use: a SANE device name, as `scanimage -L` lists it (`airscan:e0:<name>`). Empty: the one picked in the scanner menu, else the first found (record 0004 §2). |
+| `scan_dir` | `DESKTOP_TOOLS_SCAN_DIR` | *(none)* | The default folder scans are saved in. Empty: `Scans` in the Documents folder (`xdg-user-dir DOCUMENTS`), made on the first scan (record 0004 §3). |
 <!-- generated:end settings -->
 
 The settings above are the template's, for `desktop-tools` itself. The tools read their own files, below, with the
@@ -102,6 +104,55 @@ right = ["barmenu", "outputs"]
 The packaged file has it as a commented example. `audio-level` and an output segment can run side by side; the source
 lists the sinks' properties only when an output segment is configured.
 
+#### The printer and the scanner (design record 0004)
+
+Two modules, `source = "printer"` and `source = "scanner"`, both `display = "icon"` (the glyph, then the count). The
+packaged file has them as commented examples; the dotfiles turn them on with their own `glyph_override` for `idle`,
+`active` and `unavailable`, leaving `alert` out so the source's reason glyph shows (paper, ink, not found):
+
+```toml
+[modules.printer]
+source = "printer"
+display = "icon"
+glyph = "\U000F042A"
+glyph_override = { idle = "\U000F042A", active = "\U000F042A", unavailable = "\U000F0E5D" }
+
+[modules.printer.clicks]
+left = ["barmenu", "printer-queue"]
+middle = ["system-config-printer"]
+right = ["barmenu", "printer"]
+
+[modules.scanner]
+source = "scanner"
+display = "icon"
+
+[modules.scanner.clicks]
+left = ["devices", "scan"]        # the remembered preset: the feeder when loaded, else the flatbed
+middle = ["simple-scan"]
+right = ["barmenu", "scanner"]
+```
+
+| Module | Tier | When |
+|---|---|---|
+| printer | `idle` | The default queue accepting, not paused, no jobs, the printer reachable (`ready`) |
+| printer | `active` | A job printing or waiting (`printing`, `2 waiting`); the count is the unfinished jobs |
+| printer | `alert` | Paused, not accepting, out of paper, a jam, a cover open, ink empty, a held or stopped job, jobs waiting while the printer can't be reached; a low supply once a day. A new alert blinks once |
+| printer | `unavailable` | The printer away with nothing waiting, no queue, or CUPS not running |
+| scanner | `idle` | Found (`ready`, `feeder loaded`) |
+| scanner | `active` | A scan running (`scanning page 3`); the count is the pages so far |
+| scanner | `alert` | The last scan failed (for 10 minutes or until the next), a jam or open cover, or not found while its network is up |
+| scanner | `unavailable` | SANE missing, no scanner found, or away |
+
+Ink levels come from the queue's `marker-levels`, named by `marker-names` when the printer gives them, else by the
+order it reports them: magenta, cyan, yellow, black (M, C, Y, BK). A driverless (IPP Everywhere) queue reports paper,
+ink and jam states; a raw `socket://` queue mostly doesn't.
+
+The scanner menus remember the preset, format, folder and scanner in `$XDG_STATE_HOME/desktop-tools/devices/scan.json`.
+The presets: Document (300 dpi, grey, PDF; the default), Colour document (300 dpi, colour, PDF), Text, smallest
+(300 dpi, black and white, PDF), Draft (150 dpi, grey, PDF), Photo (600 dpi, colour, PNG). A preset sets the format; a
+format picked afterwards wins until another preset is picked. The settings `scanner` and `scan_dir` (above) choose the
+scanner and the default folder.
+
 ### barmenu: `menus.toml`
 
 The package ships the zsh barmenu's menus (layout, screenshot, settings, vpn, session) and the theme and lock
@@ -114,9 +165,11 @@ list of arguments; `current = true` marks a row), and one of `dynamic` or `provi
 | Key | What |
 |---|---|
 | `dynamic` | A barctl module whose source's rows are appended |
-| `provider` | `theme`, `lock`, `tessera`, `player`, `players` or `outputs`: a function in `barmenu/providers/` that gives the menu's rows when it opens, the static `rows` following them. It reads state only through read-only queries with a 2 s limit (`theme current --json`, `lockscreen status --json`, `tessera status --json`, `playerctl -p <shown> metadata --format …`, `playerctl -l`, `pactl -f json list sinks`, BlueZ's `GetManagedObjects`); when one fails, the rows still come, unmarked and with labels that name no state |
+| `provider` | `theme`, `lock`, `tessera`, `player`, `players`, `outputs`, `printer`, `printer_queue`, `printer_default`, `scanner`, `scanner_presets`, `scanner_folders` or `scanner_devices`: a function in `barmenu/providers/` that gives the menu's rows when it opens, the static `rows` following them. It reads state only through read-only queries with a 2 s limit (`theme current --json`, `lockscreen status --json`, `tessera status --json`, `playerctl -p <shown> metadata --format …`, `playerctl -l`, `pactl -f json list sinks`, BlueZ's `GetManagedObjects`); when one fails, the rows still come, unmarked and with labels that name no state |
 | `player`, `players` (menus) | Design record 0003 §4: next, previous, loop and shuffle (marked; hidden when the player gives none), `Player: <name> ›` (opens `players`), back and forward 10 s (when a length is known), all `playerctl -p <shown>` argument lists for the player `player-capsule` shows; with no player, `No player` (runs nothing) and `Player… ›`; the last row is always `Output ›` (below). `players` lists every player, the shown one marked, then `Automatic` (marked when nothing is pinned); a pick runs `barctl pin player-capsule …` |
 | `outputs` (menu) | Design record 0003 §10, from the output segment's right-click and the player menu's `Output: <name> ›` row (which shows the segment's kind glyph and name, or `Output… ›`): one row per sink, the default marked (`pactl set-default-sink <sink>`); `Connect <alias>` per paired Bluetooth audio device not connected and `Disconnect <alias>` per connected one (`bluetoothctl connect`/`disconnect <address>`); `Mixer…` (`pwvucontrol`). With BlueZ unreadable the Bluetooth rows are left out. No row pairs, removes, trusts or powers a device |
+| `printer`, `printer-queue`, `printer-default` (menus) | Design record 0004 §3: `Queue: 2 jobs…`, `Pause printing` or `Resume printing` (by state), `Default: <queue>…` (two or more queues), `Print a test page…` (asks first), the printer's state (`Network printer: reachable`, a notification with everything), `Printer settings`. The queue lists each unfinished job newest first by number, state and age, never its name; picking one of yours cancels it after a Yes/No; `Cancel all my jobs (n)…` with two or more. Every action row runs `devices printer …` |
+| `scanner`, `scanner-presets`, `scanner-folders`, `scanner-devices` (menus) | Design record 0004 §3: `Scan from feeder` (`(loaded)`/`(empty)` when the scanner says), `Scan from feeder, both sides` (a duplex feeder only), `Scan from flatbed`, the preset, the folder (never a full path), `Preview in Simple Scan` (or `Scanner: <model>…` with two or more), the last scan's path and file. Not found, the scan rows become `Find scanners…`. Every scan row runs `devices scan …` |
 | `current` (a row's) | Shown as one of rofi's active rows, which the dotfiles' `bar-menu.rasi` colours in the theme's accent; the cursor still starts on the first row. Providers set it from the state they read |
 
 An override can add rows to a provider's menu, for example a 30-minute pause:

@@ -20,30 +20,24 @@ tidy) is `switch.stopped`, unchanged.
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import time
 from pathlib import Path
 
-from desktop_tools.common import paths
+from desktop_tools.common import confirm as confirm_
 from desktop_tools.crew import log, metacall, switch, tmux, wm
 from desktop_tools.crew.registry import Coordinator, Registry, valid_name
 
 OK, FAILED, USAGE = 0, 1, 2
 # The Yes/No's rofi theme, the first found in ~/.config/rofi/themes: dotfiles' confirm.rasi (the
 # question in full over two rows, nothing to type), else the one-line prompt.rasi it replaced.
-CONFIRM_THEMES = ("confirm", "prompt")
+CONFIRM_THEMES = confirm_.THEMES
 # rofi's -p in confirm, where the question is the -mesg and a long one wraps. prompt.rasi has no
 # message, so there (and with neither theme) the question stays the -p as well.
 CONFIRM_PROMPT = "crew"
 FORCED = "Stephen: crew stop --force"
 ALL_YES = "Stephen: Yes to stop all anyway"
 ALL_FLAG = "Stephen: crew stop --all --yes"
-SETTLE = 0.3  # seconds a Yes/No waits for the click that picked it to land (barmenu's settle)
-UNSHOWN = 0.25  # an unanswered Yes/No that closed sooner than this was never seen
-# What rofi says when it can't show itself: its single-instance lock, a keyboard or pointer it
-# couldn't grab, no display.
-UNSHOWN_SAYS = ("already running", "Failed to grab", "Giving up", "open display")
+SETTLE = confirm_.SETTLE  # seconds a Yes/No waits for the click that picked it to land
+UNSHOWN = confirm_.UNSHOWN  # an unanswered Yes/No that closed sooner than this was never seen
 
 
 def _known(reg: Registry, name: str) -> Coordinator | None:
@@ -66,75 +60,32 @@ def _running(c: Coordinator, sessions: set[str]) -> bool:
     return any(s in sessions for s in c.sessions)
 
 
-class Unasked(Exception):
-    """The Yes/No couldn't be shown, twice (Stephen notified): nothing is done. It is no No: the
-    caller fails instead of going back a level."""
+Unasked = confirm_.Unasked  # the Yes/No couldn't be shown, twice: no No, a failure
 
 
 def _confirm_theme() -> Path | None:
-    themes = paths.config_home() / "rofi" / "themes"
-    return next((t for n in CONFIRM_THEMES if (t := themes / f"{n}.rasi").is_file()), None)
+    return confirm_.theme()
 
 
 def _ask(question: str) -> bool | str:
-    """One Yes/No: True on Yes, False on No (Escape, Return on the selected No), else why it
-    couldn't be shown. It opens only once the click that picked it has landed (`SETTLE`): a rofi
-    started the instant the menu's rofi closed takes that click's release as a click outside
-    it and closes at once, unseen (the click-test's Stop that did nothing)."""
-    if shutil.which("rofi") is None:
-        return "rofi is not on PATH"
-    from desktop_tools.barmenu import menus as bm
-
-    bm.settle(SETTLE)
-    argv = ["rofi", "-dmenu", "-i", "-no-custom", "-format", "s", "-selected-row", "1"]
-    theme = _confirm_theme()
-    argv += ["-theme", str(theme)] if theme else []
-    shown = theme is not None and theme.stem == CONFIRM_THEMES[0]
-    mesg = question.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    started = time.monotonic()
-    try:
-        # S603/S607: rofi with crew's fixed options; it blocks until answered.
-        done = subprocess.run(  # noqa: S603
-            [*argv, "-p", CONFIRM_PROMPT if shown else question, "-mesg", mesg],
-            input="Yes\nNo\n",
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError as e:
-        return f"rofi: {e.strerror}"
-    took = time.monotonic() - started
-    answer = done.stdout.strip()
-    if done.returncode == 0 and answer:
-        return answer == "Yes"
-    said = [line.strip() for line in done.stderr.splitlines() if line.strip()]
-    if done.returncode not in (0, 1):
-        return f"rofi exited {done.returncode}" + (f": {said[-1]}" if said else "")
-    failed = [line for line in said if any(m in line for m in UNSHOWN_SAYS)]
-    if failed:
-        return failed[-1]
-    if took < UNSHOWN:
-        return f"rofi closed after {took * 1000:.0f} ms, before it could be answered"
-    return False
+    """One Yes/No (common/confirm.py): True on Yes, False on No, else why it couldn't be shown.
+    crew's waits (`SETTLE`, `UNSHOWN`) are read here on each call, so its tests can set them."""
+    return confirm_.ask(question, prompt=CONFIRM_PROMPT, settle=SETTLE, unshown=UNSHOWN)
 
 
 def confirm(question: str) -> bool:
-    """Yes only on an explicit Yes, as coord's: No is selected, so Return on open or Escape mean
-    No. A question that couldn't be shown is asked once more; shown neither time, Stephen is
-    told and `Unasked` raised, so nothing runs without his Yes and nothing reads it as No."""
-    got = _ask(question)
-    if isinstance(got, str):
-        log.warning(f"cannot ask ({question}): {got}; asking again")
-        got = _ask(question)
-    if isinstance(got, str):
-        log.warning(f"cannot ask ({question}): {got}; nothing done")
-        switch.notify(
-            f"couldn't ask: {got}",
-            f"{question} Nothing was done.",
-            "--hint=string:x-dunst-stack-tag:crew-alert",
-        )
-        raise Unasked(got)
-    return got
+    """Yes only on an explicit Yes, as coord's (common/confirm.py, record 0004 §3): asked once
+    more if it couldn't be shown; shown neither time, Stephen is told and `Unasked` raised."""
+    return confirm_.confirm(
+        question,
+        prompt=CONFIRM_PROMPT,
+        settle=SETTLE,
+        unshown=UNSHOWN,
+        warn=log.warning,
+        tell=lambda title, body: switch.notify(
+            title, body, "--hint=string:x-dunst-stack-tag:crew-alert"
+        ),
+    )
 
 
 # ---------------------------------------------------------------- one coordinator

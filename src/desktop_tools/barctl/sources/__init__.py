@@ -13,8 +13,15 @@ from __future__ import annotations
 
 from desktop_tools.barctl.sources.base import Source
 from desktop_tools.barctl.sources.player import PlayerSource
+from desktop_tools.barctl.sources.printer import PrinterSource
+from desktop_tools.barctl.sources.scanner import ScannerSource
 from desktop_tools.barctl.sources.volume import VolumeSource
 
-SOURCES: dict[str, type[Source]] = {"volume": VolumeSource, "player": PlayerSource}
+SOURCES: dict[str, type[Source]] = {
+    "volume": VolumeSource,
+    "player": PlayerSource,
+    "printer": PrinterSource,
+    "scanner": ScannerSource,
+}
 
-__all__ = ["SOURCES", "PlayerSource", "Source", "VolumeSource"]
+__all__ = ["SOURCES", "PlayerSource", "PrinterSource", "ScannerSource", "Source", "VolumeSource"]

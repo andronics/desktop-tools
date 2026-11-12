@@ -56,6 +56,28 @@ missing. A device shows only when it is paired and its `Icon` starts with `audio
 barctl never switches the default sink (design record 0003, open question 12): WirePlumber decides, and the segment
 shows the 5-second `connected` notice and then the default it chose. Pick the headphones in `barmenu outputs`.
 
+### The printer's detail says "polling: CUPS refused a subscription"
+
+cupsd wouldn't make the printer source's pull subscription (often its `MaxSubscriptions` limit), so the source reads the
+queue every 30 seconds (5 with jobs) instead of on events. `barctl doctor` shows it too. Check cupsd's log, then
+`barctl restart`.
+
+### A printer action says "Not allowed: CUPS wants an administrator"
+
+cupsd refused the pause, resume or test page for your user. Use `Printer settings` (`system-config-printer`), or add
+your user to a group in cupsd's `SystemGroup`.
+
+### The printer or scanner shows "away"
+
+The device can't be reached and nothing waits (switched off, or on another network). For the printer, jobs waiting
+make it an alert instead (`not reachable, 2 waiting`). Without `avahi-browse`, presence is checked by a TCP probe every
+5 minutes, so it can lag.
+
+### "An agent may not operate the printer or scanner"
+
+`devices` was run with `COORDINATOR`, `CLAUDECODE` or `TESSERA_ACTOR` set, as a bar started from an agent's session
+is. Restart the bar from a clean session.
+
 ### `modules.toml` fails, and every barctl module is blank, after a downgrade
 
 An older barctl rejects `display = "capsule"` or `"output"` as an unknown display, which fails the whole file. Take

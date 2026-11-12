@@ -258,6 +258,18 @@ Player menu: rows from the player provider
 
 Players menu: rows from the players provider
 
+### `desktop-tools barmenu printer`
+
+Printer menu: rows from the printer provider
+
+### `desktop-tools barmenu printer-default`
+
+Default printer menu: rows from the printer_default provider
+
+### `desktop-tools barmenu printer-queue`
+
+Print queue menu: rows from the printer_queue provider
+
 ### `desktop-tools barmenu run`
 
 Run a command detached from the bar's pipes (setsid, no inherited descriptors).
@@ -265,6 +277,22 @@ Run a command detached from the bar's pipes (setsid, no inherited descriptors).
 | Argument | Description |
 |---|---|
 | `COMMAND` | The command and its arguments. |
+
+### `desktop-tools barmenu scanner`
+
+Scanner menu: rows from the scanner provider
+
+### `desktop-tools barmenu scanner-devices`
+
+Scanners menu: rows from the scanner_devices provider
+
+### `desktop-tools barmenu scanner-folders`
+
+Save scans to menu: rows from the scanner_folders provider
+
+### `desktop-tools barmenu scanner-presets`
+
+Scan preset menu: rows from the scanner_presets provider
 
 ### `desktop-tools barmenu screenshot`
 
@@ -292,7 +320,8 @@ VPN menu: CONNECT, Disconnect, Information
 
 ### `desktop-tools completions`
 
-Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`, `_crew_cmd`) for this
+Write each tool's completion file (`_barctl_cmd`, `_barmenu_cmd`, `_crew_cmd`,
+`_devices_cmd`) for this
 version.
 
 | Argument | Description |
@@ -501,6 +530,133 @@ failure.
 |---|---|
 | `VALUE` | N, +N, -N, or left or right to move the inner edge. |
 | `STEP` | How far left or right moves it. |
+
+### `desktop-tools devices printer cancel`
+
+Cancel a job, or all of yours on the default queue; asks first unless --yes.
+
+| Argument | Description |
+|---|---|
+| `JOB` | The job number. |
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--all` |  | Every job of yours on the queue. |
+| `--yes`, `-y` |  | Don't ask first (tests, keybindings). |
+
+### `desktop-tools devices printer default`
+
+Make a queue your default (lpoptions -d: yours, not the system's).
+
+| Argument | Description |
+|---|---|
+| `QUEUE` | The queue to make your default. |
+
+### `desktop-tools devices printer pause`
+
+Pause printing on the queue (cupsdisable).
+
+| Argument | Description |
+|---|---|
+| `QUEUE` | The queue (default: the default). |
+
+### `desktop-tools devices printer resume`
+
+Resume printing on the queue (cupsenable).
+
+| Argument | Description |
+|---|---|
+| `QUEUE` | The queue (default: the default). |
+
+### `desktop-tools devices printer status`
+
+The default queue's state: read-only, anyone may run it.
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--json` |  | One JSON object. |
+| `--notify` |  | Also as a notification. |
+
+### `desktop-tools devices printer test-page`
+
+Print CUPS's test page (it uses paper and ink); asks first unless --yes.
+
+| Argument | Description |
+|---|---|
+| `QUEUE` | The queue (default: the default). |
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--yes`, `-y` |  | Don't ask first (tests, keybindings). |
+
+### `desktop-tools devices scan copy-last`
+
+Copy the last scan's path (this session) to the clipboard.
+
+### `desktop-tools devices scan duplex`
+
+Scan every page in the feeder, both sides (a scanner with a duplex feeder).
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--preset` |  | A preset's name (Document, Photo, …). |
+| `--format` |  | pdf, png or jpeg. |
+| `--to` |  | The folder to save in. |
+
+### `desktop-tools devices scan feeder`
+
+Scan every page in the document feeder.
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--preset` |  | A preset's name (Document, Photo, …). |
+| `--format` |  | pdf, png or jpeg. |
+| `--to` |  | The folder to save in. |
+
+### `desktop-tools devices scan flatbed`
+
+Scan one page from the flatbed.
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--preset` |  | A preset's name (Document, Photo, …). |
+| `--format` |  | pdf, png or jpeg. |
+| `--to` |  | The folder to save in. |
+
+### `desktop-tools devices scan open-last`
+
+Open the last scan (this session).
+
+### `desktop-tools devices scan set`
+
+Remember a preset, a format or a folder for the next scans (the menus' pickers).
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--preset` |  | A preset's name (Document, Photo, …). |
+| `--format` |  | pdf, png or jpeg. |
+| `--to` |  | The folder to save in. |
+| `--choose` |  | Pick the folder (zenity). |
+
+### `desktop-tools devices scanner find`
+
+Look for scanners (scanimage -L, up to 15 s) and say what was found.
+
+### `desktop-tools devices scanner pick`
+
+Use this scanner from now on (the menu's choice; DESKTOP_TOOLS_SCANNER wins).
+
+| Argument | Description |
+|---|---|
+| `DEVICE` | A SANE device name (scanimage -L). |
+
+### `desktop-tools devices scanner status`
+
+The scanner's state (one eSCL status read when it has one): read-only, anyone.
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--json` |  | One JSON object. |
 
 ### `desktop-tools version`
 

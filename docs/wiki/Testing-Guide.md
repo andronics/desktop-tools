@@ -18,10 +18,14 @@ CI runs the unit tests on every supported Python version, together with ruff, my
 | `tests/integration/` | Real dependencies, marked `@pytest.mark.integration`; skipped unless `RUN_INTEGRATION=1` |
 | `tests/conftest.py` | Shared fixtures: `clean_env`, `isolate` (every folder in `tmp_path`, for every test), `theme`, `bar`, `journal_sock`, `commands`, `launched`, `write_config` |
 | `tests/fakes.py` | A fake polybar answering on its IPC socket, the journal's datagram socket, the theme, and fake commands on PATH that log every call |
+| `tests/devices_fakes.py` | Record 0004: a fake cupsd answering IPP on a Unix socket (the `cupsd` fixture, `CUPS_SERVER`), avahi-browse lines, `scanimage -A` and eSCL fixtures, and a fake `scanimage`, `tiffcp`, `tiff2pdf` and `magick` |
 | `tests/crew_fakes.py` | crew's fake desktop (the `desk` fixture): a bspwm keeping its windows in a file, a tmux, `meta` (lifecycle, `menu` and read-only verbs), alacritty, rofi and notify-send; `ROFI_SEQ` and `XCLIP` for the menus |
 
 Nothing a test runs reaches the live desktop: `isolate` points every XDG folder, barctl's state, the journal socket,
-the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_path`.
+the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_path`. No test reaches a printer,
+queue or scanner (record 0004 §9): `CUPS_SERVER` is a socket nothing listens on unless a test serves the fake cupsd;
+CUPS's and SANE's commands are tripwires on PATH; `no_device_sockets` fails a test that connects to
+`/run/cups/cups.sock` or to port 631, 80 or 9100, and stubs the reachability probe, DNS lookups and airscan.conf.
 
 ## Writing tests
 

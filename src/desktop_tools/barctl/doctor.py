@@ -204,14 +204,27 @@ def checks(now: float | None = None) -> list[Check]:
             )
             continue
         missing = [c for c in kind.commands if shutil.which(c) is None]
-        out.append(
-            _check(
-                f"source {source}",
-                not missing,
-                "needs " + ", ".join(kind.commands),
-                "install " + ", ".join(missing),
+        if kind.commands or not kind.optional:
+            out.append(
+                _check(
+                    f"source {source}",
+                    not missing,
+                    "needs " + (", ".join(kind.commands) or "nothing outside barctl"),
+                    "install " + ", ".join(missing),
+                )
             )
-        )
+        lacking = [c for c in kind.optional if shutil.which(c) is None]
+        if kind.optional:
+            out.append(
+                _check(
+                    f"source {source} extras",
+                    not lacking,
+                    "works better with " + ", ".join(kind.optional),
+                    "install " + ", ".join(lacking) + " (without it: slower presence checks)",
+                    warn=True,
+                )
+            )
+    out += devices_checks(modules)
 
     art = sorted(m.name for m in modules.values() if m.display == "capsule" and m.accent == "art")
     if art:
@@ -269,6 +282,46 @@ def checks(now: float | None = None) -> list[Check]:
         elif data.get("expires") and float(data["expires"]) <= now:
             writer = modules[name].pusher or "its pusher"
             out.append(_check(f"state {name}", False, "stale: its ttl ran out", f"run {writer}"))
+    return out
+
+
+# What the printer's and scanner's actions run (record 0004 §4-§5): missing ones are reported,
+# not failed, since the modules still show their state without them.
+DEVICE_TOOLS = {
+    "printer": ("lp", "cancel", "cupsenable", "cupsdisable", "lpoptions", "system-config-printer"),
+    "scanner": ("tiffcp", "tiff2pdf", "magick", "xclip", "xdg-open", "zenity", "simple-scan"),
+}
+
+
+def devices_checks(modules: dict[str, mods.Module]) -> list[Check]:
+    out = []
+    for source, tools in DEVICE_TOOLS.items():
+        names = sorted(m.name for m in modules.values() if m.source == source)
+        if not names:
+            continue
+        lacking = [t for t in (*tools, "dunstify") if shutil.which(t) is None]
+        out.append(
+            _check(
+                f"{source} actions",
+                not lacking,
+                f"{', '.join(names)}: the menu's actions run " + ", ".join(tools),
+                "install " + ", ".join(lacking),
+                warn=True,
+            )
+        )
+        for name in names:
+            detail = str((st.read(name) or {}).get("detail") or "")
+            if "polling:" in detail:
+                why = detail.split("polling:", 1)[1].split(";", 1)[0].strip()
+                out.append(
+                    _check(
+                        f"{name} events",
+                        False,
+                        f"polling: {why}",
+                        "check cupsd's MaxSubscriptions and its log",
+                        warn=True,
+                    )
+                )
     return out
 
 

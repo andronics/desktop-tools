@@ -61,7 +61,7 @@ class Controller:
         self.stop_event = threading.Event()
         self.failed = threading.Event()
         self.lock = threading.RLock()
-        self.writer = Writer(self.modules, self._poke)
+        self.writer = Writer(self.modules, self._poke, self.follow_state)
         self.running: dict[str, tuple[Source, threading.Thread]] = {}
         self.alerts: dict[str, float] = {}
         self.expiries: dict[str, float] = {}

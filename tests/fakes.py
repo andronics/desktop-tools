@@ -189,6 +189,24 @@ DESKTOP = [
     "zsh",
     "sh",
     "bash",
+    # record 0004: the printer and the scanner
+    "lpstat",
+    "lp",
+    "cancel",
+    "cupsenable",
+    "cupsdisable",
+    "lpoptions",
+    "lpadmin",
+    "ipptool",
+    "scanimage",
+    "simple-scan",
+    "system-config-printer",
+    "tiffcp",
+    "tiff2pdf",
+    "avahi-browse",
+    "udevadm",
+    "zenity",
+    "xdg-user-dir",
 ]
 # Real tools the fakes and tests use themselves, linked in from the system.
 REAL = ("cat", "pgrep")

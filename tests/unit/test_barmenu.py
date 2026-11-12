@@ -36,6 +36,13 @@ def test_the_zsh_menus_carried_over() -> None:
         "outputs",
         "player",
         "players",
+        "printer",  # record 0004 §3
+        "printer-default",
+        "printer-queue",
+        "scanner",
+        "scanner-devices",
+        "scanner-folders",
+        "scanner-presets",
         "screenshot",
         "session",
         "settings",

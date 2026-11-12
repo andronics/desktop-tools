@@ -57,6 +57,19 @@ SETTINGS = Settings(
             "Log level: `DEBUG`, `INFO`, `WARNING` or `ERROR`.",
             check=one_of(*LOG_LEVELS),
         ),
+        Setting(
+            "scanner",
+            "",
+            "The scanner `devices` and barctl's scanner module use: a SANE device name, as "
+            "`scanimage -L` lists it (`airscan:e0:<name>`). Empty: the one picked in the "
+            "scanner menu, else the first found (record 0004 §2).",
+        ),
+        Setting(
+            "scan_dir",
+            "",
+            "The default folder scans are saved in. Empty: `Scans` in the Documents folder "
+            "(`xdg-user-dir DOCUMENTS`), made on the first scan (record 0004 §3).",
+        ),
     ),
     default_path=DEFAULT_CONFIG_PATH,
 )
@@ -66,6 +79,8 @@ CONFIG_ENV = SETTINGS.config_env
 @dataclass(frozen=True)
 class Config:
     log_level: str
+    scanner: str = ""
+    scan_dir: str = ""
     # Setting key -> where its value came from ("default", "file", an env var name).
     sources: Mapping[str, str] = field(default_factory=dict)
 
@@ -79,5 +94,7 @@ def load_config(path: Path | None = None, environ: Mapping[str, str] | None = No
     # Cross-setting rules go here; a rule on one value is its setting's check=.
     return Config(
         log_level=resolved.str("log_level"),
+        scanner=resolved.str("scanner"),
+        scan_dir=resolved.str("scan_dir"),
         sources=dict(resolved.sources),
     )

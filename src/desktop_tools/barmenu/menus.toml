@@ -118,3 +118,54 @@ glyph = "\U000F04C3" # md-speaker
 title = "Output"
 side = "right"
 provider = "outputs"
+
+# Record 0004 §3: rows from barmenu/providers/printer.py (the queue, pause or resume by state, the
+# default with two or more queues, a test page, the printer's state, its settings). Opened by
+# the printer module's right-click. Every action row runs `devices printer`.
+[menus.printer]
+glyph = "\U000F042A" # md-printer
+title = "Printer"
+side = "left"
+provider = "printer"
+
+# Record 0004 §3: rows from barmenu/providers/printer_queue.py (one per unfinished job, newest
+# first: number, state and age, never the name; picking one cancels it after a Yes/No).
+[menus.printer-queue]
+glyph = "\U000F0279" # md-format_list_bulleted
+title = "Print queue"
+side = "left"
+provider = "printer_queue"
+
+# Record 0004 §3: one row per queue, the default marked (`devices printer default <queue>`).
+[menus.printer-default]
+glyph = "\U000F04CE" # md-star
+title = "Default printer"
+side = "left"
+provider = "printer_default"
+
+# Record 0004 §3: rows from barmenu/providers/scanner.py (scan from the feeder, both sides, the
+# flatbed; the preset, the folder, Simple Scan; the last scan). Opened by the scanner module's
+# right-click. Every scan row runs `devices scan`.
+[menus.scanner]
+glyph = "\U000F06AB" # md-scanner
+title = "Scanner"
+side = "left"
+provider = "scanner"
+
+[menus.scanner-presets]
+glyph = "\U000F062E" # md-tune
+title = "Scan preset"
+side = "left"
+provider = "scanner_presets"
+
+[menus.scanner-folders]
+glyph = "\U000F0770" # md-folder_open
+title = "Save scans to"
+side = "left"
+provider = "scanner_folders"
+
+[menus.scanner-devices]
+glyph = "\U000F06AB" # md-scanner
+title = "Scanners"
+side = "left"
+provider = "scanner_devices"

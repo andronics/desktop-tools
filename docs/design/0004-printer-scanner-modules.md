@@ -2,7 +2,7 @@
 
 <!-- Add a line for this record to the index in docs/design/README.md (CI checks). -->
 
-Status: Proposed
+Status: Approved
 Date: 2026-11-12
 Authors: Stephen Cox (direction, 2026-11-12: the printer and scanner buttons get "the barctl IPC treatment
 like the tessera module": status, connectivity and quick actions such as scanning from the document feeder
@@ -327,7 +327,8 @@ devices scan copy-last | open-last
 - barctl, barmenu and `devices` never set, clear or change `COORDINATOR`, `CLAUDECODE` or `TESSERA_ACTOR`;
   they pass to every child untouched (record 0002 §6).
 - `devices`'s acting verbs (pause, resume, default, cancel, test-page, every scan) **refuse with exit 3
-  when `COORDINATOR` or `CLAUDECODE` is set**: `An agent may not operate the printer or scanner`. Reading
+  when `COORDINATOR`, `CLAUDECODE` or `TESSERA_ACTOR` is set** (Stephen, 2026-11-12, open question 10):
+  `An agent may not operate the printer or scanner`. Reading
   a variable is not setting it. `status`, `find`, the sources and the menus' reads stay anyone's. A bar
   started from an agent's session (tainted, record 0002 §6) therefore shows its menus but each action
   says why it won't run.
@@ -503,7 +504,8 @@ An opt-in integration test (`RUN_INTEGRATION=1`, marked) does only reads against
 9. **The trial.** (a) Both sets of buttons for about a week, then the old ones go in their own PR; (b)
    replace at once. Recommendation: **(a)**, as Stephen asked: the new buttons run next to the old, and the
    hardware checklist (§9) is done before the old ones go.
-10. **Agents and the devices.** (a) `devices`'s acting verbs refuse under `COORDINATOR` or `CLAUDECODE`;
+10. **Agents and the devices.** (a) `devices`'s acting verbs refuse under `COORDINATOR`, `CLAUDECODE` or
+    `TESSERA_ACTOR`;
     (b) no refusal, agents could scan or cancel. Recommendation: **(a)**: a scan or a cancelled job is a
     physical-world act that should be Stephen's click, and the refusal reads the variables without setting
     them, as the environment rule requires.
@@ -517,3 +519,4 @@ An opt-in integration test (`RUN_INTEGRATION=1`, marked) does only reads against
 | Date | Change |
 |---|---|
 | 2026-11-12 | Proposed by the desktop coordinator |
+| 2026-11-12 | Approved: Stephen, in the desktop session 2026-11-12 (Q5, Q7, Q10), arbiter standing rule ❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified. Q5 yes (scanner left-click is a one-click scan); Q7 yes and done (the printer has a driverless IPP queue, now the default; the raw `socket://` queue stays as a fallback); Q10 yes, with `TESSERA_ACTOR` added to the variables `devices` refuses under (§7); the other questions as recommended |
