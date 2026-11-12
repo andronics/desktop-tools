@@ -33,7 +33,12 @@ from pathlib import Path
 from desktop_tools.common import paths
 
 SOURCES = ("volume", "player", "printer", "scanner", "vpn", "bluetooth", "counter")
-BUILT = ("volume", "player")  # the others are reserved names: their sources come in later PRs
+BUILT = (
+    "volume",
+    "player",
+    "printer",
+    "scanner",
+)  # the others are reserved names: their sources come in later PRs
 BUTTONS = {"left": 1, "middle": 2, "right": 3, "scroll-up": 4, "scroll-down": 5}
 DISPLAYS = ("icon", "text", "both", "capsule", "output")
 ACCENTS = ("role", "art")

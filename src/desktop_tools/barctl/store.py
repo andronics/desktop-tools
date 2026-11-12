@@ -86,13 +86,20 @@ def store(
 
 
 class Writer:
-    """How a source sets its modules: tier, glyph, label, target, the player's progress and
-    accent, and the output segment's numbers and notice, nothing else. An alert someone set on
-    the module is kept, and so is when the label last changed (`label_since`, the capsule's
-    scroll clock) while the label is the same."""
+    """How a source sets its modules: tier, glyph, label, count, detail, target, the player's
+    progress and accent, and the output segment's numbers and notice, nothing else. An alert
+    someone set on the module is kept, and so is when the label last changed (`label_since`, the
+    capsule's scroll clock) while the label is the same. A source may start an alert of its own
+    (`alert_for` seconds, record 0004 §1: an alert that appears blinks once); `follow` (the
+    controller's) is told, so the blink is drawn."""
 
-    def __init__(self, modules: dict[str, Module], poke: Callable[[str], object]) -> None:
-        self.modules, self.poke = modules, poke
+    def __init__(
+        self,
+        modules: dict[str, Module],
+        poke: Callable[[str], object],
+        follow: Callable[[str], object] | None = None,
+    ) -> None:
+        self.modules, self.poke, self.follow = modules, poke, follow
 
     def set(
         self,
@@ -102,6 +109,7 @@ class Writer:
         *,
         glyph: str | None = None,
         label: str = "",
+        count: int | None = None,
         target: str | None = None,
         detail: str | None = None,
         progress: st.State | None = None,
@@ -109,6 +117,7 @@ class Writer:
         output: st.State | None = None,
         notice: str | None = None,
         notice_until: float | None = None,
+        alert_for: float | None = None,
         now: float | None = None,
     ) -> bool:
         module = self.modules.get(name)
@@ -120,6 +129,8 @@ class Writer:
             new["glyph"] = glyph
         if label:
             new["label"] = label
+        if count:
+            new["count"] = count
         if target:
             new["target"] = target
         if detail:
@@ -135,7 +146,12 @@ class Writer:
         old = st.read(name)
         if old and old.get("alert_until"):
             new["alert_until"] = old["alert_until"]
+        if alert_for:
+            new["alert_until"] = max(now + alert_for, float(new.get("alert_until") or 0))
         if label:
             same = old is not None and old.get("label") == label and old.get("label_since")
             new["label_since"] = old["label_since"] if same and old else now
-        return store(module, new, self.poke, now)
+        written = store(module, new, self.poke, now)
+        if written and alert_for and self.follow is not None:
+            self.follow(name)
+        return written

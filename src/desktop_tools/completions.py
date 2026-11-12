@@ -194,6 +194,7 @@ def tools() -> list[Tool]:
     from desktop_tools.barctl.app import app as barctl
     from desktop_tools.barmenu.cli import build
     from desktop_tools.crew.app import app as crew
+    from desktop_tools.devices.cli import app as devices
 
     return [
         Tool(
@@ -216,6 +217,7 @@ def tools() -> list[Tool]:
             "the coordinator switchboard (brain record 0019).",
             {"name": ("names", "crew names"), "names_": ("names", "crew names")},
         ),
+        Tool("devices", devices, "the printer and the scanner (record 0004).", {}),
     ]
 
 

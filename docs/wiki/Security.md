@@ -64,6 +64,22 @@ an argument list whose sink name, BlueZ path and address come from the queries' 
 on the bar and in the menu, and held in the module's runtime state file, as the track is; nothing barctl or barmenu
 writes to the journal names a sink, a device, an alias or an address.
 
+### The printer and the scanner
+
+Design record 0004 §7. `devices`'s acting verbs (pause, resume, default, cancel, test page, every scan) refuse with
+exit 3 when `COORDINATOR`, `CLAUDECODE` or `TESSERA_ACTOR` is set: `An agent may not operate the printer or scanner`. A
+scan or a cancelled job is a physical-world act that stays Stephen's click; the variables are read, never set or
+cleared, and pass to every child untouched. `status` and `find` and the sources' and menus' reads stay anyone's.
+
+Nothing reaches a log, the journal, barctl's state fields or `doctor` that names a document, a job title, a file name, a
+path, a device URI, a host name or an address: they carry counts, states, tiers, reason words, local or network, and a
+job number. The job title is never asked of CUPS. A scan's file name is shown only in its own notification and copied
+on purpose. Scans are made in a `0700` folder in `$XDG_RUNTIME_DIR` (RAM) and only the finished file reaches the
+chosen folder.
+
+The reachability probe connects to port 631, then 80, never 9100: a connection to a raw print port can feed a blank
+page. The eSCL status is one read-only `GET`; a scanner's XML is parsed by expat, with no external entities.
+
 ## Hardening
 
 - **Supply chain:** dependencies are pinned in the lock file and updated weekly by Dependabot. GitHub Actions are pinned to commit SHAs.

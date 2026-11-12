@@ -9,4 +9,5 @@
 #   build: gcc pkg-config libfuse3-dev
 #   runtime: fuse3 libfuse3-3
 build:
-runtime:
+# record 0004 §5: tiffcp and tiff2pdf join a scan's pages into a PDF; magick converts them to PNG or JPEG
+runtime: libtiff-tools imagemagick

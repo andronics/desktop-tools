@@ -13,6 +13,7 @@ import pytest
 
 from desktop_tools.config import ENV_PREFIX
 from tests.crew_fakes import Desk, make_desk
+from tests.devices_fakes import FakeCups, printer_attrs
 from tests.fakes import (
     FakeBar,
     FakeJournal,
@@ -53,6 +54,8 @@ def isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
         "TOOL_JOURNAL_STAMPS": tmp_path / "stamps",
         "TOOL_JOURNAL_SOCKET": tmp_path / "no-journal.sock",
         "BARCTL_PROC": tmp_path / "proc",
+        # Never the real cupsd: a socket path nothing listens on, unless a test serves one.
+        "CUPS_SERVER": tmp_path / "no-cups.sock",
     }
     for key, value in env.items():
         monkeypatch.setenv(key, str(value))
@@ -77,6 +80,8 @@ def isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
         "CREW_OLD_CLASS",
         "CREW_DEBUG",
         "COORDINATOR",
+        "CLAUDECODE",
+        "TESSERA_ACTOR",
         "POLYBAR_BAR",
         "HOST_MONITOR",
     ):
@@ -164,3 +169,40 @@ def desk(
     fake = make_desk(isolate, monkeypatch, commands)
     yield fake
     assert fake.bare_tmux() == [], "a tmux call didn't name its own server"
+
+
+@pytest.fixture(autouse=True)
+def no_device_sockets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Record 0004 §9: no test reaches the real cupsd or a printer's ports. A connection to
+    /run/cups/cups.sock, or to port 631, 80 or 9100 of anything, fails the test."""
+    import socket
+
+    real = socket.socket.connect
+
+    def connect(self: socket.socket, address: object) -> None:
+        if address == "/run/cups/cups.sock" or (
+            isinstance(address, tuple) and len(address) >= 2 and address[1] in (631, 80, 9100)
+        ):
+            pytest.fail(f"a test connected to a device address: {address!r}")
+        real(self, address)  # type: ignore[arg-type]  # whatever the caller passed on
+
+    connect.__wrapped__ = real  # type: ignore[attr-defined]  # the opt-in live test's way back
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    # Nor the desktop's own airscan.conf, nor a DNS lookup of a printer or scanner: a test that
+    # wants them answers for them.
+    from desktop_tools.devices import escl, mdns
+
+    monkeypatch.setattr(escl, "CONF", ())
+    monkeypatch.setattr(mdns, "probe", lambda host, timeout=1.0: False)
+    monkeypatch.setattr(mdns, "resolves", lambda host: False)
+
+
+@pytest.fixture
+def cupsd(isolate: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeCups]:
+    """A fake cupsd on a Unix socket (CUPS_SERVER), with one network queue as the default."""
+    fake = FakeCups(isolate / "cups.sock")
+    fake.printers = [printer_attrs("Office")]
+    fake.default = "Office"
+    monkeypatch.setenv("CUPS_SERVER", str(fake.path))
+    yield fake
+    fake.close()

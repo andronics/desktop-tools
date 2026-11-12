@@ -13,6 +13,7 @@ from desktop_tools.common import procs
 class Source:
     name = ""
     commands: tuple[str, ...] = ()
+    optional: tuple[str, ...] = ()  # commands it works without, less well (doctor warns)
 
     def __init__(self, modules: Sequence[str], writer: Writer) -> None:
         self.modules = list(modules)
