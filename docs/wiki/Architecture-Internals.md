@@ -43,7 +43,8 @@ flowchart LR
 | `barctl/control.py` | The control socket's client |
 | `barctl/controller.py` | `barctl run`: sources, control socket (with `pin`), alert and ttl timers, and the capsule timer: it pokes a capsule when its frame changes and sleeps until the next scroll step or progress cell |
 | `barctl/doctor.py` | `barctl doctor`'s checks |
-| `barctl/sources/` | The controller's sources: `volume`, `player` (the label `Artist – Title` whole; `progress` from `mpris:length` and `playerctl -p <shown> position`, read on the shown player's events and every 30 s while it plays; the in-memory pin; the art URL) |
+| `barctl/outputs.py` | The audio outputs (record 0003 §10): sinks from `pactl -f json list sinks` with their kind glyph and short name, a Bluetooth sink's battery (`busctl get-property … Battery1 Percentage`), BlueZ's paired audio devices; read-only, each name, path and address checked before it goes into an argv |
+| `barctl/sources/` | The controller's sources: `volume` (for an output segment also the sinks' properties, on a new default or a sink added or removed; the connect and disconnect notices; the battery every 5 minutes while a Bluetooth sink is the default; events coalesced to one read per 100 ms), `player` (the label `Artist – Title` whole; `progress` from `mpris:length` and `playerctl -p <shown> position`, read on the shown player's events and every 30 s while it plays; the in-memory pin; the art URL) |
 | `barmenu/menus.py`, `menus.toml` | Menus as data, rofi placement, current rows as rofi's active rows, the detached launch |
 | `barmenu/providers/` | Menus whose rows come from Python when they open (`theme`, `lock`, `tessera`), from read-only queries with a 2 s limit; state-free rows when a query fails (records 0001 and 0002). `tessera` reads only `tessera status --json`, never an entry name, and passes COORDINATOR, CLAUDECODE and TESSERA_ACTOR to tessera untouched |
 | `barctl/modules.py` `Module.glyph_for` | The one place that decides a module's glyph (override, pushed, default), used by `render`, `store.shown`, `ops.module_info` and the menu prompt (record 0002 §7) |
@@ -85,6 +86,10 @@ place). If what it shows changed, barctl sends `#audio-level.hook.0` to every ba
   controller's tick reads each capsule's state, pokes it when its frame (text cells, underlined cells) changed, and
   sleeps until the next change: at most `scroll` times a second while scrolling, at most once a second for progress
   alone, not at all while paused.
+- **The output segment** (design record 0003 §10): the volume source writes the kind glyph, short name, `output`
+  (`volume`, `battery`) and, for 5 seconds after a Bluetooth sink comes or goes, `notice` with `notice_until`. Render
+  draws the notice in place of the name until it ends; the controller's tick pokes the segment once when it does.
+  `barmenu outputs` reads the same sinks and BlueZ's managed objects when it opens.
 - **A pin** (`barctl pin <module> <instance>`) is a `pin` request on the control socket; the player source shows that
   player while `playerctl -l` lists it. `barctl status --json` gives the player modules `pinned`, from the
   controller's `ping` answer.

@@ -53,13 +53,24 @@ the player's state. `barctl status` shows the label to the user's own processes,
   running controller or a bar was started with any of them set ("the bar runs in an agent's environment"), naming
   the variable, never its value; restart the bar from a clean session.
 
+### The output segment
+
+The output segment and `barmenu outputs` (design record 0003 §10) never change the audio or Bluetooth on their own:
+the volume source's only `pactl` calls read (`subscribe`, `get-default-sink`, `get-sink-volume`, `get-sink-mute`,
+`-f json list sinks`, `list short sinks`) and its only `busctl` call reads `Battery1.Percentage`; barctl never switches
+the default sink. A menu row (`pactl set-default-sink`, `bluetoothctl connect`/`disconnect`) runs only when picked, as
+an argument list whose sink name, BlueZ path and address come from the queries' JSON and are checked first (no leading
+`-`, BlueZ's path and address shapes). No row pairs, removes, trusts or powers a device. Sink and device names are shown
+on the bar and in the menu, and held in the module's runtime state file, as the track is; nothing barctl or barmenu
+writes to the journal names a sink, a device, an alias or an address.
+
 ## Hardening
 
 - **Supply chain:** dependencies are pinned in the lock file and updated weekly by Dependabot. GitHub Actions are pinned to commit SHAs.
 - **Dependency auto-merge:** Dependabot patch updates get auto-merge queued by `dependabot-automerge.yml`: they still need a code owner's approval, then merge once CI passes.
 
 - **Input validation:** a pushed state is checked field by field (tiers, counts, segment ids, the capsule's `progress`
-  numbers and its `accent`, which must be `#` and six hex digits) and anything unknown is dropped; module and segment names are restricted to the characters a file name and an action tag can carry.
+  numbers and its `accent`, which must be `#` and six hex digits, the output segment's `output` numbers and `notice`) and anything unknown is dropped; module and segment names are restricted to the characters a file name and an action tag can carry.
 - **No root:** nothing here needs it (brain record 0016).
 
 ## Reporting a vulnerability

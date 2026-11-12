@@ -335,6 +335,7 @@ def test_desktop_tools_mounts_the_tools(isolate: Path, monkeypatch: pytest.Monke
     assert r.stdout.split() == [
         "layout",
         "lock",
+        "outputs",
         "player",
         "players",
         "screenshot",

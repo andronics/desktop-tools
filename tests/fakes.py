@@ -166,6 +166,8 @@ DESKTOP = [
     "player",
     "audio",
     "pwvucontrol",
+    "busctl",
+    "bluetoothctl",
     "crew",
     "meta",
     "tmux",
