@@ -2,7 +2,7 @@
 
 <!-- Add a line for this record to the index in docs/design/README.md (CI checks). -->
 
-Status: Proposed (phase A: Approved and built; phases B-D: Proposed)
+Status: Proposed (phases A and B: Approved and built; phases C-D: Proposed)
 Date: 2026-11-12
 Authors: Stephen Cox (direction, 2026-11-12: ideas 2-5 of record 0003 approved, all four; the old
 `audio-spectrum` module dropped; the old player buttons already retired on his bar); written up by the
@@ -149,6 +149,10 @@ and once). `playerctl -a --follow` sees players that start later; one that never
 shows from its first one.
 
 ### Phase B (idea 5): quiet when idle, spoken-word controls
+
+Status: Approved (Stephen 2026-11-12, arbiter standing rule), built; open questions 14-18 and phase B's share
+of 19 answered as recommended. Spoken word is behind its own capsule switch, `spoken` (default false), so that
+a release changes nothing for a capsule without the keys (question 19).
 
 **Fade after N minutes paused.** With `fade_after = 10` (minutes, 0-240; 0 never, the packaged default),
 a capsule whose shown player has been paused or stopped that long draws its icon alone, in the `idle`
@@ -338,6 +342,7 @@ naming the key; none is secret):
 | `chips_min`, `chips_max` | chips | whole, 1-8 | 2, 4 | A |
 | `segment_clicks.<id>.<button>` | any module with segments | command | none | A |
 | `fade_after` | capsule | minutes, 0-240 | 0 (never) | B |
+| `spoken` | capsule | boolean | false | B |
 | `spoken_players` | capsule | list of player names | `[]` | B |
 | `expand_for` | capsule | seconds, 0-30 | 0 (never) | C |
 | `icon_clicks.<button>` | capsule | command | none | C |
@@ -493,3 +498,4 @@ from his bar or a live player. Then the trial on his bar, turned on by the dotfi
 |---|---|
 | 2026-11-12 | Proposed by the desktop coordinator, after Stephen approved ideas 2-5 of record 0003 (2026-11-12) |
 | 2026-11-12 | Phase A (player chips) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (11 two or more players, 12 a second click unpins, 13 four then `+N`, and 6 and 19 for the chips) answered as recommended. Phases B-D stay Proposed |
+| 2026-11-12 | Phase B (quiet when idle, spoken-word controls) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (14 shrink to the icon, 15 ten minutes, 16 hidden with `unavailable = ""`, 17 rules 1-4, 18 the speed row in shuffle's place, and 19 for phase B) answered as recommended. Spoken word gets its own switch, `spoken` (default false), so every phase B behaviour is off until a setting turns it on. Phases C-D stay Proposed |

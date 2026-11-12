@@ -94,6 +94,18 @@ place). If what it shows changed, barctl sends `#audio-level.hook.0` to every ba
   controller's tick reads each capsule's state, pokes it when its frame (text cells, underlined cells) changed, and
   sleeps until the next change: at most `scroll` times a second while scrolling, at most once a second for progress
   alone, not at all while paused.
+- **Quiet when idle** (design record 0005 phase B): the player source keeps a `changed_at` per player (when its status
+  last changed) and the time the shown player became the shown one, and writes a capsule `status_at`, the later of the
+  two. Render fades an idle capsule with `fade_after` once `status_at + fade_after` minutes have passed (its frame is
+  then empty, its icon `idle`); `next_change` returns that moment, so the tick pokes once then and nothing is written.
+  `store.shown` includes `status_at`, so a status change that leaves the glyph alone still redraws.
+- **Spoken word** (design record 0005 phase B): the stream adds `{{mpris:trackid}}`, `{{xesam:url}}` and
+  `{{xesam:genre}}`; `parse` keeps only whether they matched rules 1-3 (`Player.spoken`) and drops the text. A capsule
+  with `spoken = true` gets `kind = "spoken"` when that matched or the player's name is in `spoken_players`. For
+  spoken word the source reads the shown player's MPRIS `Rate` once per track and on each 30-second re-read
+  (`busctl --user get-property`, 2 s) into
+  `progress.rate`; `barmenu player` reads `kind` from the capsule's state, and `Rate`, `MinimumRate` and
+  `MaximumRate` in one `busctl` call when it opens.
 - **The output segment** (design record 0003 §10): the volume source writes the kind glyph, short name, `output`
   (`volume`, `battery`) and, for 5 seconds after a Bluetooth sink comes or goes, `notice` with `notice_until`. Render
   draws the notice in place of the name until it ends; the controller's tick pokes the segment once when it does.

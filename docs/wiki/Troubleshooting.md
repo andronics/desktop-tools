@@ -43,6 +43,20 @@ The player gives no length (a stream, a radio station, some browsers), or its po
 measure, so no line. The line moves on by itself while playing and is re-read every 30 seconds, so a seek made in the
 player shows within 30 seconds.
 
+### The capsule shows only its icon, or is gone
+
+With `fade_after` set, a capsule whose player has been paused or stopped that many minutes shows its icon alone;
+playing again brings it back. With `glyph_override.unavailable = ""`, a capsule with no player draws nothing at all:
+`playerctl -l` lists none. Take the key out (or set `fade_after = 0`) and `barctl restart` to undo either.
+
+### `barmenu player` has no speed row, or the 10-second skips on a podcast
+
+The spoken-word rows need `spoken = true` on the capsule and a track it recognises (an episode id or URL, a podcast or
+audiobook genre, an `.m4b`/`.aax` file or a `Podcasts`/`Audiobooks` folder); a web podcast in a browser usually gives
+none of these, so add the player's name to `spoken_players`. The speed row also needs the player's MPRIS
+`MinimumRate` and `MaximumRate`: `busctl --user get-property org.mpris.MediaPlayer2.<instance> /org/mpris/MediaPlayer2
+org.mpris.MediaPlayer2.Player Rate MinimumRate MaximumRate` shows them; a range of 1 to 1 hides it.
+
 ### The output segment shows no battery, or `barmenu outputs` has no connect rows
 
 The battery comes from BlueZ's `Battery1` on the sink's device: `busctl --system get-property org.bluez <path>

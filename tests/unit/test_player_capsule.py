@@ -432,7 +432,7 @@ def line(*fields: str) -> str:
 
 
 def test_the_format_has_length_and_art() -> None:
-    assert FORMAT.split(US)[5:] == ["{{mpris:length}}", "{{mpris:artUrl}}"]
+    assert FORMAT.split(US)[5:7] == ["{{mpris:length}}", "{{mpris:artUrl}}"]
     assert seconds("240000000") == 240.0
     assert seconds("") is None and seconds("0") is None and seconds("x") is None
 

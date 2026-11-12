@@ -11,6 +11,14 @@ always there: the kind glyph and short name barctl's `output-capsule` shows (no 
 rows are hidden when the player gives none; the seek rows when no length is known. Nothing here
 logs the player's state, and no row sets or clears COORDINATOR, CLAUDECODE or TESSERA_ACTOR
 (§6): every command gets the bar's environment as it is.
+
+Spoken word (record 0005 phase B: the capsule's state says `kind = "spoken"`, which only a
+capsule with `spoken = true` gets): the seek rows skip 30 s, and the shuffle row gives way to
+the speed row (`Speed: 1.25` and a times sign), which steps through SPEEDS within the player's
+own range and back round, so the menu stays at eight rows. The rate and its range are the
+player's MPRIS `Rate`, `MinimumRate` and `MaximumRate`, read with one `busctl --user
+get-property` (TIMEOUT seconds); the speed row is hidden when they can't be read or the range
+is 1.0 to 1.0. Picking it runs `busctl --user set-property … Rate d <value>`, an argument list.
 """
 
 from __future__ import annotations
@@ -38,6 +46,13 @@ SHUFFLE_OFF = "\U000f049e"  # md-shuffle_disabled
 PLAYERS = "\U000f0411"  # md-playlist_play
 BACK = "\U000f0d2a"  # md-rewind_10
 FORWARD = "\U000f0d71"  # md-fast_forward_10
+BACK_30 = "\U000f0d96"  # md-rewind_30
+FORWARD_30 = "\U000f0d06"  # md-fast_forward_30
+SPEED = "\U000f04c5"  # md-speedometer
+SPEEDS = (0.75, 1.0, 1.25, 1.5, 1.75, 2.0)  # the speed row's steps, within the player's range
+SPOKEN = "spoken"
+MPRIS_PATH = "/org/mpris/MediaPlayer2"
+MPRIS_PLAYER = "org.mpris.MediaPlayer2.Player"
 NONE = "\U000f038a"  # md-music_note_off
 MORE = "\u203a"  # a single right angle quote: the row opens another menu
 
@@ -78,6 +93,66 @@ def output_row() -> Row:
     return Row(shown, f"Output: {name} {MORE}", ["barmenu", "outputs"])
 
 
+def rates(target: str) -> tuple[float, float, float] | None:
+    """(Rate, MinimumRate, MaximumRate) of the player, read only, or None when any of the three
+    can't be read in TIMEOUT seconds."""
+    out = procs.query(
+        [
+            "busctl",
+            "--user",
+            "get-property",
+            f"org.mpris.MediaPlayer2.{target}",
+            MPRIS_PATH,
+            MPRIS_PLAYER,
+            "Rate",
+            "MinimumRate",
+            "MaximumRate",
+        ],
+        timeout=providers.TIMEOUT,
+    )
+    found: list[float] = []
+    for line in (out or "").splitlines():
+        parts = line.split()
+        if len(parts) != 2 or parts[0] != "d":
+            return None
+        try:
+            found.append(float(parts[1]))
+        except ValueError:
+            return None
+    if len(found) != 3 or not all(v > 0 for v in found):
+        return None
+    return found[0], found[1], found[2]
+
+
+def speed_label(rate: float) -> str:
+    return f"Speed: {rate:g}\u00d7"
+
+
+def speed_row(target: str) -> Row | None:
+    """The speed row: it sets the next of SPEEDS within the player's range (round to the first
+    after the last); None when the range can't be read or allows one speed only."""
+    found = rates(target)
+    if found is None:
+        return None
+    rate, low, high = found
+    steps = [s for s in SPEEDS if low - 1e-9 <= s <= high + 1e-9]
+    if len(steps) < 2 or high - low < 1e-9:
+        return None
+    after = next((s for s in steps if s > rate + 1e-9), steps[0])
+    command = [
+        "busctl",
+        "--user",
+        "set-property",
+        f"org.mpris.MediaPlayer2.{target}",
+        MPRIS_PATH,
+        MPRIS_PLAYER,
+        "Rate",
+        "d",
+        f"{after:g}",
+    ]
+    return Row(SPEED, speed_label(rate), command, current=abs(rate - 1.0) > 1e-9)
+
+
 def seekable(data: st.State) -> bool:
     progress = data.get("progress")
     return isinstance(progress, dict) and bool(progress.get("length"))
@@ -89,12 +164,17 @@ def rows() -> list[Row]:
     if found is None:
         return [Row(NONE, "No player", []), players_row(""), output_row()]
     _status, loop, shuffle = found
+    spoken = data.get("kind") == SPOKEN
     p = ["playerctl", "-p", target]
     out = [Row(NEXT, "Next", [*p, "next"]), Row(PREVIOUS, "Previous", [*p, "previous"])]
     if loop in LOOP:
         glyph, word, after = LOOP[loop]
         out.append(Row(glyph, f"Loop: {word}", [*p, "loop", after], current=loop != "None"))
-    if shuffle.lower() in ("true", "false"):
+    if spoken:
+        speed = speed_row(target)
+        if speed is not None:
+            out.append(speed)
+    elif shuffle.lower() in ("true", "false"):
         on = shuffle.lower() == "true"
         out.append(
             Row(
@@ -105,7 +185,12 @@ def rows() -> list[Row]:
             )
         )
     out.append(players_row(target))
-    if seekable(data):
+    if seekable(data) and spoken:
+        out += [
+            Row(BACK_30, "Back 30 s", [*p, "position", "30-"]),
+            Row(FORWARD_30, "Forward 30 s", [*p, "position", "30+"]),
+        ]
+    elif seekable(data):
         out += [
             Row(BACK, "Back 10 s", [*p, "position", "10-"]),
             Row(FORWARD, "Forward 10 s", [*p, "position", "10+"]),

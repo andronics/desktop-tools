@@ -14,16 +14,27 @@ pin; at most `chips_max` cells, the last `+N` past that, and none below `chips_m
 Unavailable with no player, idle paused or stopped, active playing. A module with
 `accent = "art"` also gets the cover's colour (barctl/art.py).
 
+A capsule also gets `status_at` (record 0005 phase B): when the shown player's status last
+changed, or another player became the shown one, from which render works out its fade. With
+`spoken = true` it gets `kind = "spoken"` for a podcast or audiobook, from the first rule that
+matches: the track id or URL names an episode; the genre says podcast, audiobook or spoken; the
+URL is a local `.m4b` or `.aax` file or under a `Podcasts` or `Audiobooks` folder; the player's
+name is in `spoken_players`. The track id, URL and genre are read for that and kept nowhere.
+For spoken word the shown player's MPRIS `Rate` is read once per track and with each 30-second
+position re-read (`busctl --user get-property`, read only) into `progress.rate`, so the line
+moves at the player's speed.
+
 The position is not in the followed format (playerctl may re-print one with `{{position}}`
 every second): it is read with `playerctl -p <shown> position` on each event of the shown player
 and every POSITION_EVERY seconds while it plays, and render moves it on from the time. Nothing
 here controls a player: the only playerctl calls are the stream, `-l`, `position` (no value)
-and `metadata`.
+and `metadata`, and the only busctl call is `get-property`.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -45,13 +56,24 @@ FIELDS = (
     "{{title}}",
     "{{mpris:length}}",
     "{{mpris:artUrl}}",
+    "{{mpris:trackid}}",  # these three only say whether it is spoken word (record 0005 B)
+    "{{xesam:url}}",
+    "{{xesam:genre}}",
 )
 FORMAT = US.join(FIELDS)
 RANK = {"Playing": 3, "Paused": 2, "Stopped": 1}
 LABEL_MAX = 200
 DASH = "\u2013"  # an en dash between artist and title
 POSITION_EVERY = 30.0  # seconds between position re-reads while the shown player plays
-RATE = 1.0  # MPRIS Rate is idea 5's; the field is in `progress` already
+RATE = 1.0  # the rate when it isn't read: music, or a player that gives none
+RATE_TIMEOUT = 2.0  # seconds the Rate read (busctl) may take
+MPRIS_PATH = "/org/mpris/MediaPlayer2"
+MPRIS_PLAYER = "org.mpris.MediaPlayer2.Player"
+SPOKEN = "spoken"
+EPISODE = re.compile(r"spotify:episode:|/episode/", re.IGNORECASE)
+SPOKEN_GENRES = ("podcast", "audiobook", "audio book", "spoken")
+SPOKEN_FILES = (".m4b", ".aax")
+SPOKEN_FOLDERS = ("podcasts", "audiobooks")
 PIN = "\U000f0403"  # md-pin: the pinned player's chip
 MORE = "\U000f01d8"  # md-dots_horizontal: the `+N` cell past chips_max
 MORE_ID = "more"  # the `+N` cell's segment id, for its own clicks (segment_clicks.more)
@@ -81,6 +103,54 @@ def track(artist: str, title: str) -> str:
     return text if len(text) <= LABEL_MAX else text[: LABEL_MAX - 1] + "…"
 
 
+def spoken_hint(trackid: str, url: str, genre: str) -> bool:
+    """Rules 1-3 of record 0005 phase B: the track id or URL names an episode; the genre (a
+    list, joined by playerctl) says podcast, audiobook or spoken; the URL is a local `.m4b` or
+    `.aax` file, or under a folder named `Podcasts` or `Audiobooks`. Only the answer is kept."""
+    if EPISODE.search(trackid) or EPISODE.search(url):
+        return True
+    lowered = genre.lower()
+    if any(word in lowered for word in SPOKEN_GENRES):
+        return True
+    if url.lower().startswith("file://"):
+        local = url[len("file://") :]
+        if local.lower().endswith(SPOKEN_FILES):
+            return True
+        folders = [part.lower() for part in local.split("/")[:-1]]
+        if any(folder in SPOKEN_FOLDERS for folder in folders):
+            return True
+    return False
+
+
+def rate_of(out: str | None) -> float | None:
+    """A `busctl get-property` answer (`d 1.5`) as a number; None when it isn't one."""
+    parts = (out or "").split()
+    if len(parts) != 2 or parts[0] != "d":
+        return None
+    try:
+        value = float(parts[1])
+    except ValueError:
+        return None
+    return value if 0 < value <= st.RATE_MAX else None
+
+
+def read_rate(instance: str) -> float | None:
+    """The player's MPRIS Rate, read only, or None when it can't be read in RATE_TIMEOUT."""
+    out = procs.query(
+        [
+            "busctl",
+            "--user",
+            "get-property",
+            f"org.mpris.MediaPlayer2.{instance}",
+            MPRIS_PATH,
+            MPRIS_PLAYER,
+            "Rate",
+        ],
+        timeout=RATE_TIMEOUT,
+    )
+    return rate_of(out)
+
+
 def seconds(micro: str) -> float | None:
     """mpris:length (microseconds) in seconds; None when unknown (a stream gives none)."""
     try:
@@ -99,6 +169,8 @@ class Player:
     length: float | None = None
     art: str = ""
     first: int = 0  # the order it was first seen in: the chips' order
+    changed_at: float = 0.0  # when its status last changed (record 0005 phase B)
+    spoken: bool = False  # rules 1-3 of spoken word matched its track; its fields aren't kept
 
 
 class PlayerSource(Source):
@@ -117,6 +189,10 @@ class PlayerSource(Source):
         # the shown player's, mostly. A failed read waits POSITION_EVERY like a good one.
         self.positions: dict[str, tuple[float | None, float]] = {}
         self.colours: dict[str, str | None] = {}  # art URL -> its accent (None: none)
+        # The shown player and since when (record 0005 phase B: a new one restarts the fade).
+        self.shown: tuple[str | None, float] = (None, 0.0)
+        # instance -> (the track it was read for, its Rate or None): one read per track.
+        self.rates: dict[str, tuple[str, float | None]] = {}
         self.fetching: set[str] = set()
         self.lock = threading.RLock()
         self.clock: Callable[[], float] = time.time
@@ -146,6 +222,7 @@ class PlayerSource(Source):
             if instance not in live:
                 del self.players[instance]
                 self.positions.pop(instance, None)
+                self.rates.pop(instance, None)
         if self.pinned is not None and self.pinned not in live:
             self.pinned = None
 
@@ -157,15 +234,24 @@ class PlayerSource(Source):
         instance, name, status, artist, title = fields[:5]
         length = seconds(fields[5]) if len(fields) > 5 else None
         art_url = fields[6].strip() if len(fields) > 6 else ""
+        trackid, url, genre = (fields[i].strip() if len(fields) > i else "" for i in (7, 8, 9))
         old = self.players.get(instance)
         if old is None or old.status != status:
             self.tick += 1
-            seq = self.tick
+            seq, changed_at = self.tick, self.clock()
         else:
-            seq = old.seq
+            seq, changed_at = old.seq, old.changed_at
         first = old.first if old is not None else self.first_seen()
         self.players[instance] = Player(
-            status, name, track(artist, title), seq, length, art_url, first
+            status,
+            name,
+            track(artist, title),
+            seq,
+            length,
+            art_url,
+            first,
+            changed_at,
+            spoken_hint(trackid, url, genre),
         )
         return instance
 
@@ -205,6 +291,9 @@ class PlayerSource(Source):
             if last is not None and now - last[1] < POSITION_EVERY:
                 return False
             self.read_position(shown)
+            # The Rate too, for spoken word (record 0005 phase B): a speed set mid-track (the
+            # menu's speed row, the player's own) or a failed read is caught here.
+            self.rates.pop(shown, None)
             self.update()
             return True
 
@@ -222,7 +311,12 @@ class PlayerSource(Source):
                     out = procs.query(["playerctl", "-p", instance, "metadata", "--format", FORMAT])
                     if not out or self.parse(out.splitlines()[0]) is None:
                         self.players[instance] = Player(
-                            "Stopped", instance.split(".")[0], "", 0, first=self.first_seen()
+                            "Stopped",
+                            instance.split(".")[0],
+                            "",
+                            0,
+                            first=self.first_seen(),
+                            changed_at=self.clock(),
                         )
                 self.pinned = instance
                 self.read_position(instance)
@@ -261,14 +355,39 @@ class PlayerSource(Source):
             if not self.stopping:
                 self.update()
 
-    def progress(self, instance: str, p: Player) -> st.State | None:
+    def kind(self, module: Module | None, p: Player) -> str:
+        """`spoken` for a capsule with `spoken = true` whose player plays spoken word (rules
+        1-4, record 0005 phase B), else empty: every other module, and the switch off."""
+        if module is None or module.display != "capsule" or not module.spoken:
+            return ""
+        names = {n.lower() for n in module.spoken_players}
+        return SPOKEN if p.spoken or p.name.lower() in names else ""
+
+    def rate(self, instance: str, p: Player, spoken: bool) -> float:
+        """The shown player's Rate for spoken word, read once per track (`refresh` drops it, so
+        the 30-second re-read reads it again); RATE otherwise or when it can't be read."""
+        if not spoken:
+            return RATE
+        known = self.rates.get(instance)
+        if known is None or known[0] != p.track:
+            known = (p.track, read_rate(instance))
+            self.rates[instance] = known
+        return known[1] if known[1] is not None else RATE
+
+    def status_at(self, instance: str, p: Player, now: float) -> float:
+        """When the shown player's status changed, or it became the shown one: the later."""
+        if self.shown[0] != instance:
+            self.shown = (instance, now)
+        return max(p.changed_at, self.shown[1])
+
+    def progress(self, instance: str, p: Player, rate: float = RATE) -> st.State | None:
         read = self.positions.get(instance)
         if read is None or read[0] is None:
             return None
         return {
             "position": read[0],
             "length": p.length,
-            "rate": RATE,
+            "rate": rate,
             "at": read[1],
             "playing": p.status == "Playing",
         }
@@ -317,7 +436,9 @@ class PlayerSource(Source):
     def update(self) -> None:
         with self.lock:
             instance = self.pick()
+            now = self.clock()
             if instance is None:
+                self.shown = (None, now)
                 self.set_all("unavailable")
                 return
             p = self.players[instance]
@@ -325,9 +446,11 @@ class PlayerSource(Source):
             icon = player_icon(self.names, p.name)
             state_icon = player_icon(self.states, p.status.lower())
             glyph = " ".join(g for g in (icon, state_icon) if g)
-            progress = self.progress(instance, p)
+            kinds = {name: self.kind(self.writer.modules.get(name), p) for name in self.modules}
+            rate = self.rate(instance, p, SPOKEN in kinds.values())
+            progress = self.progress(instance, p, rate)
             accent = self.accent_for(p.art)
-            now = self.clock()
+            status_at = self.status_at(instance, p, now)
             for name in self.modules:
                 module = self.writer.modules.get(name)
                 if module is not None and module.display == "chips":
@@ -344,6 +467,10 @@ class PlayerSource(Source):
                     target=instance,
                     progress=progress,
                     accent=accent if module is not None and module.accent == "art" else None,
+                    status_at=status_at
+                    if module is not None and module.display == "capsule"
+                    else None,
+                    kind=kinds[name],
                     now=now,
                 )
 
@@ -379,6 +506,7 @@ class PlayerSource(Source):
         with self.lock:
             self.players.clear()
             self.positions.clear()
+            self.rates.clear()
             self.update()  # a pin outlives a restarted stream; prune ends it with its player
 
     @classmethod

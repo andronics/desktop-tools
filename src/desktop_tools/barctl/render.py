@@ -9,7 +9,9 @@ runs this on every poke (`hook-0 = barctl render <module>`).
 icon, then the label in a fixed width, scrolling while it plays when it is longer, and the
 track's progress as an underline under the first cells. Both are worked out here from the state
 and the time, as the blink is, so the source writes once per real change; the controller's tick
-pokes the capsule when its frame changes (`next_change`).
+pokes the capsule when its frame changes (`next_change`). With `fade_after` (record 0005 phase
+B), a capsule whose player has been paused or stopped that many minutes since `status_at` draws
+its icon alone, in the idle colour: worked out from the time too, so nothing is written then.
 
 `display = "chips"` (record 0005 phase A) is drawn only from its segments, one per player, which
 the player source writes; with none it draws nothing.
@@ -160,10 +162,29 @@ def _cells(module: Module, part: float | None) -> int:
     return 0 if part is None else min(module.width, int(part * module.width + 0.5))
 
 
+def fade_at(module: Module, state: st.State | None, now: float) -> float | None:
+    """When an idle capsule fades to its icon (record 0005 phase B): `status_at` plus
+    `fade_after` minutes; None when it never does (fade_after 0, not idle, no clock)."""
+    if module.display != "capsule" or module.fade_after <= 0 or state is None:
+        return None
+    if shown_tier(state, now) != "idle":
+        return None
+    since = state.get("status_at")
+    if isinstance(since, bool) or not isinstance(since, (int, float)):
+        return None
+    return float(since) + module.fade_after * 60
+
+
+def faded(module: Module, state: st.State | None, now: float) -> bool:
+    """Whether the capsule shows its icon alone, its player paused `fade_after` minutes."""
+    at = fade_at(module, state, now)
+    return at is not None and now >= at
+
+
 def capsule_frame(module: Module, state: st.State | None, now: float) -> tuple[str, int]:
     """(the text cells, padded to the width; how many are underlined): what a capsule shows
-    beside its icon. Nothing with no player."""
-    if state is None or shown_tier(state, now) == "unavailable":
+    beside its icon. Nothing with no player, or once it has faded (record 0005 phase B)."""
+    if state is None or shown_tier(state, now) == "unavailable" or faded(module, state, now):
         return "", 0
     label = str(state.get("label") or "")
     width = module.width
@@ -178,11 +199,15 @@ def capsule_frame(module: Module, state: st.State | None, now: float) -> tuple[s
 def next_change(module: Module, state: st.State | None, now: float) -> float | None:
     """When the capsule's frame next changes, for the controller's tick: the next scroll step
     while scrolling, else the next progress cell, never sooner than a second for progress
-    alone; None when nothing moves (paused, no player, nothing to scroll or measure)."""
+    alone, and the fade for an idle capsule with `fade_after` (one wake, record 0005 phase B);
+    None when nothing moves (paused, no player, nothing to scroll or measure)."""
     if module.display != "capsule" or state is None:
         return None
     if shown_tier(state, now) == "unavailable":
         return None
+    fade = fade_at(module, state, now)
+    if fade is not None:
+        return fade if fade > now else None
     if scrolls(module, state, now):
         _, passing, cycle = _cycle(module, str(state.get("label") or ""))
         t = max(0.0, now - _since(state)) % cycle
@@ -233,6 +258,8 @@ def capsule(
         with contextlib.suppress(st.StateError):
             accent = st.accent(art)
     icon_hex = accent if shown not in ("unavailable", "alert") else colours.get(shown)
+    if shown == "idle" and faded(module, state, now):
+        icon_hex = colours.get("idle")  # faded: the icon alone, dim (record 0005 phase B)
     icon = _hex_paint(_safe(glyph), icon_hex) if glyph else ""
     text, cells = capsule_frame(module, state, now)
     if not text:

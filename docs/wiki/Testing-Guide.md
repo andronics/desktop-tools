@@ -67,6 +67,10 @@ CUPS's and SANE's commands are tripwires on PATH; `no_device_sockets` fails a te
   `playerctl` (imported from its tests), so no chip code can control a player; a chip's middle click is checked by
   the argv the `launched` fixture records, never run. `barctl pin --toggle` is checked on the source, the controller's
   request and the command line (with `control.request` replaced).
+- **Quiet when idle and spoken word** (`tests/unit/test_player_quiet.py`, design record 0005 phase B): the same
+  guarded `playerctl`, and a fake `busctl` that fails the test on any `set-property` and prints the Rate lines the test
+  gives (or fails, for an unreadable range). The fade runs on `now=` and the source's fake clock; the speed row's
+  `set-property` is checked by its argv, never run.
 - **The output segment** (`tests/unit/test_output_capsule.py`, design record 0003 §8 and §10): fake `pactl` (a wired,
   an HDMI and a Bluetooth headset sink in `-f json list sinks`, the default, volume and mute in files the test
   changes), `busctl` (the battery and BlueZ's managed objects) and `bluetoothctl`. Each starts with a guard that logs
