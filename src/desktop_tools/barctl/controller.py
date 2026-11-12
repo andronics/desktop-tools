@@ -3,9 +3,10 @@
 One at a time (a lock in the runtime folder). It runs every enabled source in a thread of its
 own, restarting a source whose stream ended after BARCTL_RETRY seconds; serves the control socket
 for `push`, `alert`, `reload`, `enable`, `disable` and `pin`; blinks alerting modules; redraws a
-pushed module when its ttl runs out; and pokes a capsule when its frame changes (the next scroll
-step or progress cell, record 0003 §3). On start it clears its own sources' states (they are
-redrawn within a second from the live sources) and keeps pushed ones.
+pushed module when its ttl runs out; pokes a capsule when its frame changes (the next scroll
+step or progress cell, record 0003 §3); and pokes an output segment when its notice ends (§10).
+On start it clears its own sources' states (they are redrawn within a second from the live
+sources) and keeps pushed ones.
 
 It runs from systemd (barctl.service), never from polybar: polybar 3.7 leaks its module pipes
 into long-lived children, which can freeze its next restart. It exits 0 on SIGTERM, and non-zero
@@ -37,6 +38,7 @@ from desktop_tools.common import journal, polybar
 LATE = 0.02  # seconds after a change the tick wakes, so the render lands past it
 QUICK = 5.0  # a stream that ends sooner than this after starting counts as a failure
 MAX_CRASHES = 3  # unexpected exceptions in a row from one source before the controller exits
+TIMED = ("capsule", "output")  # displays whose frame changes with the time alone
 
 
 class AlreadyRunning(Exception):
@@ -320,24 +322,35 @@ class Controller:
         return max(0.05, min(1.0, nearest - now))
 
     def capsules(self, now: float) -> tuple[float | None, list[str]]:
-        """The capsules whose frame changed since it was last drawn (to poke), and when the
-        next one changes. A source's own write pokes what it changed; this covers the scroll
-        and the progress line, which move with the time alone."""
+        """The capsules (and output segments) whose frame changed since it was last drawn (to
+        poke), and when the next one changes. A source's own write pokes what it changed; this
+        covers the scroll, the progress line and the end of an output notice, which move with
+        the time alone."""
         changed: list[str] = []
         soonest: float | None = None
         with self.lock:
-            capsules = [m for m in self.modules.values() if m.display == "capsule"]
+            capsules = [m for m in self.modules.values() if m.display in TIMED]
         off = st.disabled() if capsules else set()
         for module in capsules:
             if module.name in off:
                 self.frames.pop(module.name, None)
                 continue
             data = st.read(module.name)
-            frame = render.capsule_frame(module, data, now)
-            if self.frames.get(module.name, frame) != frame:
-                changed.append(module.name)
-            self.frames[module.name] = frame
-            wake = render.next_change(module, data, now)
+            if module.display == "output":
+                # The output segment's notice (record 0003 §10) ends with the time alone: one
+                # poke when it does. Its start was the source's write, which poked already.
+                notice = st.notice_on(data, now)
+                before = self.frames.get(module.name, ("", 0))[0]
+                if before and not notice and (data or {}).get("notice") == before:
+                    changed.append(module.name)
+                self.frames[module.name] = (notice or "", 0)
+                wake = float((data or {})["notice_until"]) if notice else None
+            else:
+                frame = render.capsule_frame(module, data, now)
+                wake = render.next_change(module, data, now)
+                if self.frames.get(module.name, frame) != frame:
+                    changed.append(module.name)
+                self.frames[module.name] = frame
             if wake is not None:
                 soonest = wake if soonest is None else min(soonest, wake)
         return soonest, changed

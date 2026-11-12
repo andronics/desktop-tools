@@ -228,6 +228,20 @@ def checks(now: float | None = None) -> list[Check]:
             )
         )
 
+    output = sorted(m.name for m in modules.values() if m.display == "output")
+    if output:
+        missing = [c for c in ("busctl", "bluetoothctl") if shutil.which(c) is None]
+        out.append(
+            _check(
+                "output segment",
+                not missing,
+                f"{', '.join(output)} shows a Bluetooth battery (busctl) and `barmenu outputs`"
+                " connects devices (bluetoothctl)",
+                "install " + ", ".join(missing) + " (systemd, bluez-utils)",
+                warn=True,
+            )
+        )
+
     found = theme.roles(st.ROLES)
     out.append(
         _check(

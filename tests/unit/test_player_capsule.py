@@ -742,6 +742,7 @@ P = ["playerctl", "-p", "spotify"]
 NEXT = ("\U000f04ad", "Next", [*P, "next"], False)
 PREVIOUS = ("\U000f04ae", "Previous", [*P, "previous"], False)
 PLAYER = ("\U000f0411", "Player: spotify \u203a", ["barmenu", "players"], False)
+OUTPUT = ("\U000f04c3", "Output… \u203a", ["barmenu", "outputs"], False)
 SEEK = [
     ("\U000f0d2a", "Back 10 s", [*P, "position", "10-"], False),
     ("\U000f0d71", "Forward 10 s", [*P, "position", "10+"], False),
@@ -773,7 +774,7 @@ def test_player_rows(
 ) -> None:
     capsule_state()
     log = playerctl(metadata={"spotify": f"Playing|{loop}|{shuffle}"})
-    assert table(player_menu.rows()) == [NEXT, PREVIOUS, row, srow, PLAYER, *SEEK]
+    assert table(player_menu.rows()) == [NEXT, PREVIOUS, row, srow, PLAYER, *SEEK, OUTPUT]
     query = ["playerctl", "-p", "spotify", "metadata", "--format", player_menu.FORMAT]
     assert calls(log) == [query]
 
@@ -783,12 +784,13 @@ def test_player_rows_hide_what_the_player_doesnt_give(
 ) -> None:
     capsule_state(length=None)
     playerctl(metadata={"spotify": "Playing||"})
-    assert table(player_menu.rows()) == [NEXT, PREVIOUS, PLAYER]
+    assert table(player_menu.rows()) == [NEXT, PREVIOUS, PLAYER, OUTPUT]
 
 
 NO_PLAYER = [
     ("\U000f038a", "No player", [], False),
     ("\U000f0411", "Player… \u203a", ["barmenu", "players"], False),
+    OUTPUT,
 ]
 
 

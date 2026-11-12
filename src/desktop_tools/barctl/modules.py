@@ -4,7 +4,8 @@
     [modules.audio-level]
     source = "volume"            # one of barctl's own sources, or
     # pusher = "crew"            # the one outside program that may `barctl push` it
-    display = "both"             # icon (glyph, then count), text (label) or both
+    display = "both"             # icon (glyph, then count), text (label), both, or capsule and
+                                 # output (record 0003: the player capsule, the output segment)
     glyph = "\\U000F0581"         # shown before anything has written the module
     glyph_override = "\\U000F099D" # wins over the pushed glyph: a string (every tier) or a table
     # glyph_override = { idle = "\\U000F099D", alert = "\\U000F0ECC" }  # per tier; others unchanged
@@ -34,7 +35,7 @@ from desktop_tools.common import paths
 SOURCES = ("volume", "player", "printer", "scanner", "vpn", "bluetooth", "counter")
 BUILT = ("volume", "player")  # the others are reserved names: their sources come in later PRs
 BUTTONS = {"left": 1, "middle": 2, "right": 3, "scroll-up": 4, "scroll-down": 5}
-DISPLAYS = ("icon", "text", "both", "capsule")
+DISPLAYS = ("icon", "text", "both", "capsule", "output")
 ACCENTS = ("role", "art")
 # The capsule's keys (record 0003 §2): (default, lowest, highest); read only for `capsule`.
 CAPSULE_KEYS: dict[str, tuple[float, float, float]] = {

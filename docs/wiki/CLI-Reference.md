@@ -246,6 +246,10 @@ Every menu's name, one per line (for completion).
 
 Lock menu: rows from the lock provider
 
+### `desktop-tools barmenu outputs`
+
+Output menu: rows from the outputs provider
+
 ### `desktop-tools barmenu player`
 
 Player menu: rows from the player provider

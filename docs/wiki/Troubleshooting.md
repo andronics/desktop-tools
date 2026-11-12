@@ -43,10 +43,23 @@ The player gives no length (a stream, a radio station, some browsers), or its po
 measure, so no line. The line moves on by itself while playing and is re-read every 30 seconds, so a seek made in the
 player shows within 30 seconds.
 
+### The output segment shows no battery, or `barmenu outputs` has no connect rows
+
+The battery comes from BlueZ's `Battery1` on the sink's device: `busctl --system get-property org.bluez <path>
+org.bluez.Battery1 Percentage` says whether the headphones give one (many give none, or only with BlueZ's experimental
+features on). It is read when the sink becomes the default and every 5 minutes, so a change shows within 5 minutes.
+The connect and disconnect rows need `busctl` and BlueZ: `barctl doctor`'s `output segment` line names what is
+missing. A device shows only when it is paired and its `Icon` starts with `audio-`.
+
+### Headphones connected but the sound stays on the speakers
+
+barctl never switches the default sink (design record 0003, open question 12): WirePlumber decides, and the segment
+shows the 5-second `connected` notice and then the default it chose. Pick the headphones in `barmenu outputs`.
+
 ### `modules.toml` fails, and every barctl module is blank, after a downgrade
 
-An older barctl rejects `display = "capsule"` as an unknown display, which fails the whole file. Take
-`[modules.player-capsule]` out of the dotfiles' `modules.toml` (or revert the dotfiles change that added it) before
+An older barctl rejects `display = "capsule"` or `"output"` as an unknown display, which fails the whole file. Take
+`[modules.player-capsule]` and `[modules.output-capsule]` out of the dotfiles' `modules.toml` (or revert the dotfiles change that added it) before
 downgrading desktop-tools; `barctl doctor` names the key it can't read.
 
 ### `barctl doctor` says "the bar runs in an agent's environment"

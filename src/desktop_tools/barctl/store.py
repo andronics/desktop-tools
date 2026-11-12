@@ -39,6 +39,17 @@ def shown(module: Module, state: st.State | None, now: float | None = None) -> t
             bool(progress.get("playing")),
             state.get("accent"),
         )
+    elif module.display == "output":
+        # The kind glyph, the name, the volume and battery, and the notice while it shows; the
+        # controller's tick pokes when a notice ends (no write marks it).
+        out = state.get("output") or {}
+        parts = (
+            glyph,
+            state.get("label"),
+            out.get("volume"),
+            out.get("battery"),
+            st.notice_on(state, now),
+        )
     else:
         parts = (glyph, state.get("count"), label)
     segments = tuple(
@@ -75,9 +86,10 @@ def store(
 
 
 class Writer:
-    """How a source sets its modules: tier, glyph, label, target, and the player's progress and
-    accent, nothing else. An alert someone set on the module is kept, and so is when the label
-    last changed (`label_since`, the capsule's scroll clock) while the label is the same."""
+    """How a source sets its modules: tier, glyph, label, target, the player's progress and
+    accent, and the output segment's numbers and notice, nothing else. An alert someone set on
+    the module is kept, and so is when the label last changed (`label_since`, the capsule's
+    scroll clock) while the label is the same."""
 
     def __init__(self, modules: dict[str, Module], poke: Callable[[str], object]) -> None:
         self.modules, self.poke = modules, poke
@@ -94,6 +106,9 @@ class Writer:
         detail: str | None = None,
         progress: st.State | None = None,
         accent: str | None = None,
+        output: st.State | None = None,
+        notice: str | None = None,
+        notice_until: float | None = None,
         now: float | None = None,
     ) -> bool:
         module = self.modules.get(name)
@@ -113,6 +128,10 @@ class Writer:
             new["progress"] = progress
         if accent:
             new["accent"] = accent
+        if output is not None:
+            new["output"] = output
+        if notice and notice_until is not None:
+            new["notice"], new["notice_until"] = notice, notice_until
         old = st.read(name)
         if old and old.get("alert_until"):
             new["alert_until"] = old["alert_until"]

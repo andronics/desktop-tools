@@ -10,6 +10,11 @@ icon, then the label in a fixed width, scrolling while it plays when it is longe
 track's progress as an underline under the first cells. Both are worked out here from the state
 and the time, as the blink is, so the source writes once per real change; the controller's tick
 pokes the capsule when its frame changes (`next_change`).
+
+`display = "output"` (record 0003 §10) is the output segment beside it: the default sink's kind
+glyph, its short name (or, for 5 seconds, a notice such as `<name> connected` in the active
+accent), a Bluetooth sink's battery, then the volume glyph by level and the percentage; muted,
+md-volume_off and the idle tier's colour. The controller's tick pokes it when a notice ends.
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ from __future__ import annotations
 import contextlib
 import time
 
+from desktop_tools.barctl import outputs
 from desktop_tools.barctl import state as st
 from desktop_tools.barctl.modules import BUTTONS, Module, shown_tier
 from desktop_tools.common import theme
@@ -94,6 +100,8 @@ def text_of(module: Module, state: st.State | None, now: float) -> tuple[str, st
     if module.display == "capsule":
         frame, _ = capsule_frame(module, state, now)
         return tier, " ".join(p for p in (glyph, frame) if p)
+    if module.display == "output":
+        return tier, " ".join(p for p in output_parts(module, state, now) if p)
     count = state.get("count") or 0
     # The player's label is whole (the capsule scrolls it); text and both show 40 of it.
     return tier, compose(module.display, glyph, cut(label, METADATA_MAX), int(count))
@@ -232,6 +240,52 @@ def capsule(
     return _actions(module, f"{icon} {painted}" if icon else painted)
 
 
+# ---------------------------------------------------------------- the output segment
+
+
+def output_parts(module: Module, state: st.State | None, now: float) -> tuple[str, str, str]:
+    """(kind glyph, the name or the notice, the battery and volume): the output segment's plain
+    text in its three parts. Only the glyph when unavailable (no pulse server)."""
+    tier = shown_tier(state, now)
+    glyph, _ = module.glyph_for(tier, state)
+    if state is None or tier == "unavailable":
+        return glyph, "", ""
+    found = state.get("output")
+    numbers: st.State = found if isinstance(found, dict) else {}
+    name = st.notice_on(state, now) or str(state.get("label") or "")
+    try:
+        volume = int(numbers.get("volume") or 0)
+        battery = numbers.get("battery")
+        level = None if battery is None else int(battery)
+    except (TypeError, ValueError):  # a hand-written state file's bad number: shown as none
+        volume, level = 0, None
+    vol = f"{outputs.volume_glyph(volume, tier == 'idle')} {volume}%".ljust(6)
+    rest = " ".join(p for p in (outputs.battery_glyph(level), vol) if p)
+    return glyph, name, rest
+
+
+def output(
+    module: Module, state: st.State | None, now: float, colours: dict[str, str], controller: bool
+) -> str:
+    """The output segment's line: the tier's role colour, the notice in the active accent."""
+    tier = shown_tier(state, now)
+    until = (state or {}).get("alert_until")
+    shown = colour(tier, until, now, controller)
+    glyph, name, rest = output_parts(module, state, now)
+    notice = st.notice_on(state, now) if tier != "unavailable" else None
+    if notice and shown != "alert":
+        pieces = [
+            _paint(_safe(glyph), shown, colours) if glyph else "",
+            _paint(_safe(notice), "active", colours),
+            _paint(_safe(rest), shown, colours) if rest else "",
+        ]
+        line = " ".join(p for p in pieces if p)
+    else:
+        text = " ".join(p for p in (glyph, name, rest) if p)
+        line = _paint(_safe(text), shown, colours) if text else ""
+    return _actions(module, line) if line else ""
+
+
 def render(
     module: Module,
     state: st.State | None,
@@ -268,6 +322,8 @@ def render(
         return module.separator.join(cells)
     if module.display == "capsule":
         return capsule(module, state, now, colours, controller)
+    if module.display == "output":
+        return output(module, state, now, colours, controller)
     tier, text = text_of(module, state, now)
     if not text:
         return ""

@@ -109,3 +109,12 @@ glyph = "\U000F0387" # md-music_note
 title = "Players"
 side = "right"
 provider = "players"
+
+# Record 0003 §10: rows from barmenu/providers/outputs.py (every sink, the default marked; connect
+# or disconnect each paired Bluetooth audio device; the mixer). Opened by the output segment's
+# right-click and the player menu's `Output ›` row.
+[menus.outputs]
+glyph = "\U000F04C3" # md-speaker
+title = "Output"
+side = "right"
+provider = "outputs"

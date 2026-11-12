@@ -59,6 +59,13 @@ the run store, `/proc` as barctl reads it and polybar's socket folder into `tmp_
   it was reached, so no source or provider code can control a player. Scroll and progress are pure functions of the
   state and a time the test passes (`now=`); the source's clock is `source.clock`, so the 30-second position re-read
   runs on a fake clock. The art accent runs on fake `curl` and `magick`.
+- **The output segment** (`tests/unit/test_output_capsule.py`, design record 0003 §8 and §10): fake `pactl` (a wired,
+  an HDMI and a Bluetooth headset sink in `-f json list sinks`, the default, volume and mute in files the test
+  changes), `busctl` (the battery and BlueZ's managed objects) and `bluetoothctl`. Each starts with a guard that logs
+  and fails any call that would change something (`set-default-sink`, `set-sink-volume`, `set-sink-mute`, a BlueZ
+  method other than `GetManagedObjects`, any `bluetoothctl` call), and the `config` fixture fails the test if one was
+  reached; a picked menu row's argv is recorded by `launched`, never run. The source's clock is `source.clock`, so the
+  5-minute battery read and the 5-second notice run on a fake clock.
 - **crew's menus** (`tests/unit/test_crew_menu.py`): the quick menu runs on meta's real JSON
   (`tests/fixtures/meta-menu-*.json`, from the live `meta <name> menu --json` with its paths made generic). The fake
   rofi answers from `rofi-answers`, one line per call ("" is Escape), and keeps each call's rows. `rofi-race`

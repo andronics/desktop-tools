@@ -18,6 +18,10 @@ wrote it:
     accent       `#rrggbb`: the art's colour for the capsule's line and icon (accent = "art")
     label_since  epoch seconds: when the label last changed, for the capsule's scroll (a source
                  keeps it; a pusher's capsule scrolls from `updated`)
+    output       the output segment's numbers (record 0003 §10): {volume, battery}, the default
+                 sink's volume in percent and its Bluetooth battery (null when BlueZ gives none)
+    notice       a short line the output segment shows in place of its name (`<name>
+                 connected`), until `notice_until` (epoch seconds)
     source       who wrote it
     updated      epoch seconds
 
@@ -51,8 +55,12 @@ FIELDS = (
     "alert_until",
     "progress",
     "accent",
+    "output",
+    "notice",
+    "notice_until",
 )
 PROGRESS_FIELDS = ("position", "length", "rate", "at", "playing")
+VOLUME_MAX = 1000  # percent: pulse allows past 100 (153 is the usual top); past this, a mistake
 RATE_MAX = 16.0  # MPRIS lets a player say any rate; past this it is a mistake, not a speed
 SEGMENT_FIELDS = ("id", "tier", "glyph", "label", "alert_until", "underline")
 BLINK = 0.5  # seconds per half of a blink
@@ -168,6 +176,34 @@ def progress(value: object) -> State:
     return out
 
 
+def _whole(value: object, where: str, high: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= high:
+        raise StateError(f"{where} must be a whole number, 0 to {high}")
+    return value
+
+
+def output(value: object) -> State:
+    """An `output` field, checked (record 0003 §10): any other shape is a StateError."""
+    if not isinstance(value, dict):
+        raise StateError("output must be an object")
+    battery = value.get("battery")
+    return {
+        "volume": _whole(value.get("volume"), "output.volume", VOLUME_MAX),
+        "battery": None if battery is None else _whole(battery, "output.battery", 100),
+    }
+
+
+def notice_on(state: State | None, now: float) -> str | None:
+    """The notice the output segment shows now, or None when there is none or it ended."""
+    data = state or {}
+    text, until = data.get("notice"), data.get("notice_until")
+    if not isinstance(text, str) or not text:
+        return None
+    if isinstance(until, bool) or not isinstance(until, (int, float)) or until <= now:
+        return None
+    return text
+
+
 def accent(value: object) -> str:
     """`#` and six hex digits, so no colour can carry a polybar tag."""
     hexdigits = "0123456789abcdefABCDEF"
@@ -190,7 +226,7 @@ def validate(data: object) -> State:
     out: State = {}
     if "tier" in data:
         out["tier"] = _tier(data["tier"])
-    for key in ("glyph", "label", "detail", "target", "source"):
+    for key in ("glyph", "label", "detail", "target", "source", "notice"):
         value = _str(data, key)
         if value is not None:
             out[key] = value
@@ -205,6 +241,10 @@ def validate(data: object) -> State:
         out["progress"] = progress(data["progress"])
     if data.get("accent") is not None:
         out["accent"] = accent(data["accent"])
+    if data.get("output") is not None:
+        out["output"] = output(data["output"])
+    if data.get("notice_until") is not None:
+        out["notice_until"] = _time(data["notice_until"], "notice_until")
     if "segments" in data and data["segments"] is not None:
         segs = data["segments"]
         if not isinstance(segs, list):
