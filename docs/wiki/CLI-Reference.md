@@ -254,6 +254,24 @@ stays open another `expand_for` seconds. With no player shown it runs nothing.
 
 Show the bars again (bsp-unhide calls it).
 
+### `desktop-tools barctl visualiser`
+
+Turn the capsule's visualiser strip off or on, or say whether it shows.
+
+The strip (design record 0005 phase D) draws a cava spectrum in the capsule's cells while
+its player plays, for a capsule with `visualiser = true`. `off` stops cava and draws the
+capsule at once, and stays off across restarts, whatever modules.toml says; `on` lifts it
+(the capsule's key still decides). The strip turns itself off when it goes over its CPU
+budget or cava keeps failing; `status` and `barctl doctor` say why.
+
+| Argument | Description |
+|---|---|
+| `ACTION` | on, off or status. |
+
+| Option | Environment variable | Description |
+|---|---|---|
+| `--json` |  | JSON instead of text. |
+
 ### `desktop-tools barctl watch`
 
 Follow state changes as they happen, until interrupted.

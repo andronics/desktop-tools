@@ -2,7 +2,7 @@
 
 <!-- Add a line for this record to the index in docs/design/README.md (CI checks). -->
 
-Status: Proposed (phases A-C: Approved and built; phase D: Proposed)
+Status: Approved (phases A-D: Approved and built)
 Date: 2026-11-12
 Authors: Stephen Cox (direction, 2026-11-12: ideas 2-5 of record 0003 approved, all four; the old
 `audio-spectrum` module dropped; the old player buttons already retired on his bar); written up by the
@@ -324,6 +324,13 @@ If 10 frames a second does not meet G1-G7, phase D stops there: this record's ch
 the numbers, and the strip is not built. If they are met, the build adds the strip, and Stephen's own
 check (5 minutes of `top` on his bar while music plays) confirms them on real hardware.
 
+**D1's result (2026-11-12): GO at 15 frames a second**, 32 bars in the capsule's 32 cells. At 15: cava
+0.33%, the sender 0.28%, polybar 0.53%, 1.15% of one core in all; frames 14.95 a second, the 95th
+percentile interval 67 ms (limit 133), the longest gap 69 ms; 0 CPU and no cava while paused; 5 of 5
+left-clicks ran during the strip. G1-G7 held at 10, 15, 20 and 30 (30: 2.15% in all). One `barctl render`
+measured 40.6 ms of CPU, not 30. The numbers and how they were taken are in the build's task folder, not
+in this repository.
+
 **Off by default, and a kill switch.**
 
 - `visualiser = false` (the packaged and default value) on the capsule; nothing starts unless it is
@@ -507,3 +514,4 @@ from his bar or a live player. Then the trial on his bar, turned on by the dotfi
 | 2026-11-12 | Phase A (player chips) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (11 two or more players, 12 a second click unpins, 13 four then `+N`, and 6 and 19 for the chips) answered as recommended. Phases B-D stay Proposed |
 | 2026-11-12 | Phase B (quiet when idle, spoken-word controls) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (14 shrink to the icon, 15 ten minutes, 16 hidden with `unavailable = ""`, 17 rules 1-4, 18 the speed row in shuffle's place, and 19 for phase B) answered as recommended. Spoken word gets its own switch, `spoken` (default false), so every phase B behaviour is off until a setting turns it on. Phases C-D stay Proposed |
 | 2026-11-12 | Phase C (the transport row) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule (❓ 2026-11-12 Desktop Tools Design Records Are Approved Until Notified); its open questions (2 a left-click on the icon, 3 in place, 4 instant now and a wipe after phase D, 5 five seconds, 6 tables and `barctl transport`, and 19 for phase C) answered as recommended. `expand_for` defaults to 0, so the row is off until a setting turns it on. Phase D stays Proposed |
+| 2026-11-12 | Phase D (the visualiser strip) Approved and built in desktop-tools: Stephen 2026-11-12, arbiter standing rule; gate passed, see work report (D1 GO at 15 frames a second: 1.15% of one core in all against the 6% budget, G1-G7 met at 10-30). Its open questions (7 the block strip with the title over it in time, 8 G1-G7 as written, 9 cava from PipeWire, 19 for phase D) answered as recommended; the overline alternative is not built. `visualiser = false` by default and only a commented example in the packaged file. Built as written, with: one strip at a time (the first capsule by name with the key); `barctl visualiser on` lifts an off but never starts a capsule without `visualiser = true`; a frame the same as the last sent is not sent again (cava repeats frames), except to a bar that just started; the budget guard is the 10-second, three-sample check of "Off by default" (Stephen's 5-minute `top` check stays his, on his bar). Record now Approved, all four phases built |

@@ -345,6 +345,45 @@ def transport(
         typer.echo("nothing to act on")
 
 
+class Switch(StrEnum):
+    on = "on"
+    off = "off"
+    status = "status"
+
+
+@app.command()
+def visualiser(
+    action: Annotated[Switch, typer.Argument(help="on, off or status.")] = Switch.status,
+    as_json: Json = False,
+) -> None:
+    """Turn the capsule's visualiser strip off or on, or say whether it shows.
+
+    The strip (design record 0005 phase D) draws a cava spectrum in the capsule's cells while
+    its player plays, for a capsule with `visualiser = true`. `off` stops cava and draws the
+    capsule at once, and stays off across restarts, whatever modules.toml says; `on` lifts it
+    (the capsule's key still decides). The strip turns itself off when it goes over its CPU
+    budget or cava keeps failing; `status` and `barctl doctor` say why.
+    """
+    try:
+        data = ops.visualiser(action.value)
+    except ops.Failure as e:
+        raise _fail(e) from None
+    if as_json:
+        _dump(data)
+        return
+    if data["state"] == "on":
+        drawing = data["drawing"]
+        now = f"drawing {drawing}" if drawing else "waiting for its player to play"
+        if not data["controller"]:
+            now = "the controller is not running"
+        typer.echo(f"visualiser: on for {', '.join(data['modules'])} ({now})")
+        if not data["cava"]:
+            typer.echo("barctl: cava is not installed: the strip can't start", err=True)
+    else:
+        since = f" since {data['since']}" if data["since"] else ""
+        typer.echo(f"visualiser: off ({data['why']}{since})")
+
+
 @app.command()
 def reload(module: Annotated[str | None, typer.Argument(help="One module.")] = None) -> None:
     """Redraw every module, or one, without restarting polybar.

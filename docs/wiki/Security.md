@@ -54,6 +54,13 @@ only `kind` is kept. Its only `busctl` call in the source is a read (`get-proper
 player` runs `busctl --user set-property … Rate d <value>` only when picked, as an argument list, the bus name built
 from the instance in barctl's state.
 
+The visualiser strip (design record 0005 phase D, `visualiser = true`, off by default) runs `cava` on the default
+sink's monitor, which is everything that plays, calls included, while the shown player plays. cava turns it into one
+level per cell in memory; barctl reads the levels from cava's pipe and sends them to the bars as block glyphs, and
+nothing records, stores or logs audio or levels: the only file is cava's config in the runtime folder. Its journal
+lines name only why it turned off. cava is started as an argument list with barctl's own config, never a shell string,
+and stopped by its PID.
+
 - **The art fetch** (`accent = "art"`, off by default) goes only to the cover URL the player itself gives, once per
   new URL: `curl -q` (no `.curlrc`, so no cookie jar), HTTPS only (redirects too), 2 seconds, 1 MiB at most, into a
   20-file cache in the runtime folder; `file://` covers are read where they are. The colour it gives is checked to

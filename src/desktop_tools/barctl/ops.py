@@ -322,6 +322,55 @@ def transport_press(name: str, cell: str, now: float | None = None) -> list[str]
     return argv
 
 
+# ---------------------------------------------------------------- the visualiser strip
+
+
+def visualiser_status(modules: dict[str, mods.Module] | None = None) -> dict[str, Any]:
+    """The visualiser strip (record 0005 phase D): its switch, the capsules that ask for it,
+    whether cava is installed, and what the controller draws now."""
+    import shutil
+
+    modules = load() if modules is None else modules
+    switch = st.visualiser_switch()
+    asking = sorted(m.name for m in modules.values() if m.display == "capsule" and m.visualiser)
+    answer = control.request("ping")
+    live = (answer or {}).get("visualiser")
+    live = live if isinstance(live, dict) else {}
+    if switch.get("on") is False:
+        reason = str(switch.get("reason") or "switch")
+        state, why = "off", st.VISUALISER_REASONS.get(reason, reason)
+    elif not asking:
+        state, why, reason = "off", "no capsule has visualiser = true", "key"
+    else:
+        state, why, reason = "on", "", ""
+    at = switch.get("at")
+    return {
+        "state": state,
+        "reason": reason,
+        "why": why,
+        "since": iso(at) if isinstance(at, float) and state == "off" and reason != "key" else None,
+        "switch": None if not switch else ("on" if switch["on"] else "off"),
+        "modules": asking,
+        "cava": shutil.which("cava") is not None,
+        "controller": answer is not None,
+        "drawing": live.get("drawing"),
+        "cava_pid": live.get("cava_pid"),
+    }
+
+
+def visualiser(action: str) -> dict[str, Any]:
+    """`barctl visualiser on|off|status`: the strip's runtime switch, kept in barctl's settings
+    (it survives restarts) and winning over the capsule's key when off. `off` stops cava and
+    draws the capsule at once; `on` lifts an off, and the capsule's `visualiser` key decides."""
+    if action not in ("on", "off", "status"):
+        raise Failure(f"not on, off or status: {action!r}", USAGE)
+    modules = load()
+    if action != "status":
+        st.set_visualiser(action == "on")
+        control.request("visualiser")
+    return visualiser_status(modules)
+
+
 # ---------------------------------------------------------------- the player's pin
 
 
