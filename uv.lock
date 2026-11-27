@@ -205,7 +205,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "interpose", git = "https://github.com/metalayerlab/interpose?rev=v0.2.0" },
+    { name = "interpose", git = "https://github.com/metalayerlab/interpose?rev=v0.5.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "typer", specifier = ">=0.15" },
 ]
@@ -230,8 +230,8 @@ wheels = [
 
 [[package]]
 name = "interpose"
-version = "0.2.0"
-source = { git = "https://github.com/metalayerlab/interpose?rev=v0.2.0#0ff135e71e9821ad2fbbc960c6cafcbe44111f26" }
+version = "0.5.0"
+source = { git = "https://github.com/metalayerlab/interpose?rev=v0.5.0#d9c40a7a7a994f70e1095e5d49b1cb969c876629" }
 dependencies = [
     { name = "pyyaml" },
 ]
